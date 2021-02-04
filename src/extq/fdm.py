@@ -172,3 +172,64 @@ def _transition_matrix_reversible_helper(transitions, u, ind, shape):
     return sparse.csr_matrix(
         (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
     )
+
+
+def forward_committor(generator, weights, in_domain, guess):
+    """Compute the forward committor.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    weights : (M,) ndarray of float
+        Reweighting factor to the invariant distribution for each point.
+    in_domain : (M,) ndarray of bool
+        Whether each point is in the domain.
+    guess : (M,) ndarray of float
+        Guess for the committor. Must obey boundary conditions.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Forward committor at each point.
+
+    """
+    a = generator[in_domain, :][:, in_domain]
+    b = -generator[in_domain, :] @ guess
+    coeffs = sparse.linalg.spsolve(a, b)
+    return (
+        guess
+        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+    )
+
+
+def backward_committor(generator, weights, in_domain, guess):
+    """Compute the backward committor.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    weights : (M,) ndarray of float
+        Reweighting factor to the invariant distribution for each point.
+    in_domain : (M,) ndarray of bool
+        Whether each point is in the domain.
+    guess : (M,) ndarray of float
+        Guess for the committor. Must obey boundary conditions.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Backward committor at each point.
+
+    """
+    adjoint_generator = (
+        sparse.diags(1.0 / weights) @ generator.T @ sparse.diags(weights)
+    )
+    a = adjoint_generator[in_domain, :][:, in_domain]
+    b = -adjoint_generator[in_domain, :] @ guess
+    coeffs = sparse.linalg.spsolve(a, b)
+    return (
+        guess
+        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+    )
