@@ -233,3 +233,34 @@ def backward_committor(generator, weights, in_domain, guess):
         guess
         + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
     )
+
+
+def reweight(tmat):
+    """Compute the reweighting factors to the invariant distribution.
+
+    Parameters
+    ----------
+    tmat : (M, M) sparse matrix
+        Transition matrix.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Reweighting factor at each point.
+
+    """
+    w, v = sparse.linalg.eigs(tmat.T, k=1, which="LR")
+    fixed_index = np.argmax(np.abs(v[:, 0]))
+    mask = np.full(tmat.shape[0], True)
+    mask[fixed_index] = False
+
+    gen = tmat - sparse.identity(tmat.shape[0])
+    a = gen.T[mask, :][:, mask]
+    b = -gen.T[mask, fixed_index]
+    coeffs = sparse.linalg.spsolve(a, b)
+
+    weights = np.empty(tmat.shape[0])
+    weights[fixed_index] = 1.0
+    weights[mask] = coeffs
+    weights /= np.sum(weights)
+    return weights
