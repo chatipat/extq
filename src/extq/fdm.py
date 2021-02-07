@@ -77,7 +77,7 @@ def transition_matrix_reversible_2d(
     )
 
     # time step of transition matrix
-    dt = 8.0 * kT / sep ** 2
+    dt = sep ** 2 / (8.0 * kT)
 
     return tmat, dt
 
@@ -141,7 +141,7 @@ def transition_matrix_reversible_3d(
     )
 
     # time step of transition matrix
-    dt = 12.0 * kT / sep ** 2
+    dt = sep ** 2 / (12.0 * kT)
 
     return tmat, dt
 
