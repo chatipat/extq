@@ -174,6 +174,204 @@ def _transition_matrix_reversible_helper(transitions, u, ind, shape):
     )
 
 
+def generator_matrix_irreversible_2d(
+    drift,
+    diffusion,
+    xlo,
+    xhi,
+    xnum,
+    ylo,
+    yhi,
+    ynum,
+):
+    """Compute the transition matrix for an irreversible 2D potential.
+
+    Parameters
+    ----------
+    drift, diffusion : callable
+        Drift and diffusion functions for a 2D system. These functions
+        are called as drift(x, y) and diffusion(x, y), and must
+        be vectorized.
+    xlo, ylo : float
+        Minimum x/y values.
+    xhi, yhi : float
+        Maximum x/y values.
+    xnum, ynum : int
+        Number of x/y values to evaluate.
+
+    Returns
+    -------
+    sparse matrix
+        Generator matrix.
+
+    """
+
+    # precompute indices and drift/diffusion terms
+    xind, yind = np.ogrid[:xnum, :ynum]
+    ind = np.ravel_multi_index((xind, yind), (xnum, ynum))
+    xsep = (xhi - xlo) / (xnum - 1.0)
+    ysep = (yhi - ylo) / (ynum - 1.0)
+    xv, yv = xlo + xsep * xind, ylo + ysep * yind
+    mu_x, mu_y = drift(xv, yv)
+    sigma_x, sigma_y = diffusion(xv, yv)
+
+    data = []
+    row_ind = []
+    col_ind = []
+    p0 = np.zeros((xnum, ynum))
+
+    # probability of transitioning to adjacent cell
+
+    row, col = np.s_[:-1, :], np.s_[1:, :]
+    p = 0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[1:, :], np.s_[:-1, :]
+    p = -0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[:, :-1], np.s_[:, 1:]
+    p = 0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[:, 1:], np.s_[:, :-1]
+    p = -0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    # probability of not transitioning
+    data.append(p0.ravel())
+    row_ind.append(ind.ravel())
+    col_ind.append(ind.ravel())
+
+    # assemble sparse transition matrix
+    data = np.concatenate(data)
+    row_ind = np.concatenate(row_ind)
+    col_ind = np.concatenate(col_ind)
+    return sparse.csr_matrix(
+        (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
+    )
+
+
+def generator_matrix_irreversible_3d(
+    drift,
+    diffusion,
+    xlo,
+    xhi,
+    xnum,
+    ylo,
+    yhi,
+    ynum,
+    zlo,
+    zhi,
+    znum,
+):
+    """Compute the transition matrix for an irreversible 3D potential.
+
+    Parameters
+    ----------
+    drift, diffusion : callable
+        Drift and diffusion functions for a 3D system. These functions
+        are called as drift(x, y, z) and diffusion(x, y, z), and must
+        be vectorized.
+    xlo, ylo, zlo : float
+        Minimum x/y/z values.
+    xhi, yhi, zhi : float
+        Maximum x/y/z values.
+    xnum, ynum, znum : int
+        Number of x/y/z values to evaluate.
+
+    Returns
+    -------
+    sparse matrix
+        Generator matrix.
+
+    """
+
+    # precompute indices and drift/diffusion terms
+    xind, yind, zind = np.ogrid[:xnum, :ynum, :znum]
+    ind = np.ravel_multi_index((xind, yind, zind), (xnum, ynum, znum))
+    xsep = (xhi - xlo) / (xnum - 1.0)
+    ysep = (yhi - ylo) / (ynum - 1.0)
+    zsep = (zhi - zlo) / (znum - 1.0)
+    xv, yv, zv = xlo + xsep * xind, ylo + ysep * yind, zlo + zsep * zind
+    mu_x, mu_y, mu_z = drift(xv, yv, zv)
+    sigma_x, sigma_y, sigma_z = diffusion(xv, yv, zv)
+
+    data = []
+    row_ind = []
+    col_ind = []
+    p0 = np.zeros((xnum, ynum, znum))
+
+    # probability of transitioning to adjacent cell
+
+    row, col = np.s_[:-1, :, :], np.s_[1:, :, :]
+    p = 0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[1:, :, :], np.s_[:-1, :, :]
+    p = -0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[:, :-1, :], np.s_[:, 1:, :]
+    p = 0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[:, 1:, :], np.s_[:, :-1, :]
+    p = -0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[:, :, :-1], np.s_[:, :, 1:]
+    p = 0.5 * mu_z[row] / zsep + sigma_z[row] / zsep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    row, col = np.s_[:, :, 1:], np.s_[:, :, :-1]
+    p = -0.5 * mu_z[row] / zsep + sigma_z[row] / zsep ** 2
+    p0[row] -= p
+    data.append(p.ravel())
+    row_ind.append(ind[row].ravel())
+    col_ind.append(ind[col].ravel())
+
+    # probability of not transitioning
+    data.append(p0.ravel())
+    row_ind.append(ind.ravel())
+    col_ind.append(ind.ravel())
+
+    # assemble sparse transition matrix
+    data = np.concatenate(data)
+    row_ind = np.concatenate(row_ind)
+    col_ind = np.concatenate(col_ind)
+    return sparse.csr_matrix(
+        (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
+    )
+
+
 def forward_committor(generator, weights, in_domain, guess):
     """Compute the forward committor.
 
