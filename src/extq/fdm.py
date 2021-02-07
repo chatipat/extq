@@ -264,3 +264,71 @@ def reweight(tmat):
     weights[mask] = coeffs
     weights /= np.sum(weights)
     return weights
+
+
+def rate(generator, forward_q, backward_q, weights, rxn_coords):
+    """Compute the TPT rate.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    forward_q : (M,) ndarray of float
+        Forward committor at each point.
+    backward_q : (M,) ndarray of float
+        Backward committor at each point.
+    weights : (M,) ndarray of float.
+        Reweighting factor at each point.
+    rxn_coords : (M,) ndarray of float
+        Reaction coordinate at each point. This must be zero in the
+        reactant state and one in the product state.
+
+    Returns
+    -------
+    float
+        TPT rate.
+
+    """
+    numer = np.sum(
+        (weights * backward_q)
+        * (
+            generator @ (forward_q * rxn_coords)
+            - rxn_coords * (generator @ forward_q)
+        )
+    )
+    denom = np.sum(weights)
+    return numer / denom
+
+
+def current(generator, forward_q, backward_q, weights, cv):
+    """Compute the reactive current at each point.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    forward_q : (M,) ndarray of float
+        Forward committor at each point.
+    backward_q : (M,) ndarray of float
+        Backward committor at each point.
+    weights : (M,) ndarray of float.
+        Reweighting factor at each point.
+    cv : (M,) ndarray of float
+        Collective variable at each point.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Reactive current at each point.
+
+    """
+    forward_flux = (weights * backward_q) * (
+        generator @ (forward_q * cv) - cv * (generator @ forward_q)
+    )
+    backward_flux = forward_q * (
+        generator.T @ ((weights * backward_q) * cv)
+        - cv * (generator.T @ (weights * backward_q))
+    )
+    numer = 0.5 * (forward_flux - backward_flux)
+    denom = np.sum(weights)
+    return numer / denom
