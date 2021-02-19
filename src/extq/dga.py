@@ -178,7 +178,7 @@ def backward_committor_sparse(
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
-def reweight(basis, lag, guess=None, test_basis=None):
+def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
     """Estimate the reweighting factors to the invariant distribution.
 
     Parameters
@@ -187,9 +187,13 @@ def reweight(basis, lag, guess=None, test_basis=None):
         Basis for estimating the reweighting factors.
     lag : int
         Lag time in unit of frames.
+    maxlag : int
+        Number of frames at the end of each trajectory that are required
+        to have zero weight. This is the maximum lag time the output
+        weights can be used with by other methods.
     guess : list of (n_frames[i],) ndarray of float, optional
-        Guess for the reweighting factors. The last lag frames of each
-        trajectory must be zero.
+        Guess for the reweighting factors. The last maxlag frames of
+        each trajectory must be zero.
         If None, use uniform weights (except for the last lag frames).
     test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
         Test basis against which to minimize the error. Must have the
@@ -205,25 +209,28 @@ def reweight(basis, lag, guess=None, test_basis=None):
         trajectory.
 
     """
+    if maxlag is None:
+        maxlag = lag
+    assert maxlag >= lag
     if test_basis is None:
         test_basis = basis
     if guess is None:
         guess = []
         for x in basis:
             w = np.ones(len(x))
-            w[-lag:] = 0.0
+            w[-maxlag:] = 0.0
             guess.append(w)
     a = 0.0
     b = 0.0
     for x, y, w in zip(test_basis, basis, guess):
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[-maxlag:] == 0.0)
         a += ((x[lag:] - x[:-lag]).T * w[:-lag]) @ y[:-lag]
         b -= (x[lag:] - x[:-lag]).T @ w[:-lag]
     coeffs = linalg.solve(a, b)
     return [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess)]
 
 
-def reweight_sparse(basis, lag, guess=None, test_basis=None):
+def reweight_sparse(basis, lag, maxlag=None, guess=None, test_basis=None):
     """Estimate the reweighting factors to the invariant distribution
     using sparse basis sets.
 
@@ -233,9 +240,13 @@ def reweight_sparse(basis, lag, guess=None, test_basis=None):
         Sparse basis for estimating the reweighting factors.
     lag : int
         Lag time in unit of frames.
+    maxlag : int
+        Number of frames at the end of each trajectory that are required
+        to have zero weight. This is the maximum lag time the output
+        weights can be used with by other methods.
     guess : list of (n_frames[i],) ndarray of float, optional
-        Guess for the reweighting factors. The last lag frames of each
-        trajectory must be zero.
+        Guess for the reweighting factors. The last maxlag frames of
+        each trajectory must be zero.
         If None, use uniform weights (except for the last lag frames).
     test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
         Sparse test basis against which to minimize the error. Must have
@@ -251,18 +262,21 @@ def reweight_sparse(basis, lag, guess=None, test_basis=None):
         trajectory.
 
     """
+    if maxlag is None:
+        maxlag = lag
+    assert maxlag >= lag
     if test_basis is None:
         test_basis = basis
     if guess is None:
         guess = []
         for x in basis:
             w = np.ones(x.shape[0])
-            w[-lag:] = 0.0
+            w[-maxlag:] = 0.0
             guess.append(w)
     a = 0.0
     b = 0.0
     for x, y, w in zip(test_basis, basis, guess):
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[-maxlag:] == 0.0)
         a += (x[lag:] - x[:-lag]).T @ sparse.diags(w[:-lag]) @ y[:-lag]
         b -= (x[lag:] - x[:-lag]).T @ w[:-lag]
     coeffs = sparse.linalg.spsolve(a, b)
