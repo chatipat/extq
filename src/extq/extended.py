@@ -18,6 +18,10 @@ def moving_matmul(a, k):
         Each point is the product of k sequential matrices.
 
     """
+    assert k >= 1
+    if k == 1:
+        return a
+
     in_len, dim, _ = a.shape
     out_len = in_len - k + 1
     n_slices = (out_len + k) // (k + 1)

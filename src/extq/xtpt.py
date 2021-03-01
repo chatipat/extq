@@ -109,7 +109,7 @@ def extended_current(forward_q, backward_q, weights, transitions, cv, lag):
         a = np.zeros((n_transitions + lag - 1, 2, n_indices, 2, n_indices))
         a[:-lag, 0, :, 0, :] = m[1:]
         a[lag:, 1, :, 1, :] = m[:-1]
-        a[lag - 1 : -(lag - 1), 0, :, 1, :] = np.einsum(
+        a[lag - 1 : n_transitions, 0, :, 1, :] = np.einsum(
             "n,ni,nj->nij", w[:-lag], qp[lag:], qm[:-lag]
         )
         a = a.reshape(n_transitions + lag - 1, 2 * n_indices, 2 * n_indices)
