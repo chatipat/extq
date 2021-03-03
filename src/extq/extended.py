@@ -62,12 +62,13 @@ def moving_matmul(a, k):
             out=forward_acc[:, i],
         )
 
+    # discard padding
+    backward_acc = backward_acc.reshape(n_slices * (k + 1), dim, dim)[:out_len]
+    forward_acc = forward_acc.reshape(n_slices * (k + 1), dim, dim)[:out_len]
+
     # combine the two accumulations to get
-    #   n-k:n, n-k+1:n+1, ..., n-1:n+k-1, n:n+k
-    # where n = m*(k+1) + k
-    # then discard padding
-    result = backward_acc @ forward_acc
-    result = result.reshape(n_slices * (k + 1), dim, dim)
-    result = result[:out_len]
+    #   0:k, 1:k+1, 2:k+2, ...
+    result = padded[:out_len]  # reuse array
+    np.matmul(backward_acc, forward_acc, out=result)
 
     return result
