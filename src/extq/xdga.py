@@ -73,7 +73,9 @@ def forward_extended_committor(
 
         n_indices = m.shape[1]
 
-        wm = w[:-lag, None, None] * moving_matmul(m, lag)
+        m = np.array(m, dtype=w.dtype, order="C")
+        wm = moving_matmul(np.copy(m, order="C"), lag)
+        wm *= w[:-lag, None, None]
         for i in range(1, n_indices - 1):
             for j in range(1, n_indices - 1):
                 mask = wm[:, i, j] != 0.0
@@ -173,7 +175,9 @@ def backward_extended_committor(
 
         n_indices = m.shape[1]
 
-        wm = w[:-lag, None, None] * moving_matmul(m, lag)
+        m = np.array(m, dtype=w.dtype, order="C")
+        wm = moving_matmul(m, lag)
+        wm *= w[:-lag, None, None]
         for i in range(1, n_indices - 1):
             for j in range(1, n_indices - 1):
                 mask = wm[:, j, i] != 0.0
