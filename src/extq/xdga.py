@@ -17,12 +17,12 @@ def forward_extended_committor(
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_indices, n_basis) ndarray of float
+    basis : list of (n_indices, n_frames[i], n_basis) ndarray of float
         Basis for estimating the extended committor. Must be zero
         outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_frames[i]-1, n_indices, n_indices) ndarray
+    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
         frames. Note that indices 0 and n_indices-1 are special. Index 0
         indicates the reactant, and must have no transitions to it from
@@ -30,11 +30,11 @@ def forward_extended_committor(
         must not have any transitions from it to any other index. Also,
         both indices 0 and n_indices-1 must have a single transition to
         itself.
-    guess : list of (n_frames[i], n_indices) ndarray of float
+    guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_indices, n_basis) ndarray of float, optional
+    test_basis : list of (n_indices, n_frames[i], n_basis) ndarray of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
@@ -45,7 +45,7 @@ def forward_extended_committor(
 
     Returns
     -------
-    list of (n_frames[i], n_indices) ndarray of float
+    list of (n_indices, n_frames[i]) ndarray of float
         Estimated forward extended committor at each frame.
 
     """
@@ -58,47 +58,50 @@ def forward_extended_committor(
 
         if check:
             # check that transitions are valid
-            assert np.all(m[:, 0, 0] == 1)
-            assert np.all(m[:, 1:, 0] == 0)
-            assert np.all(m[:, -1, -1] == 1)
-            assert np.all(m[:, -1, :-1] == 0)
+            assert np.all(m[0, 0] == 1)
+            assert np.all(m[1:, 0] == 0)
+            assert np.all(m[-1, -1] == 1)
+            assert np.all(m[-1, :-1] == 0)
 
             # check that the bases and guess obey boundary conditions
-            assert np.all(x[:, 0] == 0.0)
-            assert np.all(x[:, -1] == 0.0)
-            assert np.all(y[:, 0] == 0.0)
-            assert np.all(y[:, -1] == 0.0)
-            assert np.all(g[:, 0] == 0.0)
-            assert np.all(g[:, -1] == 1.0)
+            assert np.all(x[0] == 0.0)
+            assert np.all(x[-1] == 0.0)
+            assert np.all(y[0] == 0.0)
+            assert np.all(y[-1] == 0.0)
+            assert np.all(g[0] == 0.0)
+            assert np.all(g[-1] == 1.0)
 
-        n_indices = m.shape[1]
+        n_indices = m.shape[0]
 
+        m = np.moveaxis(m, -1, 0)
         m = np.array(m, dtype=w.dtype, order="C")
-        wm = moving_matmul(np.copy(m, order="C"), lag)
-        wm *= w[:-lag, None, None]
+        m = moving_matmul(m, lag)
+        m = np.moveaxis(m, 0, -1)
+
+        wm = w[:-lag] * m
         for i in range(1, n_indices - 1):
             for j in range(1, n_indices - 1):
-                mask = wm[:, i, j] != 0.0
+                mask = wm[i, j] != 0.0
                 if np.any(mask):
-                    wmij = wm[mask, i, j]
-                    xij = x[:-lag, i][mask]
-                    yij = y[lag:, j][mask]
-                    gij = g[lag:, j][mask]
+                    wmij = wm[i, j, mask]
+                    xij = x[i, :-lag][mask]
+                    yij = y[j, lag:][mask]
+                    gij = g[j, lag:][mask]
                     a += (xij.T * wmij) @ yij
                     b -= (xij.T * wmij) @ gij
-            mask = wm[:, i, -1] != 0.0
+            mask = wm[i, -1] != 0.0
             if np.any(mask):
-                wmij = wm[mask, i, -1]
-                xij = x[:-lag, i][mask]
+                wmij = wm[i, -1, mask]
+                xij = x[i, :-lag][mask]
                 b -= xij.T @ wmij
 
         mask = w[:-lag] != 0.0
         if np.any(mask):
             wi = w[:-lag][mask]
             for i in range(1, n_indices - 1):
-                xi = x[:-lag, i][mask]
-                yi = y[:-lag, i][mask]
-                gi = g[:-lag, i][mask]
+                xi = x[i, :-lag][mask]
+                yi = y[i, :-lag][mask]
+                gi = g[i, :-lag][mask]
                 a -= (xi.T * wi) @ yi
                 b += (xi.T * wi) @ gi
 
@@ -119,12 +122,12 @@ def backward_extended_committor(
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_indices, n_basis) ndarray of float
+    basis : list of (n_indices, n_frames[i], n_basis) ndarray of float
         Basis for estimating the extended committor. Must be zero
         outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_frames[i]-1, n_indices, n_indices) ndarray
+    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
         frames. Note that indices 0 and n_indices-1 are special. Index 0
         indicates the reactant, and must have no transitions to it from
@@ -132,11 +135,11 @@ def backward_extended_committor(
         must not have any transitions from it to any other index. Also,
         both indices 0 and n_indices-1 must have a single transition to
         itself.
-    guess : list of (n_frames[i], n_indices) ndarray of float
+    guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_indices, n_basis) ndarray of float, optional
+    test_basis : list of (n_indices, n_frames[i], n_basis) ndarray of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
@@ -147,7 +150,7 @@ def backward_extended_committor(
 
     Returns
     -------
-    list of (n_frames[i], n_indices) ndarray of float
+    list of (n_indices, n_frames[i]) ndarray of float
         Estimated backward extended committor at each frame.
 
     """
@@ -160,47 +163,50 @@ def backward_extended_committor(
 
         if check:
             # check that transitions are valid
-            assert np.all(m[:, 0, 0] == 1)
-            assert np.all(m[:, 1:, 0] == 0)
-            assert np.all(m[:, -1, -1] == 1)
-            assert np.all(m[:, -1, :-1] == 0)
+            assert np.all(m[0, 0] == 1)
+            assert np.all(m[1:, 0] == 0)
+            assert np.all(m[-1, -1] == 1)
+            assert np.all(m[-1, :-1] == 0)
 
             # check that the bases and guess obey boundary conditions
-            assert np.all(x[:, 0] == 0.0)
-            assert np.all(x[:, -1] == 0.0)
-            assert np.all(y[:, 0] == 0.0)
-            assert np.all(y[:, -1] == 0.0)
-            assert np.all(g[:, 0] == 1.0)
-            assert np.all(g[:, -1] == 0.0)
+            assert np.all(x[0] == 0.0)
+            assert np.all(x[-1] == 0.0)
+            assert np.all(y[0] == 0.0)
+            assert np.all(y[-1] == 0.0)
+            assert np.all(g[0] == 1.0)
+            assert np.all(g[-1] == 0.0)
 
-        n_indices = m.shape[1]
+        n_indices = m.shape[0]
 
+        m = np.moveaxis(m, -1, 0)
         m = np.array(m, dtype=w.dtype, order="C")
-        wm = moving_matmul(m, lag)
-        wm *= w[:-lag, None, None]
+        m = moving_matmul(m, lag)
+        m = np.moveaxis(m, 0, -1)
+
+        wm = w[:-lag] * m
         for i in range(1, n_indices - 1):
             for j in range(1, n_indices - 1):
-                mask = wm[:, j, i] != 0.0
+                mask = wm[j, i] != 0.0
                 if np.any(mask):
-                    wmij = wm[mask, j, i]
-                    xij = x[lag:, i][mask]
-                    yij = y[:-lag, j][mask]
-                    gij = g[:-lag, j][mask]
+                    wmij = wm[j, i, mask]
+                    xij = x[i, lag:][mask]
+                    yij = y[j, :-lag][mask]
+                    gij = g[j, :-lag][mask]
                     a += (xij.T * wmij) @ yij
                     b -= (xij.T * wmij) @ gij
-            mask = wm[:, 0, i] != 0.0
+            mask = wm[0, i] != 0.0
             if np.any(mask):
-                wmij = wm[mask, 0, i]
-                xij = x[lag:, i][mask]
+                wmij = wm[0, i, mask]
+                xij = x[i, lag:][mask]
                 b -= xij.T @ wmij
 
         mask = w[:-lag] != 0.0
         if np.any(mask):
             wi = w[:-lag][mask]
             for i in range(1, n_indices - 1):
-                xi = x[lag:, i][mask]
-                yi = y[lag:, i][mask]
-                gi = g[lag:, i][mask]
+                xi = x[i, lag:][mask]
+                yi = y[i, lag:][mask]
+                gi = g[i, lag:][mask]
                 a -= (xi.T * wi) @ yi
                 b += (xi.T * wi) @ gi
 
