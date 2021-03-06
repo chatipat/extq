@@ -2,8 +2,6 @@ import numba as nb
 import numpy as np
 
 from .extended import moving_matmul
-from .extended import moving_matmul_Am_B_An
-from .extended import moving_matmul_Am_B_Cn
 
 
 def extended_rate(forward_q, backward_q, weights, transitions, rxn_coord, lag):
@@ -68,27 +66,32 @@ def _extended_rate_helper(qp, qm, w, m, h, lag):
     n_frames = w.shape[0]
     n_indices = m.shape[0]
 
-    a = np.empty((n_frames - 1, n_indices, n_indices))
-    b = np.empty((n_frames - 1, n_indices, n_indices))
+    # temporary array
+    a = np.zeros((n_frames - 1, 2, n_indices, 2, n_indices))
 
     for i in range(n_indices):
         for j in range(n_indices):
             for t in range(n_frames - 1):
-                # A is before/after the current time
-                a[t, i, j] = m[i, j, t]
-                # B is at the current time
-                b[t, i, j] = m[i, j, t] * (h[j, t + 1] - h[i, t])
+                # before current time
+                a[t, 0, i, 0, j] = m[i, j, t]
 
-    # shape (n_frames - lag, n_indices, n_indices)
-    mm = moving_matmul_Am_B_An(a, b, lag)
-    assert len(mm) == n_frames - lag
+                # at current time
+                a[t, 0, i, 1, j] = m[i, j, t] * (h[j, t + 1] - h[i, t])
+
+                # after current time
+                a[t, 1, i, 1, j] = m[i, j, t]
+
+    a = a.reshape(n_frames - 1, 2 * n_indices, 2 * n_indices)
+    a = moving_matmul(a, lag)
+    a = a.reshape(n_frames - lag, 2, n_indices, 2, n_indices)
+    a = a[:, 0, :, 1, :]
 
     # tally contributions to the reaction rate
     result = 0.0
     for i in range(n_indices):
         for j in range(n_indices):
             for t in range(n_frames - lag):
-                result += w[t] * qm[i, t] * qp[j, t + lag] * mm[t, i, j]
+                result += w[t] * qm[i, t] * qp[j, t + lag] * a[t, i, j]
     return result
 
 
@@ -152,60 +155,54 @@ def _extended_current_helper(qm, qp, w, m, f, lag):
     n_frames = w.shape[0]
     n_indices = m.shape[0]
 
-    # temporary arrays
-    a = np.empty((n_frames + lag - 2, n_indices, n_indices))
-    b = np.empty((n_frames + lag - 2, n_indices, n_indices))
-    c = np.empty((n_frames + lag - 2, n_indices, n_indices))
+    # temporary array
+    a = np.zeros((n_frames + lag - 2, 2, n_indices, 2, n_indices))
 
     for i in range(n_indices):
         for j in range(n_indices):
-            # A starts at the current time, and goes to time tau
+            # start at the current time and go to time tau
             for t in range(n_frames - 2):
-                a[t, i, j] = m[i, j, t + 1]
-            for t in range(n_frames - 2, n_frames + lag - 2):
-                a[t, i, j] = 0.0
+                a[t, 0, i, 0, j] = m[i, j, t + 1]
 
-            # B loops time tau to time zero
-            for t in range(lag - 1):
-                b[t, i, j] = 0.0
+            # loop time tau to time zero
             for t in range(lag - 1, n_frames - 1):
-                b[t, i, j] = w[t - lag + 1] * qp[i, t + 1] * qm[j, t - lag + 1]
-            for t in range(n_frames - 1, n_frames + lag - 2):
-                b[t, i, j] = 0.0
+                a[t, 0, i, 1, j] = (
+                    w[t - lag + 1] * qp[i, t + 1] * qm[j, t - lag + 1]
+                )
 
-            # C starts at time zero, and goes to the current time
-            for t in range(lag):
-                c[t, i, j] = 0.0
+            # start at time zero and go to the current time
             for t in range(lag, n_frames + lag - 2):
-                c[t, i, j] = m[i, j, t - lag]
+                a[t, 1, i, 1, j] = m[i, j, t - lag]
 
-    # shape (n_frames - 1, n_indices, n_indices)
     # note that the indices are effectively transposed here:
     # m[t, j, i] has i as the past and j as the future
-    mm = moving_matmul_Am_B_Cn(a, b, c, lag)
+    a = a.reshape(n_frames + lag - 2, 2 * n_indices, 2 * n_indices)
+    a = moving_matmul(a, lag)
+    a = a.reshape(n_frames - 1, 2, n_indices, 2, n_indices)
+    a = a[:, 0, :, 1, :]
 
     # apply transition at current time
     for t in range(n_frames - 1):
         for i in range(n_indices):
             for j in range(n_indices):
-                mm[t, j, i] *= m[i, j, t]
+                a[t, j, i] *= m[i, j, t]
 
     # zero off contributions from before/after the reaction
     for t in range(n_frames - 1):
-        mm[t, 0, 0] = 0.0  # before reaction
-        mm[t, n_indices - 1, n_indices - 1] = 0.0  # after reaction
+        a[t, 0, 0] = 0.0  # before reaction
+        a[t, n_indices - 1, n_indices - 1] = 0.0  # after reaction
 
     # apply collective variable
     for t in range(n_frames - 1):
         for i in range(n_indices):
             for j in range(n_indices):
-                mm[t, j, i] *= f[j, t + 1] - f[i, t]
+                a[t, j, i] *= f[j, t + 1] - f[i, t]
 
     # tally contributions to the pointwise reactive current
     result = np.zeros((n_indices, n_frames))
     for i in range(n_indices):
         for j in range(n_indices):
             for t in range(n_frames - 1):
-                result[i, t] += mm[t, j, i]  # past
-                result[j, t + 1] += mm[t, j, i]  # future
+                result[i, t] += a[t, j, i]  # past
+                result[j, t + 1] += a[t, j, i]  # future
     return result
