@@ -76,32 +76,22 @@ def forward_extended_committor(
         m = moving_matmul(m, lag)
         m = np.moveaxis(m, 0, -1)
 
-        wm = w[:-lag] * m
         for i in range(1, n_indices - 1):
-            for j in range(1, n_indices - 1):
-                mask = wm[i, j] != 0.0
-                if np.any(mask):
-                    wmij = wm[i, j, mask]
-                    xij = x[i, :-lag][mask]
-                    yij = y[j, lag:][mask]
-                    gij = g[j, lag:][mask]
-                    a += (xij.T * wmij) @ yij
-                    b -= (xij.T * wmij) @ gij
-            mask = wm[i, -1] != 0.0
-            if np.any(mask):
-                wmij = wm[i, -1, mask]
-                xij = x[i, :-lag][mask]
-                b -= xij.T @ wmij
+            wx = w[:-lag, None] * x[i, :-lag]
 
-        mask = w[:-lag] != 0.0
-        if np.any(mask):
-            wi = w[:-lag][mask]
-            for i in range(1, n_indices - 1):
-                xi = x[i, :-lag][mask]
-                yi = y[i, :-lag][mask]
-                gi = g[i, :-lag][mask]
-                a -= (xi.T * wi) @ yi
-                b += (xi.T * wi) @ gi
+            yi = 0.0
+            gi = 0.0
+
+            for j in range(1, n_indices - 1):
+                yi += m[i, j, :, None] * y[j, lag:]
+                gi += m[i, j] * g[j, lag:]
+            gi += m[i, -1]  # since g[-1] == 1.0
+
+            yi -= y[i, :-lag]
+            gi -= g[i, :-lag]
+
+            a += wx.T @ yi
+            b -= wx.T @ gi
 
     coeffs = linalg.solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
@@ -177,32 +167,22 @@ def backward_extended_committor(
         m = moving_matmul(m, lag)
         m = np.moveaxis(m, 0, -1)
 
-        wm = w[:-lag] * m
         for i in range(1, n_indices - 1):
-            for j in range(1, n_indices - 1):
-                mask = wm[j, i] != 0.0
-                if np.any(mask):
-                    wmij = wm[j, i, mask]
-                    xij = x[i, lag:][mask]
-                    yij = y[j, :-lag][mask]
-                    gij = g[j, :-lag][mask]
-                    a += (xij.T * wmij) @ yij
-                    b -= (xij.T * wmij) @ gij
-            mask = wm[0, i] != 0.0
-            if np.any(mask):
-                wmij = wm[0, i, mask]
-                xij = x[i, lag:][mask]
-                b -= xij.T @ wmij
+            wx = w[:-lag, None] * x[i, lag:]
 
-        mask = w[:-lag] != 0.0
-        if np.any(mask):
-            wi = w[:-lag][mask]
-            for i in range(1, n_indices - 1):
-                xi = x[i, lag:][mask]
-                yi = y[i, lag:][mask]
-                gi = g[i, lag:][mask]
-                a -= (xi.T * wi) @ yi
-                b += (xi.T * wi) @ gi
+            yi = 0.0
+            gi = 0.0
+
+            for j in range(1, n_indices - 1):
+                yi += m[j, i, :, None] * y[j, :-lag]
+                gi += m[j, i] * g[j, :-lag]
+            gi += m[0, i]  # since g[0] == 1.0
+
+            yi -= y[i, lag:]
+            gi -= g[i, lag:]
+
+            a += wx.T @ yi
+            b -= wx.T @ gi
 
     coeffs = linalg.solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
@@ -279,16 +259,22 @@ def forward_extended_committor_sparse(
         m = moving_matmul(m, lag)
         m = np.moveaxis(m, 0, -1)
 
-        wm = w[:-lag] * m
         for i in range(1, n_indices - 1):
-            for j in range(1, n_indices - 1):
-                a += x[i][:-lag].T @ scipy.sparse.diags(wm[i, j]) @ y[j][lag:]
-                b -= x[i][:-lag].T @ scipy.sparse.diags(wm[i, j]) @ g[j][lag:]
-            b -= x[i][:-lag].T @ wm[i, -1]  # since g[-1] = 1.0
+            wx = scipy.sparse.diags(w[:-lag]) @ x[i][:-lag]
 
-        for i in range(1, n_indices - 1):
-            a -= x[i][:-lag].T @ scipy.sparse.diags(w[:-lag]) @ y[i][:-lag]
-            b += x[i][:-lag].T @ scipy.sparse.diags(w[:-lag]) @ g[i][:-lag]
+            yi = 0.0
+            gi = 0.0
+
+            for j in range(1, n_indices - 1):
+                yi += scipy.sparse.diags(m[i, j]) @ y[j][lag:]
+                gi += scipy.sparse.diags(m[i, j]) @ g[j][lag:]
+            gi += m[i, -1]  # since g[-1] = 1.0
+
+            yi -= y[i][:-lag]
+            gi -= g[i][:-lag]
+
+            a += wx.T @ yi
+            b -= wx.T @ gi
 
     coeffs = scipy.sparse.linalg.spsolve(a, b)
     return [
@@ -368,16 +354,22 @@ def backward_extended_committor_sparse(
         m = moving_matmul(m, lag)
         m = np.moveaxis(m, 0, -1)
 
-        wm = w[:-lag] * m
         for i in range(1, n_indices - 1):
-            for j in range(1, n_indices - 1):
-                a += x[i][lag:].T @ scipy.sparse.diags(wm[j, i]) @ y[j][:-lag]
-                b -= x[i][lag:].T @ scipy.sparse.diags(wm[j, i]) @ g[j][:-lag]
-            b -= x[i][lag:].T @ wm[0, i]  # since g[0] == 1.0
+            wx = scipy.sparse.diags(w[:-lag]) @ x[i][lag:]
 
-        for i in range(1, n_indices - 1):
-            a -= x[i][lag:].T @ scipy.sparse.diags(w[:-lag]) @ y[i][lag:]
-            b += x[i][lag:].T @ scipy.sparse.diags(w[:-lag]) @ g[i][lag:]
+            yi = 0.0
+            gi = 0.0
+
+            for j in range(1, n_indices - 1):
+                yi += scipy.sparse.diags(m[j, i]) @ y[j][:-lag]
+                gi += scipy.sparse.diags(m[j, i]) @ g[j][:-lag]
+            gi += m[0, i]  # since g[0] == 1.0
+
+            yi -= y[i][lag:]
+            gi -= g[i][lag:]
+
+            a += wx.T @ yi
+            b -= wx.T @ gi
 
     coeffs = scipy.sparse.linalg.spsolve(a, b)
     return [
