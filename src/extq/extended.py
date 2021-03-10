@@ -77,7 +77,7 @@ def moving_matmul(a, k):
         a[i + k] = forward_acc[k - 1]
 
     # last partial slice
-    if n_slices * (k + 1) != out_len:
+    if remaining > 0:
         i = n_slices * (k + 1)
 
         # accumulate backward
@@ -91,7 +91,8 @@ def moving_matmul(a, k):
 
         # accumulate forward
         # note this is truncated by the end of the input
-        forward_acc[0] = a[i + k]
+        if remaining > 1:
+            forward_acc[0] = a[i + k]
         for j in range(2, min(remaining, k)):
             np.dot(
                 forward_acc[j - 2],
