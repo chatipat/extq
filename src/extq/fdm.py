@@ -433,6 +433,136 @@ def backward_committor(generator, weights, in_domain, guess):
     )
 
 
+def forward_mfpt(generator, weights, in_domain, guess):
+    """Compute the forward mean first passage time.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    weights : (M,) ndarray of float
+        Change of measure to the invariant distribution for each point.
+    in_domain : (M,) ndarray of bool
+        Whether each point is in the domain.
+    guess : (M,) ndarray of float
+        Guess for the mean first passage time. Must obey boundary
+        conditions.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Forward mean first passage time at each point.
+
+    """
+    a = generator[in_domain, :][:, in_domain]
+    b = -generator[in_domain, :] @ guess - 1.0
+    coeffs = sparse.linalg.spsolve(a, b)
+    return (
+        guess
+        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+    )
+
+
+def backward_mfpt(generator, weights, in_domain, guess):
+    """Compute the backward mean first passage time.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    weights : (M,) ndarray of float
+        Change of measure to the invariant distribution for each point.
+    in_domain : (M,) ndarray of bool
+        Whether each point is in the domain.
+    guess : (M,) ndarray of float
+        Guess for the mean first passage time. Must obey boundary
+        conditions.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Backward mean first passage time at each point.
+
+    """
+    adjoint_generator = (
+        sparse.diags(1.0 / weights) @ generator.T @ sparse.diags(weights)
+    )
+    a = adjoint_generator[in_domain, :][:, in_domain]
+    b = -adjoint_generator[in_domain, :] @ guess - 1.0
+    coeffs = sparse.linalg.spsolve(a, b)
+    return (
+        guess
+        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+    )
+
+
+def forward_feynman_kac(generator, weights, in_domain, function, guess):
+    """Solve the forward Feynman-Kac formula.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    weights : (M,) ndarray of float
+        Change of measure to the invariant distribution for each point.
+    in_domain : (M,) ndarray of bool
+        Whether each point is in the domain.
+    function : (M,) ndarray of float
+        Function to integrate. Must be zero outside the domain.
+    guess : (M,) ndarray of float
+        Guess of the solution. Must obey boundary conditions.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Solution of the Feynman-Kac formula at each point.
+
+    """
+    assert np.all(function[np.logical_not(in_domain)] == 0.0)
+    a = generator[in_domain, :][:, in_domain]
+    b = -generator[in_domain, :] @ guess - function[in_domain]
+    coeffs = sparse.linalg.spsolve(a, b)
+    return (
+        guess
+        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+    )
+
+
+def backward_feynman_kac(generator, weights, in_domain, function, guess):
+    """Solve the backward Feynman-Kac formula.
+
+    Parameters
+    ----------
+    generator : (M, M) sparse matrix
+        Generator matrix.
+    weights : (M,) ndarray of float
+        Change of measure to the invariant distribution for each point.
+    in_domain : (M,) ndarray of bool
+        Whether each point is in the domain.
+    function : (M,) ndarray of float
+        Function to integrate. Must be zero outside the domain.
+    guess : (M,) ndarray of float
+        Guess of the solution. Must obey boundary conditions.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Solution of the Feynman-Kac formula at each point.
+
+    """
+    assert np.all(function[np.logical_not(in_domain)] == 0.0)
+    adjoint_generator = (
+        sparse.diags(1.0 / weights) @ generator.T @ sparse.diags(weights)
+    )
+    a = adjoint_generator[in_domain, :][:, in_domain]
+    b = -adjoint_generator[in_domain, :] @ guess - function[in_domain]
+    coeffs = sparse.linalg.spsolve(a, b)
+    return (
+        guess
+        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+    )
+
+
 def reweight(generator):
     """Compute the reweighting factors to the invariant distribution.
 
