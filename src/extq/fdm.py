@@ -3,26 +3,7 @@ import numpy as np
 from scipy import sparse
 
 
-def transition_matrix_to_generator_matrix(tmat, dt):
-    """Compute the generator matrix from the transition matrix.
-
-    Parameters
-    ----------
-    tmat : (M, M) sparse matrix
-        Transition matrix.
-    dt : int
-        Lag time of the transition matrix.
-
-    Returns
-    -------
-    (M, M) sparse matrix
-        Generator matrix.
-
-    """
-    return (tmat - sparse.identity(tmat.shape[0])) / dt
-
-
-def transition_matrix_reversible_2d(
+def generator_matrix_reversible_2d(
     potential,
     xlo,
     xnum,
@@ -32,7 +13,7 @@ def transition_matrix_reversible_2d(
     kT,
 ):
     """
-    Compute the transition matrix for a reversible 2D potential.
+    Compute the generator matrix for a reversible 2D potential.
 
     Parameters
     ----------
@@ -51,9 +32,7 @@ def transition_matrix_reversible_2d(
     Returns
     -------
     sparse matrix
-        Transition matrix.
-    float
-        Time step of the transition matrix.
+        Generator matrix.
 
     """
 
@@ -79,10 +58,13 @@ def transition_matrix_reversible_2d(
     # time step of transition matrix
     dt = sep ** 2 / (8.0 * kT)
 
-    return tmat, dt
+    # generator matrix
+    gen = (tmat - sparse.identity(tmat.shape[0])) / dt
+
+    return gen
 
 
-def transition_matrix_reversible_3d(
+def generator_matrix_reversible_3d(
     potential,
     xlo,
     xnum,
@@ -94,7 +76,7 @@ def transition_matrix_reversible_3d(
     kT,
 ):
     """
-    Compute the transition matrix for a reversible 3D potential.
+    Compute the generator matrix for a reversible 3D potential.
 
     Parameters
     ----------
@@ -113,9 +95,7 @@ def transition_matrix_reversible_3d(
     Returns
     -------
     sparse matrix
-        Transition matrix.
-    float
-        Time step of the transition matrix.
+        Generator matrix.
 
     """
 
@@ -143,7 +123,10 @@ def transition_matrix_reversible_3d(
     # time step of transition matrix
     dt = sep ** 2 / (12.0 * kT)
 
-    return tmat, dt
+    # generator matrix
+    gen = (tmat - sparse.identity(tmat.shape[0])) / dt
+
+    return gen
 
 
 def _transition_matrix_reversible_helper(transitions, u, ind, shape):
@@ -184,7 +167,7 @@ def generator_matrix_irreversible_2d(
     yhi,
     ynum,
 ):
-    """Compute the transition matrix for an irreversible 2D potential.
+    """Compute the generator matrix for an irreversible 2D potential.
 
     Parameters
     ----------
@@ -277,7 +260,7 @@ def generator_matrix_irreversible_3d(
     zhi,
     znum,
 ):
-    """Compute the transition matrix for an irreversible 3D potential.
+    """Compute the generator matrix for an irreversible 3D potential.
 
     Parameters
     ----------
