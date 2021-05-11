@@ -4,7 +4,15 @@ import numpy as np
 from .extended import moving_matmul
 
 
-def extended_rate(forward_q, backward_q, weights, transitions, rxn_coord, lag):
+def extended_rate(
+    forward_q,
+    backward_q,
+    weights,
+    n_domain_indices,
+    transitions,
+    rxn_coord,
+    lag,
+):
     """Estimate the TPT rate with extended committors.
 
     Parameters
@@ -15,17 +23,15 @@ def extended_rate(forward_q, backward_q, weights, transitions, rxn_coord, lag):
         Backward extended committor for each frame.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
+    n_domain_indices : int
+        Number of indices inside the domain.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Note that indices 0 and n_indices-1 are special. Index 0
-        indicates the reactant, and must have no transitions to it from
-        any other index. Index n_indices-1 indicates the product, and
-        must not have any transitions from it to any other index. Also,
-        both indices 0 and n_indices-1 must have a single transition to
-        itself.
+        frames. Indices inside the domain must precede indices outside
+        of the domain.
     rxn_coord : list of (n_indices, n_frames[i]) ndarray of float
-        Reaction coordinate at each frame. This must be zero in the
-        reactant (index 0) and one in the product (index n_indices-1).
+        Reaction coordinate at each frame. Must obey boundary
+        conditions.
     lag : int
         Lag time in units of frames.
 
@@ -41,13 +47,6 @@ def extended_rate(forward_q, backward_q, weights, transitions, rxn_coord, lag):
         forward_q, backward_q, weights, transitions, rxn_coord
     ):
         assert np.all(w[-lag:] == 0.0)
-        assert np.all(m[0, 0] == 1)
-        assert np.all(m[1:, 0] == 0)
-        assert np.all(m[-1, -1] == 1)
-        assert np.all(m[-1, :-1] == 0)
-        assert np.all(h[0, 0] == 0.0)
-        assert np.all(h[-1, -1] == 1.0)
-
         n_frames = w.shape[0]
         n_indices = m.shape[0]
         assert qp.shape == (n_indices, n_frames)
@@ -55,47 +54,90 @@ def extended_rate(forward_q, backward_q, weights, transitions, rxn_coord, lag):
         assert w.shape == (n_frames,)
         assert m.shape == (n_indices, n_indices, n_frames - 1)
         assert h.shape == (n_indices, n_frames)
-
-        numer += _extended_rate_helper(qp, qm, w, m, h, lag)
-
+        numer += _extended_rate_helper(qp, qm, w, n_domain_indices, m, h, lag)
     return numer / denom
 
 
 @nb.njit
-def _extended_rate_helper(qp, qm, w, m, h, lag):
-    n_frames = w.shape[0]
-    n_indices = m.shape[0]
+def _extended_rate_helper(qp, qm, w, nd, m, h, lag):
+    nf = len(w)
+    ni = len(m)
+    assert nd <= ni
 
     # temporary array
-    a = np.zeros((n_frames - 1, 2, n_indices, 2, n_indices))
+    a = np.zeros((nf - 1, 2, nd + 1, 2, nd + 1))
 
-    for i in range(n_indices):
-        for j in range(n_indices):
-            for t in range(n_frames - 1):
-                # before current time
+    for t in range(nf - 1):
+
+        # before current time
+        for i in range(nd):
+            for j in range(nd):
                 a[t, 0, i, 0, j] = m[i, j, t]
+        for i in range(nd, ni):
+            for j in range(nd):
+                a[t, 0, nd, 0, j] += qm[i, t + 0] * m[i, j, t]
+        a[t, 0, nd, 0, nd] = 1.0
 
-                # at current time
+        # at current time
+        for i in range(nd):
+            for j in range(nd):
                 a[t, 0, i, 1, j] = m[i, j, t] * (h[j, t + 1] - h[i, t])
+        for i in range(nd):
+            for j in range(nd, ni):
+                a[t, 0, i, 1, nd] += (
+                    m[i, j, t] * qp[j, t + 1] * (h[j, t + 1] - h[i, t])
+                )
+        for i in range(nd, ni):
+            for j in range(nd):
+                a[t, 0, nd, 1, j] += (
+                    qm[i, t + 0] * m[i, j, t] * (h[j, t + 1] - h[i, t])
+                )
+        for i in range(nd, ni):
+            for j in range(nd, ni):
+                a[t, 0, nd, 1, nd] += (
+                    qm[i, t + 0]
+                    * m[i, j, t]
+                    * qp[j, t + 1]
+                    * (h[j, t + 1] - h[i, t])
+                )
 
-                # after current time
+        # after current time
+        for i in range(nd):
+            for j in range(nd):
                 a[t, 1, i, 1, j] = m[i, j, t]
+        for i in range(nd):
+            for j in range(nd, ni):
+                a[t, 1, i, 1, nd] += m[i, j, t] * qp[j, t + 1]
+        a[t, 1, nd, 1, nd] = 1.0
 
-    a = a.reshape(n_frames - 1, 2 * n_indices, 2 * n_indices)
+    a = a.reshape(nf - 1, 2 * (nd + 1), 2 * (nd + 1))
     a = moving_matmul(a, lag)
-    a = a.reshape(n_frames - lag, 2, n_indices, 2, n_indices)
+    a = a.reshape(nf - lag, 2, (nd + 1), 2, (nd + 1))
     a = a[:, 0, :, 1, :]
 
     # tally contributions to the reaction rate
     result = 0.0
-    for i in range(n_indices):
-        for j in range(n_indices):
-            for t in range(n_frames - lag):
-                result += w[t] * qm[i, t] * qp[j, t + lag] * a[t, i, j]
+    for t in range(nf - lag):
+        for i in range(nd):
+            for j in range(nd):
+                result += w[t] * qm[i, t] * a[t, i, j] * qp[j, t + lag]
+        for i in range(nd):
+            result += w[t] * qm[i, t] * a[t, i, nd]
+        for j in range(nd):
+            result += w[t] * a[t, nd, j] * qp[j, t + lag]
+        result += w[t] * a[t, nd, nd]
     return result
 
 
-def extended_current(forward_q, backward_q, weights, transitions, cv, lag):
+def extended_current(
+    forward_q,
+    backward_q,
+    weights,
+    n_domain_indices,
+    transitions,
+    cv,
+    lag,
+):
     """Estimate the reactive current with extended committors.
 
     Parameters
@@ -106,14 +148,12 @@ def extended_current(forward_q, backward_q, weights, transitions, cv, lag):
         Backward extended committor for each frame.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
+    n_domain_indices : int
+        Number of indices inside the domain.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Note that indices 0 and n_indices-1 are special. Index 0
-        indicates the reactant, and must have no transitions to it from
-        any other index. Index n_indices-1 indicates the product, and
-        must not have any transitions from it to any other index. Also,
-        both indices 0 and n_indices-1 must have a single transition to
-        itself.
+        frames. Indices inside the domain must precede indices outside
+        of the domain.
     cv : list of (n_indices, n_frames[i]) narray of float
         Collective variable at each frame.
     lag : int
@@ -126,16 +166,11 @@ def extended_current(forward_q, backward_q, weights, transitions, cv, lag):
 
     """
     result = []
-    denom = 2.0 * lag * sum(np.sum(w) for w in weights)
+    denom = lag * sum(np.sum(w) for w in weights)
     for qp, qm, w, m, f in zip(
         forward_q, backward_q, weights, transitions, cv
     ):
         assert np.all(w[-lag:] == 0.0)
-        assert np.all(m[0, 0] == 1)
-        assert np.all(m[1:, 0] == 0)
-        assert np.all(m[-1, -1] == 1)
-        assert np.all(m[-1, :-1] == 0)
-
         n_frames = w.shape[0]
         n_indices = m.shape[0]
         assert qp.shape == (n_indices, n_frames)
@@ -143,66 +178,88 @@ def extended_current(forward_q, backward_q, weights, transitions, cv, lag):
         assert w.shape == (n_frames,)
         assert m.shape == (n_indices, n_indices, n_frames - 1)
         assert f.shape == (n_indices, n_frames)
-
-        numer = _extended_current_helper(qm, qp, w, m, f, lag)
+        numer = _extended_current_helper(
+            qm, qp, w, n_domain_indices, m, f, lag
+        )
         result.append(numer / denom)
-
     return result
 
 
 @nb.njit
-def _extended_current_helper(qm, qp, w, m, f, lag):
-    n_frames = w.shape[0]
-    n_indices = m.shape[0]
+def _extended_current_helper(qm, qp, w, nd, m, f, lag):
+    nf = len(w)
+    ni = len(m)
+    assert nd <= ni
 
     # temporary array
-    a = np.zeros((n_frames + lag - 2, 2, n_indices, 2, n_indices))
+    a = np.zeros((nf + lag - 2, 2, nd + 1, 2, nd + 1))
 
-    for i in range(n_indices):
-        for j in range(n_indices):
-            # start at the current time and go to time tau
-            for t in range(n_frames - 2):
+    # start at the current time and go to time tau
+    for t in range(nf - 2):
+        for i in range(nd):
+            for j in range(nd):
                 a[t, 0, i, 0, j] = m[i, j, t + 1]
+        for i in range(nd):
+            for j in range(nd, ni):
+                a[t, 0, i, 0, nd] += m[i, j, t + 1] * qp[j, t + 2]
+        a[t, 0, nd, 0, nd] = 1.0
 
-            # loop time tau to time zero
-            for t in range(lag - 1, n_frames - 1):
+    # loop time tau to time zero
+    for t in range(lag - 1, nf - 1):
+        for i in range(nd):
+            for j in range(nd):
                 a[t, 0, i, 1, j] = (
                     w[t - lag + 1] * qp[i, t + 1] * qm[j, t - lag + 1]
                 )
+        for i in range(nd):
+            a[t, 0, i, 1, nd] += w[t - lag + 1] * qp[i, t + 1]
+        for j in range(nd):
+            a[t, 0, nd, 1, j] += w[t - lag + 1] * qm[j, t - lag + 1]
+        a[t, 0, nd, 1, nd] = w[t - lag + 1]
 
-            # start at time zero and go to the current time
-            for t in range(lag, n_frames + lag - 2):
+    # start at time zero and go to the current time
+    for t in range(lag, nf + lag - 2):
+        for i in range(nd):
+            for j in range(nd):
                 a[t, 1, i, 1, j] = m[i, j, t - lag]
+        for i in range(nd, ni):
+            for j in range(nd):
+                a[t, 1, nd, 1, j] += qm[i, t - lag] * m[i, j, t - lag]
+        a[t, 1, nd, 1, nd] = 1.0
 
     # note that the indices are effectively transposed here:
     # m[t, j, i] has i as the past and j as the future
-    a = a.reshape(n_frames + lag - 2, 2 * n_indices, 2 * n_indices)
+    a = a.reshape(nf + lag - 2, 2 * (nd + 1), 2 * (nd + 1))
     a = moving_matmul(a, lag)
-    a = a.reshape(n_frames - 1, 2, n_indices, 2, n_indices)
+    a = a.reshape(nf - 1, 2, (nd + 1), 2, (nd + 1))
     a = a[:, 0, :, 1, :]
 
     # apply transition at current time
-    for t in range(n_frames - 1):
-        for i in range(n_indices):
-            for j in range(n_indices):
-                a[t, j, i] *= m[i, j, t]
-
-    # zero off contributions from before/after the reaction
-    for t in range(n_frames - 1):
-        a[t, 0, 0] = 0.0  # before reaction
-        a[t, n_indices - 1, n_indices - 1] = 0.0  # after reaction
-
-    # apply collective variable
-    for t in range(n_frames - 1):
-        for i in range(n_indices):
-            for j in range(n_indices):
-                a[t, j, i] *= f[j, t + 1] - f[i, t]
+    coeffs = np.zeros((nf - 1, ni, ni))
+    for t in range(nf - 1):
+        for i in range(nd):
+            for j in range(nd):
+                coeffs[t, i, j] = a[t, j, i] * m[i, j, t]
+        for i in range(nd):
+            for j in range(nd, ni):
+                coeffs[t, i, j] = a[t, nd, i] * m[i, j, t] * qp[j, t + 1]
+        for i in range(nd, ni):
+            for j in range(nd):
+                coeffs[t, i, j] = a[t, j, nd] * qm[i, t + 0] * m[i, j, t]
+        for i in range(nd, ni):
+            for j in range(nd, ni):
+                coeffs[t, i, j] = (
+                    a[t, nd, nd] * qm[i, t + 0] * m[i, j, t] * qp[j, t + 1]
+                )
 
     # tally contributions to the pointwise reactive current
-    result = np.zeros((n_indices, n_frames))
-    for i in range(n_indices):
-        for j in range(n_indices):
-            for t in range(n_frames - 1):
-                result[i, t] += a[t, j, i]  # past
-                result[j, t + 1] += a[t, j, i]  # future
+    result = np.zeros((ni, nf))
+    for i in range(ni):
+        for j in range(ni):
+            for t in range(nf - 1):
+                # apply collective variable at current time
+                c = coeffs[t, i, j] * (f[j, t + 1] - f[i, t])
+                # split contribution symmetrically
+                result[i, t] += 0.5 * c  # past
+                result[j, t + 1] += 0.5 * c  # future
     return result

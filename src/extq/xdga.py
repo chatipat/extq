@@ -3,6 +3,8 @@ import scipy.sparse
 import scipy.sparse.linalg
 from scipy import linalg
 
+from .extended import backward_modified_transitions
+from .extended import forward_modified_transitions
 from .extended import moving_matmul
 
 
@@ -13,37 +15,29 @@ def forward_extended_committor(
     guess,
     lag,
     test_basis=None,
-    check=True,
 ):
     """Estimate the forward extended committor using DGA.
 
     Parameters
     ----------
-    basis : list of (n_indices, n_frames[i], n_basis) ndarray of float
-        Basis for estimating the extended committor. Must be zero
-        outside of the domain.
+    basis : list of (n_domain_indices, n_frames[i], n_basis) ndarray of float
+        Basis for estimating the extended committor. Only indices inside
+        the domain should be given.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Note that indices 0 and n_indices-1 are special. Index 0
-        indicates the reactant, and must have no transitions to it from
-        any other index. Index n_indices-1 indicates the product, and
-        must not have any transitions from it to any other index. Also,
-        both indices 0 and n_indices-1 must have a single transition to
-        itself.
+        frames. Indices inside the domain must precede indices outside
+        of the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_indices, n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_domain_indices, n_frames[i], n_basis) ndarray of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
         extended committor.
-    check : bool, optional
-        If True, throw an error if inputs are invalid. Disabling this
-        can increase performance.
 
     Returns
     -------
@@ -58,34 +52,22 @@ def forward_extended_committor(
     for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
         assert np.all(w[-lag:] == 0.0)
 
-        if check:
-            _check_transitions(m)
+        nd, _, _ = x.shape
+        _, ni, nt = m.shape
+        dtype = np.result_type(x, y, w, m, g)
+        f = np.zeros((ni, ni, nt), dtype=dtype)
+        m = forward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
 
-            # check that the bases and guess obey boundary conditions
-            assert np.all(x[0] == 0.0)
-            assert np.all(x[-1] == 0.0)
-            assert np.all(y[0] == 0.0)
-            assert np.all(y[-1] == 0.0)
-            assert np.all(g[0] == 0.0)
-            assert np.all(g[-1] == 1.0)
-
-        n_indices = m.shape[0]
-
-        m = np.moveaxis(m, -1, 0)
-        m = np.array(m, dtype=w.dtype, order="C")
-        m = moving_matmul(m, lag)
-        m = np.moveaxis(m, 0, -1)
-
-        for i in range(1, n_indices - 1):
+        for i in range(nd):
             wx = w[:-lag, None] * x[i, :-lag]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(1, n_indices - 1):
+            for j in range(nd):
                 yi += m[i, j, :, None] * y[j, lag:]
                 gi += m[i, j] * g[j, lag:]
-            gi += m[i, -1]  # since g[-1] == 1.0
+            gi += m[i, nd]  # integral and boundary conditions
 
             yi -= y[i, :-lag]
             gi -= g[i, :-lag]
@@ -94,7 +76,13 @@ def forward_extended_committor(
             b -= wx.T @ gi
 
     coeffs = linalg.solve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
+    result = []
+    for y, g in zip(basis, guess):
+        nd, _, _ = y.shape
+        q = g.copy()
+        q[:nd] += y @ coeffs
+        result.append(q)
+    return result
 
 
 def backward_extended_committor(
@@ -104,37 +92,29 @@ def backward_extended_committor(
     guess,
     lag,
     test_basis=None,
-    check=True,
 ):
     """Estimate the backward extended committor using DGA.
 
     Parameters
     ----------
-    basis : list of (n_indices, n_frames[i], n_basis) ndarray of float
-        Basis for estimating the extended committor. Must be zero
-        outside of the domain.
+    basis : list of (n_domain_indices, n_frames[i], n_basis) ndarray of float
+        Basis for estimating the extended committor. Only indices inside
+        the domain should be given.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Note that indices 0 and n_indices-1 are special. Index 0
-        indicates the reactant, and must have no transitions to it from
-        any other index. Index n_indices-1 indicates the product, and
-        must not have any transitions from it to any other index. Also,
-        both indices 0 and n_indices-1 must have a single transition to
-        itself.
+        frames. Indices inside the domain must precede indices outside
+        of the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_indices, n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_domain_indices, n_frames[i], n_basis) ndarray of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
         extended committor.
-    check : bool, optional
-        If True, throw an error if inputs are invalid. Disabling this
-        can increase performance.
 
     Returns
     -------
@@ -149,34 +129,22 @@ def backward_extended_committor(
     for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
         assert np.all(w[-lag:] == 0.0)
 
-        if check:
-            _check_transitions(m)
+        nd, _, _ = x.shape
+        ni, _, nt = m.shape
+        dtype = np.result_type(x, y, w, m, g)
+        f = np.zeros((ni, ni, nt), dtype=dtype)
+        m = backward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
 
-            # check that the bases and guess obey boundary conditions
-            assert np.all(x[0] == 0.0)
-            assert np.all(x[-1] == 0.0)
-            assert np.all(y[0] == 0.0)
-            assert np.all(y[-1] == 0.0)
-            assert np.all(g[0] == 1.0)
-            assert np.all(g[-1] == 0.0)
-
-        n_indices = m.shape[0]
-
-        m = np.moveaxis(m, -1, 0)
-        m = np.array(m, dtype=w.dtype, order="C")
-        m = moving_matmul(m, lag)
-        m = np.moveaxis(m, 0, -1)
-
-        for i in range(1, n_indices - 1):
+        for i in range(nd):
             wx = w[:-lag, None] * x[i, lag:]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(1, n_indices - 1):
+            for j in range(nd):
                 yi += m[j, i, :, None] * y[j, :-lag]
                 gi += m[j, i] * g[j, :-lag]
-            gi += m[0, i]  # since g[0] == 1.0
+            gi += m[nd, i]  # integral and boundary conditions
 
             yi -= y[i, lag:]
             gi -= g[i, lag:]
@@ -185,7 +153,13 @@ def backward_extended_committor(
             b -= wx.T @ gi
 
     coeffs = linalg.solve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
+    result = []
+    for y, g in zip(basis, guess):
+        nd, _, _ = y.shape
+        q = g.copy()
+        q[:nd] += y @ coeffs
+        result.append(q)
+    return result
 
 
 def forward_extended_committor_sparse(
@@ -195,26 +169,21 @@ def forward_extended_committor_sparse(
     guess,
     lag,
     test_basis=None,
-    check=True,
 ):
     """Estimate the forward extended committor with a sparse basis set.
 
     Parameters
     ----------
     basis : list of list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the extended committor. Must be zero
-        outside of the domain. The outer list is over trajectories; the
-        inner list is over indices.
+        Sparse basis for estimating the extended committor. Only indices
+        inside the domain should be given. The outer list is over
+        trajectories; the inner list is over indices.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Note that indices 0 and n_indices-1 are special. Index 0
-        indicates the reactant, and must have no transitions to it from
-        any other index. Index n_indices-1 indicates the product, and
-        must not have any transitions from it to any other index. Also,
-        both indices 0 and n_indices-1 must have a single transition to
-        itself.
+        frames. Indices inside the domain must precede indices outside
+        of the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
@@ -224,9 +193,6 @@ def forward_extended_committor_sparse(
         the same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
         extended committor.
-    check : bool, optional
-        If True, throw an error if inputs are invalid. Disabling this
-        can increase performance.
 
     Returns
     -------
@@ -241,34 +207,22 @@ def forward_extended_committor_sparse(
     for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
         assert np.all(w[-lag:] == 0.0)
 
-        if check:
-            _check_transitions(m)
+        nd = len(x)
+        _, ni, nt = m.shape
+        dtype = np.result_type(*x, *y, w, m, g)
+        f = np.zeros((ni, ni, nt), dtype=dtype)
+        m = forward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
 
-            # check that the bases and guess obey boundary conditions
-            assert x[0].count_nonzero() == 0
-            assert x[-1].count_nonzero() == 0
-            assert y[0].count_nonzero() == 0
-            assert y[-1].count_nonzero() == 0
-            assert np.all(g[0] == 0.0)
-            assert np.all(g[-1] == 1.0)
-
-        n_indices = m.shape[0]
-
-        m = np.moveaxis(m, -1, 0)
-        m = np.array(m, dtype=w.dtype, order="C")
-        m = moving_matmul(m, lag)
-        m = np.moveaxis(m, 0, -1)
-
-        for i in range(1, n_indices - 1):
+        for i in range(nd):
             wx = scipy.sparse.diags(w[:-lag]) @ x[i][:-lag]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(1, n_indices - 1):
+            for j in range(nd):
                 yi += scipy.sparse.diags(m[i, j]) @ y[j][lag:]
                 gi += scipy.sparse.diags(m[i, j]) @ g[j][lag:]
-            gi += m[i, -1]  # since g[-1] = 1.0
+            gi += m[i, nd]  # integral and boundary conditions
 
             yi -= y[i][:-lag]
             gi -= g[i][:-lag]
@@ -277,10 +231,18 @@ def forward_extended_committor_sparse(
             b -= wx.T @ gi
 
     coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return [
-        np.array([yi @ coeffs + gi for yi, gi in zip(y, g)])
-        for y, g in zip(basis, guess)
-    ]
+    result = []
+    for y, g in zip(basis, guess):
+        nd = len(y)
+        ni = len(g)
+        q = []
+        for i in range(nd):
+            q.append(y[i] @ coeffs + g[i])
+        for i in range(nd, ni):
+            q.append(g[i])
+        q = np.array(q)
+        result.append(q)
+    return result
 
 
 def backward_extended_committor_sparse(
@@ -290,26 +252,21 @@ def backward_extended_committor_sparse(
     guess,
     lag,
     test_basis=None,
-    check=True,
 ):
     """Estimate the backward extended committor with a sparse basis set.
 
     Parameters
     ----------
     basis : list of list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the extended committor. Must be zero
-        outside of the domain. The outer list is over trajectories; the
-        inner list is over indices.
+        Sparse basis for estimating the extended committor. Only indices
+        inside the domain should be given. The outer list is over
+        trajectories; the inner list is over indices.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Note that indices 0 and n_indices-1 are special. Index 0
-        indicates the reactant, and must have no transitions to it from
-        any other index. Index n_indices-1 indicates the product, and
-        must not have any transitions from it to any other index. Also,
-        both indices 0 and n_indices-1 must have a single transition to
-        itself.
+        frames. Indices inside the domain must precede indices outside
+        of the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
@@ -319,9 +276,6 @@ def backward_extended_committor_sparse(
         the same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
         extended committor.
-    check : bool, optional
-        If True, throw an error if inputs are invalid. Disabling this
-        can increase performance.
 
     Returns
     -------
@@ -336,34 +290,22 @@ def backward_extended_committor_sparse(
     for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
         assert np.all(w[-lag:] == 0.0)
 
-        if check:
-            _check_transitions(m)
+        nd = len(x)
+        ni, _, nt = m.shape
+        dtype = np.result_type(*x, *y, w, m, g)
+        f = np.zeros((ni, ni, nt), dtype=dtype)
+        m = backward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
 
-            # check that the bases and guess obey boundary conditions
-            assert x[0].count_nonzero() == 0
-            assert x[-1].count_nonzero() == 0
-            assert y[0].count_nonzero() == 0
-            assert y[-1].count_nonzero() == 0
-            assert np.all(g[0] == 1.0)
-            assert np.all(g[-1] == 0.0)
-
-        n_indices = m.shape[0]
-
-        m = np.moveaxis(m, -1, 0)
-        m = np.array(m, dtype=w.dtype, order="C")
-        m = moving_matmul(m, lag)
-        m = np.moveaxis(m, 0, -1)
-
-        for i in range(1, n_indices - 1):
+        for i in range(nd):
             wx = scipy.sparse.diags(w[:-lag]) @ x[i][lag:]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(1, n_indices - 1):
+            for j in range(nd):
                 yi += scipy.sparse.diags(m[j, i]) @ y[j][:-lag]
                 gi += scipy.sparse.diags(m[j, i]) @ g[j][:-lag]
-            gi += m[0, i]  # since g[0] == 1.0
+            gi += m[nd, i]  # integral and boundary conditions
 
             yi -= y[i][lag:]
             gi -= g[i][lag:]
@@ -372,17 +314,15 @@ def backward_extended_committor_sparse(
             b -= wx.T @ gi
 
     coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return [
-        np.array([yi @ coeffs + gi for yi, gi in zip(y, g)])
-        for y, g in zip(basis, guess)
-    ]
-
-
-def _check_transitions(m):
-    """Check that transitions are valid."""
-    assert m.ndim == 3
-    assert m.shape[0] == m.shape[1]
-    assert np.all(m[0, 0] == 1)
-    assert np.all(m[1:, 0] == 0)
-    assert np.all(m[-1, -1] == 1)
-    assert np.all(m[-1, :-1] == 0)
+    result = []
+    for y, g in zip(basis, guess):
+        nd = len(y)
+        ni = len(g)
+        q = []
+        for i in range(nd):
+            q.append(y[i] @ coeffs + g[i])
+        for i in range(nd, ni):
+            q.append(g[i])
+        q = np.array(q)
+        result.append(q)
+    return result
