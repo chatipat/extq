@@ -12,6 +12,7 @@ def forward_extended_committor(
     basis,
     weights,
     transitions,
+    in_domain,
     guess,
     lag,
     test_basis=None,
@@ -21,14 +22,16 @@ def forward_extended_committor(
     Parameters
     ----------
     basis : list of (n_domain_indices, n_frames[i], n_basis) ndarray of float
-        Basis for estimating the extended committor. Only indices inside
-        the domain should be given.
+        Basis for estimating the extended committor. Must be zero
+        outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Indices inside the domain must precede indices outside
-        of the domain.
+        frames.
+    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+        For each value of the index process, whether each frame of the
+        trajectories is in the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
@@ -49,25 +52,26 @@ def forward_extended_committor(
         test_basis = basis
     a = 0.0
     b = 0.0
-    for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
+    for x, y, w, m, d, g in zip(
+        test_basis, basis, weights, transitions, in_domain, guess
+    ):
         assert np.all(w[-lag:] == 0.0)
 
-        nd, _, _ = x.shape
-        _, ni, nt = m.shape
+        ni, _, nt = m.shape
         dtype = np.result_type(x, y, w, m, g)
         f = np.zeros((ni, ni, nt), dtype=dtype)
-        m = forward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
+        m = forward_modified_transitions(m, d, f, g, lag, dtype=dtype)
 
-        for i in range(nd):
+        for i in range(ni):
             wx = w[:-lag, None] * x[i, :-lag]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(nd):
+            for j in range(ni):
                 yi += m[i, j, :, None] * y[j, lag:]
                 gi += m[i, j] * g[j, lag:]
-            gi += m[i, nd]  # integral and boundary conditions
+            gi += m[i, ni]  # integral and boundary conditions
 
             yi -= y[i, :-lag]
             gi -= g[i, :-lag]
@@ -76,19 +80,14 @@ def forward_extended_committor(
             b -= wx.T @ gi
 
     coeffs = linalg.solve(a, b)
-    result = []
-    for y, g in zip(basis, guess):
-        nd, _, _ = y.shape
-        q = g.copy()
-        q[:nd] += y @ coeffs
-        result.append(q)
-    return result
+    return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
 def backward_extended_committor(
     basis,
     weights,
     transitions,
+    in_domain,
     guess,
     lag,
     test_basis=None,
@@ -98,14 +97,16 @@ def backward_extended_committor(
     Parameters
     ----------
     basis : list of (n_domain_indices, n_frames[i], n_basis) ndarray of float
-        Basis for estimating the extended committor. Only indices inside
-        the domain should be given.
+        Basis for estimating the extended committor. Must be zero
+        outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Indices inside the domain must precede indices outside
-        of the domain.
+        frames.
+    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+        For each value of the index process, whether each frame of the
+        trajectories is in the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
@@ -126,25 +127,26 @@ def backward_extended_committor(
         test_basis = basis
     a = 0.0
     b = 0.0
-    for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
+    for x, y, w, m, d, g in zip(
+        test_basis, basis, weights, transitions, in_domain, guess
+    ):
         assert np.all(w[-lag:] == 0.0)
 
-        nd, _, _ = x.shape
         ni, _, nt = m.shape
         dtype = np.result_type(x, y, w, m, g)
         f = np.zeros((ni, ni, nt), dtype=dtype)
-        m = backward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
+        m = backward_modified_transitions(m, d, f, g, lag, dtype=dtype)
 
-        for i in range(nd):
+        for i in range(ni):
             wx = w[:-lag, None] * x[i, lag:]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(nd):
+            for j in range(ni):
                 yi += m[j, i, :, None] * y[j, :-lag]
                 gi += m[j, i] * g[j, :-lag]
-            gi += m[nd, i]  # integral and boundary conditions
+            gi += m[ni, i]  # integral and boundary conditions
 
             yi -= y[i, lag:]
             gi -= g[i, lag:]
@@ -153,19 +155,14 @@ def backward_extended_committor(
             b -= wx.T @ gi
 
     coeffs = linalg.solve(a, b)
-    result = []
-    for y, g in zip(basis, guess):
-        nd, _, _ = y.shape
-        q = g.copy()
-        q[:nd] += y @ coeffs
-        result.append(q)
-    return result
+    return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
 def forward_extended_committor_sparse(
     basis,
     weights,
     transitions,
+    in_domain,
     guess,
     lag,
     test_basis=None,
@@ -175,15 +172,17 @@ def forward_extended_committor_sparse(
     Parameters
     ----------
     basis : list of list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the extended committor. Only indices
-        inside the domain should be given. The outer list is over
-        trajectories; the inner list is over indices.
+        Sparse basis for estimating the extended committor. Must be zero
+        outside of the domain. The outer list is over trajectories; the
+        inner list is over indices.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Indices inside the domain must precede indices outside
-        of the domain.
+        frames.
+    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+        For each value of the index process, whether each frame of the
+        trajectories is in the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
@@ -204,25 +203,26 @@ def forward_extended_committor_sparse(
         test_basis = basis
     a = 0.0
     b = 0.0
-    for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
+    for x, y, w, m, d, g in zip(
+        test_basis, basis, weights, transitions, in_domain, guess
+    ):
         assert np.all(w[-lag:] == 0.0)
 
-        nd = len(x)
-        _, ni, nt = m.shape
+        ni, _, nt = m.shape
         dtype = np.result_type(*x, *y, w, m, g)
         f = np.zeros((ni, ni, nt), dtype=dtype)
-        m = forward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
+        m = forward_modified_transitions(m, d, f, g, lag, dtype=dtype)
 
-        for i in range(nd):
+        for i in range(ni):
             wx = scipy.sparse.diags(w[:-lag]) @ x[i][:-lag]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(nd):
+            for j in range(ni):
                 yi += scipy.sparse.diags(m[i, j]) @ y[j][lag:]
                 gi += scipy.sparse.diags(m[i, j]) @ g[j][lag:]
-            gi += m[i, nd]  # integral and boundary conditions
+            gi += m[i, ni]  # integral and boundary conditions
 
             yi -= y[i][:-lag]
             gi -= g[i][:-lag]
@@ -231,24 +231,17 @@ def forward_extended_committor_sparse(
             b -= wx.T @ gi
 
     coeffs = scipy.sparse.linalg.spsolve(a, b)
-    result = []
-    for y, g in zip(basis, guess):
-        nd = len(y)
-        ni = len(g)
-        q = []
-        for i in range(nd):
-            q.append(y[i] @ coeffs + g[i])
-        for i in range(nd, ni):
-            q.append(g[i])
-        q = np.array(q)
-        result.append(q)
-    return result
+    return [
+        np.array([yi @ coeffs + gi for yi, gi in zip(y, g)])
+        for y, g in zip(basis, guess)
+    ]
 
 
 def backward_extended_committor_sparse(
     basis,
     weights,
     transitions,
+    in_domain,
     guess,
     lag,
     test_basis=None,
@@ -258,15 +251,17 @@ def backward_extended_committor_sparse(
     Parameters
     ----------
     basis : list of list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the extended committor. Only indices
-        inside the domain should be given. The outer list is over
-        trajectories; the inner list is over indices.
+        Sparse basis for estimating the extended committor. Must be zero
+        outside of the domain. The outer list is over trajectories; the
+        inner list is over indices.
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
     transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
         Possible transitions of the index process between adjacent
-        frames. Indices inside the domain must precede indices outside
-        of the domain.
+        frames.
+    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+        For each value of the index process, whether each frame of the
+        trajectories is in the domain.
     guess : list of (n_indices, n_frames[i]) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
@@ -287,25 +282,26 @@ def backward_extended_committor_sparse(
         test_basis = basis
     a = 0.0
     b = 0.0
-    for x, y, w, m, g in zip(test_basis, basis, weights, transitions, guess):
+    for x, y, w, m, d, g in zip(
+        test_basis, basis, weights, transitions, in_domain, guess
+    ):
         assert np.all(w[-lag:] == 0.0)
 
-        nd = len(x)
         ni, _, nt = m.shape
         dtype = np.result_type(*x, *y, w, m, g)
         f = np.zeros((ni, ni, nt), dtype=dtype)
-        m = backward_modified_transitions(nd, m, f, g, lag, dtype=dtype)
+        m = backward_modified_transitions(m, d, f, g, lag, dtype=dtype)
 
-        for i in range(nd):
+        for i in range(ni):
             wx = scipy.sparse.diags(w[:-lag]) @ x[i][lag:]
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(nd):
+            for j in range(ni):
                 yi += scipy.sparse.diags(m[j, i]) @ y[j][:-lag]
                 gi += scipy.sparse.diags(m[j, i]) @ g[j][:-lag]
-            gi += m[nd, i]  # integral and boundary conditions
+            gi += m[ni, i]  # integral and boundary conditions
 
             yi -= y[i][lag:]
             gi -= g[i][lag:]
@@ -314,15 +310,7 @@ def backward_extended_committor_sparse(
             b -= wx.T @ gi
 
     coeffs = scipy.sparse.linalg.spsolve(a, b)
-    result = []
-    for y, g in zip(basis, guess):
-        nd = len(y)
-        ni = len(g)
-        q = []
-        for i in range(nd):
-            q.append(y[i] @ coeffs + g[i])
-        for i in range(nd, ni):
-            q.append(g[i])
-        q = np.array(q)
-        result.append(q)
-    return result
+    return [
+        np.array([yi @ coeffs + gi for yi, gi in zip(y, g)])
+        for y, g in zip(basis, guess)
+    ]

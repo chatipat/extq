@@ -114,63 +114,55 @@ def moving_matmul(a, k):
     return a[:out_len]
 
 
-def forward_modified_transitions(nd, m, f, g, lag, dtype=np.float64):
-    _, ni, nt = m.shape
-    assert ni >= nd
+def forward_modified_transitions(m, d, f, g, lag, dtype=np.float64):
+    ni, _, nt = m.shape
     assert m.shape == (ni, ni, nt)
+    assert d.shape == (ni, nt + 1)
     assert f.shape == (ni, ni, nt)
     assert g.shape == (ni, nt + 1)
-    r = _forward_modified_transitions_helper(ni, nd, nt, m, f, g, dtype)
+    r = _forward_modified_transitions_helper(ni, nt, m, d, f, g, dtype)
     r = moving_matmul(r, lag)
     result = np.moveaxis(r, 0, -1)
     return result
 
 
 @nb.njit(fastmath=True)
-def _forward_modified_transitions_helper(ni, nd, nt, m, f, g, dtype):
-    r = np.zeros((nt, nd + 1, nd + 1), dtype=dtype)
-    for i in range(nd):
-        for j in range(nd):
-            for n in range(nt):
-                r[n, i, j] = m[i, j, n]
-        # integral
-        for j in range(ni):
-            for n in range(nt):
-                r[n, i, nd] += m[i, j, n] * f[i, j, n]
-        # boundary conditions
-        for j in range(nd, ni):
-            for n in range(nt):
-                r[n, i, nd] += m[i, j, n] * g[j, n + 1]
-    r[:, nd, nd] = 1.0
+def _forward_modified_transitions_helper(ni, nt, m, d, f, g, dtype):
+    r = np.zeros((nt, ni + 1, ni + 1), dtype=dtype)
+    for n in range(nt):
+        for i in range(ni):
+            if d[i, n]:
+                for j in range(ni):
+                    r[n, i, j] = m[i, j, n]
+                    r[n, i, ni] += m[i, j, n] * f[i, j, n]  # integral
+            else:
+                r[n, i, ni] = g[i, n]  # boundary conditions
+        r[n, ni, ni] = 1.0
     return r
 
 
-def backward_modified_transitions(nd, m, f, g, lag, dtype=np.float64):
+def backward_modified_transitions(m, d, f, g, lag, dtype=np.float64):
     ni, _, nt = m.shape
-    assert ni >= nd
     assert m.shape == (ni, ni, nt)
+    assert d.shape == (ni, nt + 1)
     assert f.shape == (ni, ni, nt)
     assert g.shape == (ni, nt + 1)
-    r = _backward_modified_transitions_helper(ni, nd, nt, m, f, g, dtype)
+    r = _backward_modified_transitions_helper(ni, nt, m, d, f, g, dtype)
     r = moving_matmul(r, lag)
     result = np.moveaxis(r, 0, -1)
     return result
 
 
 @nb.njit(fastmath=True)
-def _backward_modified_transitions_helper(ni, nd, nt, m, f, g, dtype):
-    r = np.zeros((nt, nd + 1, nd + 1), dtype=dtype)
-    for j in range(nd):
-        for i in range(nd):
-            for n in range(nt):
-                r[n, i, j] = m[i, j, n]
-        # integral
-        for i in range(ni):
-            for n in range(nt):
-                r[n, nd, j] += m[i, j, n] * f[i, j, n]
-        # boundary conditions
-        for i in range(nd, ni):
-            for n in range(nt):
-                r[n, nd, j] += m[i, j, n] * g[i, n + 0]
-    r[:, nd, nd] = 1.0
+def _backward_modified_transitions_helper(ni, nt, m, d, f, g, dtype):
+    r = np.zeros((nt, ni + 1, ni + 1), dtype=dtype)
+    for n in range(nt):
+        for j in range(ni):
+            if d[j, n + 1]:
+                for i in range(ni):
+                    r[n, i, j] = m[i, j, n]
+                    r[n, ni, j] += m[i, j, n] * f[i, j, n]  # integral
+            else:
+                r[n, ni, j] = g[j, n + 1]  # boundary conditions
+        r[n, ni, ni] = 1.0
     return r
