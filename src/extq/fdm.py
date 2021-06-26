@@ -457,7 +457,7 @@ def reweight(generator):
     return weights
 
 
-def rate(generator, forward_q, backward_q, weights, rxn_coords):
+def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
     """Compute the TPT rate.
 
     Parameters
@@ -470,9 +470,10 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords):
         Backward committor at each point.
     weights : (M,) ndarray of float.
         Reweighting factor at each point.
-    rxn_coords : (M,) ndarray of float
+    rxn_coords : (M,) ndarray of float, optional
         Reaction coordinate at each point. This must be zero in the
-        reactant state and one in the product state.
+        reactant state and one in the product state. If None, estimate
+        the rate without using a reaction coordinate.
 
     Returns
     -------
@@ -480,13 +481,13 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords):
         TPT rate.
 
     """
-    numer = np.sum(
-        (weights * backward_q)
-        * (
+    if rxn_coords is None:
+        numer = (weights * backward_q) @ generator @ forward_q
+    else:
+        numer = (weights * backward_q) @ (
             generator @ (forward_q * rxn_coords)
             - rxn_coords * (generator @ forward_q)
         )
-    )
     denom = np.sum(weights)
     return numer / denom
 
