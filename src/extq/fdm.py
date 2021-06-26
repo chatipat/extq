@@ -3,31 +3,20 @@ import numpy as np
 from scipy import sparse
 
 
-def generator_matrix_reversible_2d(
-    potential,
-    xlo,
-    xnum,
-    ylo,
-    ynum,
-    sep,
-    kT,
-):
+def generator_reversible_2d(potential, kT, x, y):
     """
     Compute the generator matrix for a reversible 2D potential.
 
     Parameters
     ----------
-    potential : callable
-        Potential function for a 2D system. This function is called as
-        potential(x, y), and must be vectorized.
-    xlo, ylo : float
-        Minimum x/y value.
-    xnum, ynum : int
-        Number of x/y values to evaluate.
-    sep : float
-        Separation between each x/y value.
+    potential : (nx, ny) ndarray of float
+        Potential energy for a 2D system.
     kT : float
-        Temperature of the system, in units of the potential.
+        Temperature of the system, in units of energy.
+    x : (nx,) ndarray of float
+        X coordinates. Must be evenly spaced.
+    y : (ny,) ndarray of float
+        Y coordinates. Must be evenly spaced.
 
     Returns
     -------
@@ -36,61 +25,41 @@ def generator_matrix_reversible_2d(
 
     """
 
-    # precompute potential and indices
-    xind, yind = np.ogrid[:xnum, :ynum]
-    xv, yv = xlo + sep * xind, ylo + sep * yind
-    u = potential(xv, yv) / kT
-    ind = np.ravel_multi_index((xind, yind), (xnum, ynum))
+    xsep = (x[-1] - x[0]) / (len(x) - 1)
+    ysep = (y[-1] - y[0]) / (len(y) - 1)
+    assert np.allclose(x[1:] - x[:-1], xsep)
+    assert np.allclose(y[1:] - y[:-1], ysep)
+
+    shape = (len(x), len(y))
+    ind = np.ravel_multi_index(np.ogrid[: len(x), : len(y)], shape)
 
     # possible transitions per step
     transitions = [
-        (np.s_[:-1, :], np.s_[1:, :]),
-        (np.s_[1:, :], np.s_[:-1, :]),
-        (np.s_[:, :-1], np.s_[:, 1:]),
-        (np.s_[:, 1:], np.s_[:, :-1]),
+        (np.s_[:-1, :], np.s_[1:, :], xsep),
+        (np.s_[1:, :], np.s_[:-1, :], xsep),
+        (np.s_[:, :-1], np.s_[:, 1:], ysep),
+        (np.s_[:, 1:], np.s_[:, :-1], ysep),
     ]
 
-    # compute transition matrix
-    tmat = _transition_matrix_reversible_helper(
-        transitions, u, ind, (xnum, ynum)
-    )
-
-    # time step of transition matrix
-    dt = sep ** 2 / (8.0 * kT)
-
-    # generator matrix
-    gen = (tmat - sparse.identity(tmat.shape[0])) / dt
-
-    return gen
+    return _generator_reversible_helper(transitions, potential, kT, ind, shape)
 
 
-def generator_matrix_reversible_3d(
-    potential,
-    xlo,
-    xnum,
-    ylo,
-    ynum,
-    zlo,
-    znum,
-    sep,
-    kT,
-):
+def generator_reversible_3d(potential, kT, x, y, z):
     """
     Compute the generator matrix for a reversible 3D potential.
 
     Parameters
     ----------
-    potential : callable
-        Potential function for a 3D system. This function is called as
-        potential(x, y, z), and must be vectorized.
-    xlo, ylo, zlo : float
-        Minimum x/y/z value.
-    xnum, ynum, znum : int
-        Number of x/y/z values to evaluate.
-    sep : float
-        Separation between each x/y/z value.
+    potential : (nx, ny, nz) ndarray of float
+        Potential energy for a 3D system.
     kT : float
-        Temperature of the system, in units of the potential.
+        Temperature of the system, in units of energy.
+    x : (nx,) ndarray of float
+        X coordinates. Must be evenly spaced.
+    y : (ny,) ndarray of float
+        Y coordinates. Must be evenly spaced.
+    z : (nz,) ndarray of float
+        Z coordinates. Must be evenly spaced.
 
     Returns
     -------
@@ -99,56 +68,48 @@ def generator_matrix_reversible_3d(
 
     """
 
-    # precompute potential and indices
-    xind, yind, zind = np.ogrid[:xnum, :ynum, :znum]
-    xv, yv, zv = xlo + sep * xind, ylo + sep * yind, zlo + sep * zind
-    u = potential(xv, yv, zv) / kT
-    ind = np.ravel_multi_index((xind, yind, zind), (xnum, ynum, znum))
+    xsep = (x[-1] - x[0]) / (len(x) - 1)
+    ysep = (y[-1] - y[0]) / (len(y) - 1)
+    zsep = (z[-1] - z[0]) / (len(z) - 1)
+    assert np.allclose(x[1:] - x[:-1], xsep)
+    assert np.allclose(y[1:] - y[:-1], ysep)
+    assert np.allclose(z[1:] - z[:-1], zsep)
+
+    shape = (len(x), len(y), len(z))
+    ind = np.ravel_multi_index(np.ogrid[: len(x), : len(y), : len(z)], shape)
 
     # possible transitions per step
     transitions = [
-        (np.s_[:-1, :, :], np.s_[1:, :, :]),
-        (np.s_[1:, :, :], np.s_[:-1, :, :]),
-        (np.s_[:, :-1, :], np.s_[:, 1:, :]),
-        (np.s_[:, 1:, :], np.s_[:, :-1, :]),
-        (np.s_[:, :, :-1], np.s_[:, :, 1:]),
-        (np.s_[:, :, 1:], np.s_[:, :, :-1]),
+        (np.s_[:-1, :, :], np.s_[1:, :, :], xsep),
+        (np.s_[1:, :, :], np.s_[:-1, :, :], xsep),
+        (np.s_[:, :-1, :], np.s_[:, 1:, :], ysep),
+        (np.s_[:, 1:, :], np.s_[:, :-1, :], ysep),
+        (np.s_[:, :, :-1], np.s_[:, :, 1:], zsep),
+        (np.s_[:, :, 1:], np.s_[:, :, :-1], zsep),
     ]
 
-    # compute transition matrix
-    tmat = _transition_matrix_reversible_helper(
-        transitions, u, ind, (xnum, ynum, znum)
-    )
-
-    # time step of transition matrix
-    dt = sep ** 2 / (12.0 * kT)
-
-    # generator matrix
-    gen = (tmat - sparse.identity(tmat.shape[0])) / dt
-
-    return gen
+    return _generator_reversible_helper(transitions, potential, kT, ind, shape)
 
 
-def _transition_matrix_reversible_helper(transitions, u, ind, shape):
+def _generator_reversible_helper(transitions, u, kT, ind, shape):
     data = []
     row_ind = []
     col_ind = []
-    p0 = np.ones(shape)
+    p0 = np.zeros(shape)
 
-    # probabilities of transitioning to adjacent cell
-    for row, col in transitions:
-        p = (1.0 / len(transitions)) / (1.0 + np.exp((u[col] - u[row])))
+    # transitioning to adjacent cell
+    for row, col, sep in transitions:
+        p = (2.0 * kT / sep ** 2) / (1.0 + np.exp((u[col] - u[row]) / kT))
         p0[row] -= p
         data.append(p.ravel())
         row_ind.append(ind[row].ravel())
         col_ind.append(ind[col].ravel())
 
-    # probability of not transitioning
+    # not transitioning
     data.append(p0.ravel())
     row_ind.append(ind.ravel())
     col_ind.append(ind.ravel())
 
-    # assemble sparse transition matrix
     data = np.concatenate(data)
     row_ind = np.concatenate(row_ind)
     col_ind = np.concatenate(col_ind)
@@ -157,30 +118,21 @@ def _transition_matrix_reversible_helper(transitions, u, ind, shape):
     )
 
 
-def generator_matrix_irreversible_2d(
-    drift,
-    diffusion,
-    xlo,
-    xhi,
-    xnum,
-    ylo,
-    yhi,
-    ynum,
+def generator_irreversible_2d(
+    drift_x, drift_y, diffusion_x, diffusion_y, x, y
 ):
     """Compute the generator matrix for an irreversible 2D potential.
 
     Parameters
     ----------
-    drift, diffusion : callable
-        Drift and diffusion functions for a 2D system. These functions
-        are called as drift(x, y) and diffusion(x, y), and must
-        be vectorized.
-    xlo, ylo : float
-        Minimum x/y values.
-    xhi, yhi : float
-        Maximum x/y values.
-    xnum, ynum : int
-        Number of x/y values to evaluate.
+    drift_x, drift_y : (nx, ny) ndarray of float
+        Drift for a 2D system.
+    diffusion_x, diffusion_y : (nx, ny) ndarray of float
+        Diffusion for a 2D system.
+    x : (nx,) ndarray of float
+        X coordinates. Must be evenly spaced.
+    y : (ny,) ndarray of float
+        Y coordinates. Must be evenly spaced.
 
     Returns
     -------
@@ -189,91 +141,42 @@ def generator_matrix_irreversible_2d(
 
     """
 
-    # precompute indices and drift/diffusion terms
-    xind, yind = np.ogrid[:xnum, :ynum]
-    ind = np.ravel_multi_index((xind, yind), (xnum, ynum))
-    xsep = (xhi - xlo) / (xnum - 1.0)
-    ysep = (yhi - ylo) / (ynum - 1.0)
-    xv, yv = xlo + xsep * xind, ylo + ysep * yind
-    mu_x, mu_y = drift(xv, yv)
-    sigma_x, sigma_y = diffusion(xv, yv)
+    xsep = (x[-1] - x[0]) / (len(x) - 1)
+    ysep = (y[-1] - y[0]) / (len(y) - 1)
+    assert np.allclose(x[1:] - x[:-1], xsep)
+    assert np.allclose(y[1:] - y[:-1], ysep)
 
-    data = []
-    row_ind = []
-    col_ind = []
-    p0 = np.zeros((xnum, ynum))
+    shape = (len(x), len(y))
+    ind = np.ravel_multi_index(np.ogrid[: len(x), : len(y)], shape)
 
-    # probability of transitioning to adjacent cell
+    # possible transitions per step
+    transitions = [
+        (np.s_[:-1, :], np.s_[1:, :], drift_x, diffusion_x, xsep),
+        (np.s_[1:, :], np.s_[:-1, :], drift_x, diffusion_x, -xsep),
+        (np.s_[:, :-1], np.s_[:, 1:], drift_y, diffusion_y, ysep),
+        (np.s_[:, 1:], np.s_[:, :-1], drift_y, diffusion_y, -ysep),
+    ]
 
-    row, col = np.s_[:-1, :], np.s_[1:, :]
-    p = 0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[1:, :], np.s_[:-1, :]
-    p = -0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[:, :-1], np.s_[:, 1:]
-    p = 0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[:, 1:], np.s_[:, :-1]
-    p = -0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    # probability of not transitioning
-    data.append(p0.ravel())
-    row_ind.append(ind.ravel())
-    col_ind.append(ind.ravel())
-
-    # assemble sparse transition matrix
-    data = np.concatenate(data)
-    row_ind = np.concatenate(row_ind)
-    col_ind = np.concatenate(col_ind)
-    return sparse.csr_matrix(
-        (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
-    )
+    return _generator_irreversible_helper(transitions, ind, shape)
 
 
-def generator_matrix_irreversible_3d(
-    drift,
-    diffusion,
-    xlo,
-    xhi,
-    xnum,
-    ylo,
-    yhi,
-    ynum,
-    zlo,
-    zhi,
-    znum,
+def generator_irreversible_3d(
+    drift_x, drift_y, drift_z, diffusion_x, diffusion_y, diffusion_z, x, y, z
 ):
     """Compute the generator matrix for an irreversible 3D potential.
 
     Parameters
     ----------
-    drift, diffusion : callable
-        Drift and diffusion functions for a 3D system. These functions
-        are called as drift(x, y, z) and diffusion(x, y, z), and must
-        be vectorized.
-    xlo, ylo, zlo : float
-        Minimum x/y/z values.
-    xhi, yhi, zhi : float
-        Maximum x/y/z values.
-    xnum, ynum, znum : int
-        Number of x/y/z values to evaluate.
+    drift_x, drift_y, drift_z : (nx, ny, nz) ndarray of float
+        Drift for a 3D system.
+    diffusion_x, diffusion_y, diffusion_z : (nx, ny, nz) ndarray of float
+        Diffusion for a 3D system.
+    x : (nx,) ndarray of float
+        X coordinates. Must be evenly spaced.
+    y : (ny,) ndarray of float
+        Y coordinates. Must be evenly spaced.
+    z : (nz,) ndarray of float
+        Z coordinates. Must be evenly spaced.
 
     Returns
     -------
@@ -282,71 +185,48 @@ def generator_matrix_irreversible_3d(
 
     """
 
-    # precompute indices and drift/diffusion terms
-    xind, yind, zind = np.ogrid[:xnum, :ynum, :znum]
-    ind = np.ravel_multi_index((xind, yind, zind), (xnum, ynum, znum))
-    xsep = (xhi - xlo) / (xnum - 1.0)
-    ysep = (yhi - ylo) / (ynum - 1.0)
-    zsep = (zhi - zlo) / (znum - 1.0)
-    xv, yv, zv = xlo + xsep * xind, ylo + ysep * yind, zlo + zsep * zind
-    mu_x, mu_y, mu_z = drift(xv, yv, zv)
-    sigma_x, sigma_y, sigma_z = diffusion(xv, yv, zv)
+    xsep = (x[-1] - x[0]) / (len(x) - 1)
+    ysep = (y[-1] - y[0]) / (len(y) - 1)
+    zsep = (z[-1] - z[0]) / (len(z) - 1)
+    assert np.allclose(x[1:] - x[:-1], xsep)
+    assert np.allclose(y[1:] - y[:-1], ysep)
+    assert np.allclose(z[1:] - z[:-1], zsep)
 
+    shape = (len(x), len(y), len(z))
+    ind = np.ravel_multi_index(np.ogrid[: len(x), : len(y), : len(z)], shape)
+
+    # possible transitions per step
+    transitions = [
+        (np.s_[:-1, :, :], np.s_[1:, :, :], drift_x, diffusion_x, xsep),
+        (np.s_[1:, :, :], np.s_[:-1, :, :], drift_x, diffusion_x, -xsep),
+        (np.s_[:, :-1, :], np.s_[:, 1:, :], drift_y, diffusion_y, ysep),
+        (np.s_[:, 1:, :], np.s_[:, :-1, :], drift_y, diffusion_y, -ysep),
+        (np.s_[:, :, :-1], np.s_[:, :, 1:], drift_z, diffusion_z, zsep),
+        (np.s_[:, :, 1:], np.s_[:, :, :-1], drift_z, diffusion_z, -zsep),
+    ]
+
+    return _generator_irreversible_helper(transitions, ind, shape)
+
+
+def _generator_irreversible_helper(transitions, ind, shape):
     data = []
     row_ind = []
     col_ind = []
-    p0 = np.zeros((xnum, ynum, znum))
+    p0 = np.zeros(shape)
 
-    # probability of transitioning to adjacent cell
+    # transitioning to adjacent cell
+    for row, col, drift, diffusion, sep in transitions:
+        p = 0.5 * drift[row] / sep + diffusion[row] / sep ** 2
+        p0[row] -= p
+        data.append(p.ravel())
+        row_ind.append(ind[row].ravel())
+        col_ind.append(ind[col].ravel())
 
-    row, col = np.s_[:-1, :, :], np.s_[1:, :, :]
-    p = 0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[1:, :, :], np.s_[:-1, :, :]
-    p = -0.5 * mu_x[row] / xsep + sigma_x[row] / xsep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[:, :-1, :], np.s_[:, 1:, :]
-    p = 0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[:, 1:, :], np.s_[:, :-1, :]
-    p = -0.5 * mu_y[row] / ysep + sigma_y[row] / ysep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[:, :, :-1], np.s_[:, :, 1:]
-    p = 0.5 * mu_z[row] / zsep + sigma_z[row] / zsep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    row, col = np.s_[:, :, 1:], np.s_[:, :, :-1]
-    p = -0.5 * mu_z[row] / zsep + sigma_z[row] / zsep ** 2
-    p0[row] -= p
-    data.append(p.ravel())
-    row_ind.append(ind[row].ravel())
-    col_ind.append(ind[col].ravel())
-
-    # probability of not transitioning
+    # not transitioning
     data.append(p0.ravel())
     row_ind.append(ind.ravel())
     col_ind.append(ind.ravel())
 
-    # assemble sparse transition matrix
     data = np.concatenate(data)
     row_ind = np.concatenate(row_ind)
     col_ind = np.concatenate(col_ind)
