@@ -524,3 +524,158 @@ def current(generator, forward_q, backward_q, weights, cv):
     numer = 0.5 * (forward_flux - backward_flux)
     denom = np.sum(weights)
     return numer / denom
+
+
+def extended_forward_committor(
+    generator, weights, transitions, in_domain, guess
+):
+    """Compute the forward extended committor.
+
+    Parameters
+    ----------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    weights : (n_points,) ndarray of float
+        Change of measure to the invariant distribution for each point.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
+    in_domain : (n_indices, n_points) ndarray of bool
+        Whether each point is in the domain.
+    guess : (n_indices, n_points) ndarray of float
+        Guess for the extended committor. Must obey boundary conditions.
+
+    Returns
+    -------
+    (n_indices, n_points) ndarray of float
+        Forward extended committor at each point.
+
+    """
+    gen = sparse.bmat(
+        [[generator.multiply(mij) for mij in mi] for mi in transitions],
+        format="csr",
+    )
+    pi = np.concatenate([weights] * len(transitions))
+    d = np.concatenate(in_domain)
+    g = np.concatenate(guess)
+    qp = forward_committor(gen, pi, d, g)
+    return qp.reshape(len(transitions), len(weights))
+
+
+def extended_backward_committor(
+    generator, weights, transitions, in_domain, guess
+):
+    """Compute the backward extended committor.
+
+    Parameters
+    ----------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    weights : (n_points,) ndarray of float
+        Change of measure to the invariant distribution for each point.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
+    in_domain : (n_indices, n_points) ndarray of bool
+        Whether each point is in the domain.
+    guess : (n_indices, n_points) ndarray of float
+        Guess for the extended committor. Must obey boundary conditions.
+
+    Returns
+    -------
+    (n_indices, n_points) ndarray of float
+        Backward extended committor at each point.
+
+    """
+    gen = sparse.bmat(
+        [[generator.multiply(mij) for mij in mi] for mi in transitions],
+        format="csr",
+    )
+    pi = np.concatenate([weights] * len(transitions))
+    d = np.concatenate(in_domain)
+    g = np.concatenate(guess)
+    qm = backward_committor(gen, pi, d, g)
+    return qm.reshape(len(transitions), len(weights))
+
+
+def extended_rate(
+    generator, forward_q, backward_q, weights, transitions, rxn_coords=None
+):
+    """Compute the TPT rate using extended committors.
+
+    Parameters
+    ----------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    forward_q : (n_indices, n_points) ndarray of float
+        Forward extended committor at each point.
+    backward_q : (n_indices, n_points) ndarray of float
+        Backward extended committor at each point.
+    weights : (n_points,) ndarray of float.
+        Change of measure to the invariant distribution at each point.
+    rxn_coords : (n_indices, n_points) ndarray of float, optional
+        Reaction coordinate at each point. This must be zero in the
+        reactant state and one in the product state. If None, estimate
+        the rate without using a reaction coordinate.
+
+    Returns
+    -------
+    float
+        TPT rate.
+
+    """
+    gen = sparse.bmat(
+        [[generator.multiply(mij) for mij in mi] for mi in transitions],
+        format="csr",
+    )
+    qp = np.concatenate(forward_q)
+    qm = np.concatenate(backward_q)
+    pi = np.concatenate([weights] * len(transitions))
+    if rxn_coords is None:
+        h = None
+    else:
+        h = np.concatenate(rxn_coords)
+    r = rate(gen, qp, qm, pi, h)
+    return r * len(transitions)
+
+
+def extended_current(
+    generator, forward_q, backward_q, weights, transitions, cv
+):
+    """Compute the reactive current using extended committors.
+
+    Parameters
+    ----------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    forward_q : (n_indices, n_points) ndarray of float
+        Forward extended committor at each point.
+    backward_q : (n_indices, n_points) ndarray of float
+        Backward extended committor at each point.
+    weights : (n_points,) ndarray of float.
+        Change of measure to the invariant distribution at each point.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
+    rxn_coords : (n_indices, n_points) ndarray of float
+        Collective variable at each point.
+
+    Returns
+    -------
+    (n_indices, n_points) ndarray of float
+        Reactive current at each point.
+
+    """
+    gen = sparse.bmat(
+        [[generator.multiply(mij) for mij in mi] for mi in transitions],
+        format="csr",
+    )
+    qp = np.concatenate(forward_q)
+    qm = np.concatenate(backward_q)
+    pi = np.concatenate([weights] * len(transitions))
+    h = np.concatenate(cv)
+    j = current(gen, qp, qm, pi, h)
+    return j.reshape(len(transitions), len(weights)) * len(transitions)
