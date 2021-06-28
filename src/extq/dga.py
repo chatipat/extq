@@ -1,7 +1,8 @@
 import numba as nb
 import numpy as np
-from scipy import linalg
-from scipy import sparse
+import scipy.linalg
+import scipy.sparse
+import scipy.sparse.linalg
 
 from .stop import backward_stop
 from .stop import forward_stop
@@ -12,18 +13,18 @@ def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
         Basis for estimating the committor. Must be zero outside of the
         domain.
     weights : list of (n_frames[i],) ndarray of float
-        Reweighting factor to the invariant distribution for each frame.
+        Change of measure to the invariant distribution for each frame.
     in_domain : list of (n_frames[i],) ndarray of bool
         Whether each frame of the trajectories is in the domain.
     guess : list of (n_frames[i],) ndarray of float
         Guess for the committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the committor.
         If None, use the basis that is used to estimate the committor.
@@ -43,9 +44,10 @@ def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         assert np.all(w[-lag:] == 0.0)
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
-        a += (x[:-lag].T * w[:-lag]) @ (y[iy] - y[:-lag])
-        b -= (x[:-lag].T * w[:-lag]) @ (g[iy] - g[:-lag])
-    coeffs = linalg.solve(a, b)
+        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        a += wx.T @ (y[iy] - y[:-lag])
+        b -= wx.T @ (g[iy] - g[:-lag])
+    coeffs = _solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
@@ -54,18 +56,18 @@ def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
         Basis for estimating the committor. Must be zero outside of the
         domain.
     weights : list of (n_frames[i],) ndarray of float
-        Reweighting factor to the invariant distribution for each frame.
+        Change of measure to the invariant distribution for each frame.
     in_domain : list of (n_frames[i],) ndarray of bool
         Whether each frame of the trajectories is in the domain.
     guess : list of (n_frames[i],) ndarray of float
         Guess for the committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the committor.
         If None, use the basis that is used to estimate the committor.
@@ -85,97 +87,10 @@ def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         assert np.all(w[-lag:] == 0.0)
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
-        a += (x[lag:].T * w[:-lag]) @ (y[iy] - y[lag:])
-        b -= (x[lag:].T * w[:-lag]) @ (g[iy] - g[lag:])
-    coeffs = linalg.solve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
-
-
-def forward_committor_sparse(
-    basis, weights, in_domain, guess, lag, test_basis=None
-):
-    """Estimate the forward committor using DGA with sparse basis sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the committor. Must be zero outside
-        of the domain.
-    weights : list of (n_frames[i],) ndarray of float
-        Reweighting factor to the invariant distribution for each frame.
-    in_domain : list of (n_frames[i],) ndarray of bool
-        Whether each frame of the trajectories is in the domain.
-    guess : list of (n_frames[i],) ndarray of float
-        Guess for the committor. Must obey boundary conditions.
-    lag : int
-        DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the committor.
-        If None, use the basis that is used to estimate the committor.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the forward committor at each frame of the
-        trajectory.
-
-    """
-    if test_basis is None:
-        test_basis = basis
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, g in zip(test_basis, basis, weights, in_domain, guess):
-        assert np.all(w[-lag:] == 0.0)
-        iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
-        assert np.all(iy < len(d))
-        a += x[:-lag].T @ sparse.diags(w[:-lag]) @ (y[iy] - y[:-lag])
-        b -= x[:-lag].T @ sparse.diags(w[:-lag]) @ (g[iy] - g[:-lag])
-    coeffs = sparse.linalg.spsolve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
-
-
-def backward_committor_sparse(
-    basis, weights, in_domain, guess, lag, test_basis=None
-):
-    """Estimate the backward committor using DGA with sparse basis sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the committor. Must be zero outside
-        of the domain.
-    weights : list of (n_frames[i],) ndarray of float
-        Reweighting factor to the invariant distribution for each frame.
-    in_domain : list of (n_frames[i],) ndarray of bool
-        Whether each frame of the trajectories is in the domain.
-    guess : list of (n_frames[i],) ndarray of float
-        Guess for the committor. Must obey boundary conditions.
-    lag : int
-        DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the committor.
-        If None, use the basis that is used to estimate the committor.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the backward committor at each frame of the
-        trajectory.
-
-    """
-    if test_basis is None:
-        test_basis = basis
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, g in zip(test_basis, basis, weights, in_domain, guess):
-        assert np.all(w[-lag:] == 0.0)
-        iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
-        assert np.all(iy >= 0)
-        a += x[lag:].T @ sparse.diags(w[:-lag]) @ (y[iy] - y[lag:])
-        b -= x[lag:].T @ sparse.diags(w[:-lag]) @ (g[iy] - g[lag:])
-    coeffs = sparse.linalg.spsolve(a, b)
+        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        a += wx.T @ (y[iy] - y[lag:])
+        b -= wx.T @ (g[iy] - g[lag:])
+    coeffs = _solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
@@ -184,7 +99,7 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
         Basis for estimating the mean first passage time. Must be zero
         outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
@@ -196,7 +111,7 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
@@ -218,10 +133,11 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         ix = np.arange(len(d) - lag)
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
-        a += (x[:-lag].T * w[:-lag]) @ (y[iy] - y[:-lag])
-        b -= (x[:-lag].T * w[:-lag]) @ (g[iy] - g[:-lag])
-        b -= (x[:-lag].T * w[:-lag]) @ (iy - ix)
-    coeffs = linalg.solve(a, b)
+        integral = iy - ix
+        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        a += wx.T @ (y[iy] - y[:-lag])
+        b -= wx.T @ (g[iy] - g[:-lag] + integral)
+    coeffs = _solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
@@ -230,7 +146,7 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
         Basis for estimating the mean first passage time. Must be zero
         outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
@@ -242,7 +158,7 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
@@ -264,108 +180,11 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         ix = np.arange(lag, len(d))
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
-        a += (x[lag:].T * w[:-lag]) @ (y[iy] - y[lag:])
-        b -= (x[lag:].T * w[:-lag]) @ (g[iy] - g[lag:])
-        b -= (x[lag:].T * w[:-lag]) @ (ix - iy)
-    coeffs = linalg.solve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
-
-
-def forward_mfpt_sparse(
-    basis, weights, in_domain, guess, lag, test_basis=None
-):
-    """Estimate the forward mean first passage time using DGA with
-    sparse basis sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the mean first passage time. Must be
-        zero outside of the domain.
-    weights : list of (n_frames[i],) ndarray of float
-        Change of measure to the invariant distribution for each frame.
-    in_domain : list of (n_frames[i],) ndarray of bool
-        Whether each frame of the trajectories is in the domain.
-    guess : list of (n_frames[i],) ndarray of float
-        Guess for the mean first passage time. Must obey boundary
-        conditions.
-    lag : int
-        DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the mean first
-        passage time. If None, use the basis that is used to estimate
-        the mean first passage time.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the forward mean first passage time at each frame of
-        the trajectory.
-
-    """
-    if test_basis is None:
-        test_basis = basis
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, g in zip(test_basis, basis, weights, in_domain, guess):
-        assert np.all(w[-lag:] == 0.0)
-        ix = np.arange(len(d) - lag)
-        iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
-        assert np.all(iy < len(d))
-        a += x[:-lag].T @ sparse.diags(w[:-lag]) @ (y[iy] - y[:-lag])
-        b -= x[:-lag].T @ sparse.diags(w[:-lag]) @ (g[iy] - g[:-lag])
-        b -= x[:-lag].T @ sparse.diags(w[:-lag]) @ (iy - ix)
-    coeffs = sparse.linalg.spsolve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
-
-
-def backward_mfpt_sparse(
-    basis, weights, in_domain, guess, lag, test_basis=None
-):
-    """Estimate the backward mean first passage time using DGA with
-    sparse basis sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the mean first passage time. Must be
-        zero outside of the domain.
-    weights : list of (n_frames[i],) ndarray of float
-        Change of measure to the invariant distribution for each frame.
-    in_domain : list of (n_frames[i],) ndarray of bool
-        Whether each frame of the trajectories is in the domain.
-    guess : list of (n_frames[i],) ndarray of float
-        Guess for the mean first passage time. Must obey boundary
-        conditions.
-    lag : int
-        DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the mean first
-        passage time. If None, use the basis that is used to estimate
-        the mean first passage time.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the backward mean first passage time at each frame of
-        the trajectory.
-
-    """
-    if test_basis is None:
-        test_basis = basis
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, g in zip(test_basis, basis, weights, in_domain, guess):
-        assert np.all(w[-lag:] == 0.0)
-        ix = np.arange(lag, len(d))
-        iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
-        assert np.all(iy >= 0)
-        a += x[lag:].T @ sparse.diags(w[:-lag]) @ (y[iy] - y[lag:])
-        b -= x[lag:].T @ sparse.diags(w[:-lag]) @ (g[iy] - g[lag:])
-        b -= x[lag:].T @ sparse.diags(w[:-lag]) @ (ix - iy)
-    coeffs = sparse.linalg.spsolve(a, b)
+        integral = ix - iy
+        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        a += wx.T @ (y[iy] - y[lag:])
+        b -= wx.T @ (g[iy] - g[lag:] + integral)
+    coeffs = _solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
@@ -376,7 +195,7 @@ def forward_feynman_kac(
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
         Basis for estimating the solution of the Feynman-Kac formula.
         Must be zero outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
@@ -390,7 +209,7 @@ def forward_feynman_kac(
         Guess of the solution. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
@@ -412,10 +231,11 @@ def forward_feynman_kac(
         assert np.all(w[-lag:] == 0.0)
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
-        a += (x[:-lag].T * w[:-lag]) @ (y[iy] - y[:-lag])
-        b -= (x[:-lag].T * w[:-lag]) @ (g[iy] - g[:-lag])
-        b -= (x[:-lag].T * w[:-lag]) @ _forward_feynman_kac_helper(iy, f, lag)
-    coeffs = linalg.solve(a, b)
+        integral = _forward_feynman_kac_helper(iy, f, lag)
+        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        a += wx.T @ (y[iy] - y[:-lag])
+        b -= wx.T @ (g[iy] - g[:-lag] + integral)
+    coeffs = _solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
@@ -426,7 +246,7 @@ def backward_feynman_kac(
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
         Basis for estimating the solution of the Feynman-Kac formula.
         Must be zero outside of the domain.
     weights : list of (n_frames[i],) ndarray of float
@@ -440,7 +260,7 @@ def backward_feynman_kac(
         Guess of the solution. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
+    test_basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
@@ -462,120 +282,11 @@ def backward_feynman_kac(
         assert np.all(w[-lag:] == 0.0)
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
-        a += (x[lag:].T * w[:-lag]) @ (y[iy] - y[lag:])
-        b -= (x[lag:].T * w[:-lag]) @ (g[iy] - g[lag:])
-        b -= (x[lag:].T * w[:-lag]) @ _backward_feynman_kac_helper(iy, f, lag)
-    coeffs = linalg.solve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
-
-
-def forward_feynman_kac_sparse(
-    basis, weights, in_domain, function, guess, lag, test_basis=None
-):
-    """Solve the forward Feynman-Kac formula using DGA with sparse basis
-    sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the solution of the Feynman-Kac
-        formula. Must be zero outside of the domain.
-    weights : list of (n_frames[i],) ndarray of float
-        Change of measure to the invariant distribution for each frame.
-    in_domain : list of (n_frames[i],) ndarray of bool
-        Whether each frame of the trajectories is in the domain.
-    function : list of (n_frames[i]-1,) ndarray of float
-        Function to integrate. Note that is defined over transitions,
-        not frames.
-    guess : list of (n_frames[i],) ndarray of float
-        Guess of the solution. Must obey boundary conditions.
-    lag : int
-        DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the solution.
-        If None, use the basis that is used to estimate the solution.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the solution of the forward Feynman-Kac formula at
-        each frame of the trajectory.
-
-    """
-    if test_basis is None:
-        test_basis = basis
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess
-    ):
-        assert np.all(w[-lag:] == 0.0)
-        iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
-        assert np.all(iy < len(d))
-        a += x[:-lag].T @ sparse.diags(w[:-lag]) @ (y[iy] - y[:-lag])
-        b -= x[:-lag].T @ sparse.diags(w[:-lag]) @ (g[iy] - g[:-lag])
-        b -= (
-            x[:-lag].T
-            @ sparse.diags(w[:-lag])
-            @ _forward_feynman_kac_helper(iy, f, lag)
-        )
-    coeffs = sparse.linalg.spsolve(a, b)
-    return [y @ coeffs + g for y, g in zip(basis, guess)]
-
-
-def backward_feynman_kac_sparse(
-    basis, weights, in_domain, function, guess, lag, test_basis=None
-):
-    """Solve the backward Feynman-Kac formula using DGA with sparse basis
-    sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the solution of the Feynman-Kac
-        formula. Must be zero outside of the domain.
-    weights : list of (n_frames[i],) ndarray of float
-        Change of measure to the invariant distribution for each frame.
-    in_domain : list of (n_frames[i],) ndarray of bool
-        Whether each frame of the trajectories is in the domain.
-    function : list of (n_frames[i]-1,) ndarray of float
-        Function to integrate. Note that is defined over transitions,
-        not frames.
-    guess : list of (n_frames[i],) ndarray of float
-        Guess of the solution. Must obey boundary conditions.
-    lag : int
-        DGA lag time in units of frames.
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the solution.
-        If None, use the basis that is used to estimate the solution.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the solution of the backward Feynman-Kac formula at
-        each frame of the trajectory.
-
-    """
-    if test_basis is None:
-        test_basis = basis
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess
-    ):
-        assert np.all(w[-lag:] == 0.0)
-        iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
-        assert np.all(iy >= 0)
-        a += x[lag:].T @ sparse.diags(w[:-lag]) @ (y[iy] - y[lag:])
-        b -= x[lag:].T @ sparse.diags(w[:-lag]) @ (g[iy] - g[lag:])
-        b -= (
-            x[lag:].T
-            @ sparse.diags(w[:-lag])
-            @ _backward_feynman_kac_helper(iy, f, lag)
-        )
-    coeffs = sparse.linalg.spsolve(a, b)
+        integral = _backward_feynman_kac_helper(iy, f, lag)
+        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        a += wx.T @ (y[iy] - y[lag:])
+        b -= wx.T @ (g[iy] - g[lag:] + integral)
+    coeffs = _solve(a, b)
     return [y @ coeffs + g for y, g in zip(basis, guess)]
 
 
@@ -602,12 +313,12 @@ def _backward_feynman_kac_helper(iy, f, lag):
 
 
 def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
-    """Estimate the reweighting factors to the invariant distribution.
+    """Estimate the change of measure to the invariant distribution.
 
     Parameters
     ----------
-    basis : list of (n_frames[i], n_basis) ndarray of float
-        Basis for estimating the reweighting factors.
+    basis : list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+        Basis for estimating the change of measure.
     lag : int
         Lag time in unit of frames.
     maxlag : int
@@ -615,73 +326,19 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
         to have zero weight. This is the maximum lag time the output
         weights can be used with by other methods.
     guess : list of (n_frames[i],) ndarray of float, optional
-        Guess for the reweighting factors. The last maxlag frames of
+        Guess for the change of measure. The last maxlag frames of
         each trajectory must be zero.
         If None, use uniform weights (except for the last lag frames).
     test_basis : list of (n_frames[i], n_basis) ndarray of float, optional
         Test basis against which to minimize the error. Must have the
-        same dimension as the basis used to estimate the reweighting
-        factors.
-        If None, use the basis that is used to estimate the reweighting
-        factors.
+        same dimension as the basis used to estimate the change of
+        measure. If None, use the basis that is used to estimate the
+        change of measure.
 
     Returns
     -------
     list of (n_frames[i],) ndarray
-        Estimate of the reweighting factors at each frame of the
-        trajectory.
-
-    """
-    if maxlag is None:
-        maxlag = lag
-    assert maxlag >= lag
-    if test_basis is None:
-        test_basis = basis
-    if guess is None:
-        guess = []
-        for x in basis:
-            w = np.ones(len(x))
-            w[-maxlag:] = 0.0
-            guess.append(w)
-    a = 0.0
-    b = 0.0
-    for x, y, w in zip(test_basis, basis, guess):
-        assert np.all(w[-maxlag:] == 0.0)
-        a += ((x[lag:] - x[:-lag]).T * w[:-lag]) @ y[:-lag]
-        b -= (x[lag:] - x[:-lag]).T @ w[:-lag]
-    coeffs = linalg.solve(a, b)
-    return [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess)]
-
-
-def reweight_sparse(basis, lag, maxlag=None, guess=None, test_basis=None):
-    """Estimate the reweighting factors to the invariant distribution
-    using sparse basis sets.
-
-    Parameters
-    ----------
-    basis : list of (n_frames[i], n_basis) sparse matrix of float
-        Sparse basis for estimating the reweighting factors.
-    lag : int
-        Lag time in unit of frames.
-    maxlag : int
-        Number of frames at the end of each trajectory that are required
-        to have zero weight. This is the maximum lag time the output
-        weights can be used with by other methods.
-    guess : list of (n_frames[i],) ndarray of float, optional
-        Guess for the reweighting factors. The last maxlag frames of
-        each trajectory must be zero.
-        If None, use uniform weights (except for the last lag frames).
-    test_basis : list of (n_frames[i], n_basis) sparse matrix of float, optional
-        Sparse test basis against which to minimize the error. Must have
-        the same dimension as the basis used to estimate the reweighting
-        factors.
-        If None, use the basis that is used to estimate the reweighting
-        factors.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray
-        Estimate of the reweighting factors at each frame of the
+        Estimate of the change of measure at each frame of the
         trajectory.
 
     """
@@ -700,7 +357,15 @@ def reweight_sparse(basis, lag, maxlag=None, guess=None, test_basis=None):
     b = 0.0
     for x, y, w in zip(test_basis, basis, guess):
         assert np.all(w[-maxlag:] == 0.0)
-        a += (x[lag:] - x[:-lag]).T @ sparse.diags(w[:-lag]) @ y[:-lag]
-        b -= (x[lag:] - x[:-lag]).T @ w[:-lag]
-    coeffs = sparse.linalg.spsolve(a, b)
+        wdx = scipy.sparse.diags(w[:-lag]) @ (x[lag:] - x[:-lag])
+        a += wdx.T @ y[:-lag]
+        b -= np.ravel(wdx.sum(axis=0))
+    coeffs = _solve(a, b)
     return [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess)]
+
+
+def _solve(a, b):
+    if scipy.sparse.issparse(a):
+        return scipy.sparse.linalg.spsolve(a, b)
+    else:
+        return scipy.linalg.solve(a, b)
