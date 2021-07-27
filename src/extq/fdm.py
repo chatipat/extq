@@ -527,7 +527,12 @@ def current(generator, forward_q, backward_q, weights, cv):
 
 
 def extended_forward_committor(
-    generator, weights, transitions, in_domain, guess
+    generator,
+    weights,
+    transitions,
+    in_domain,
+    guess,
+    dt=None,
 ):
     """Compute the forward extended committor.
 
@@ -545,6 +550,8 @@ def extended_forward_committor(
         Whether each point is in the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
+    dt : float, optional
+        Timestep of the transitions, if time-dependent.
 
     Returns
     -------
@@ -552,10 +559,7 @@ def extended_forward_committor(
         Forward extended committor at each point.
 
     """
-    gen = sparse.bmat(
-        [[generator.multiply(mij) for mij in mi] for mi in transitions],
-        format="csr",
-    )
+    gen = _extended_generator(generator, transitions, dt=dt)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     g = np.concatenate(guess)
@@ -564,7 +568,12 @@ def extended_forward_committor(
 
 
 def extended_backward_committor(
-    generator, weights, transitions, in_domain, guess
+    generator,
+    weights,
+    transitions,
+    in_domain,
+    guess,
+    dt=None,
 ):
     """Compute the backward extended committor.
 
@@ -582,6 +591,8 @@ def extended_backward_committor(
         Whether each point is in the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
+    dt : float, optional
+        Timestep of the transitions, if time-dependent.
 
     Returns
     -------
@@ -589,10 +600,7 @@ def extended_backward_committor(
         Backward extended committor at each point.
 
     """
-    gen = sparse.bmat(
-        [[generator.multiply(mij) for mij in mi] for mi in transitions],
-        format="csr",
-    )
+    gen = _extended_generator(generator, transitions, dt=dt)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     g = np.concatenate(guess)
@@ -601,7 +609,13 @@ def extended_backward_committor(
 
 
 def extended_rate(
-    generator, forward_q, backward_q, weights, transitions, rxn_coords=None
+    generator,
+    forward_q,
+    backward_q,
+    weights,
+    transitions,
+    rxn_coords=None,
+    dt=None,
 ):
     """Compute the TPT rate using extended committors.
 
@@ -619,6 +633,8 @@ def extended_rate(
         Reaction coordinate at each point. This must be zero in the
         reactant state and one in the product state. If None, estimate
         the rate without using a reaction coordinate.
+    dt : float, optional
+        Timestep of the transitions, if time-dependent.
 
     Returns
     -------
@@ -626,10 +642,7 @@ def extended_rate(
         TPT rate.
 
     """
-    gen = sparse.bmat(
-        [[generator.multiply(mij) for mij in mi] for mi in transitions],
-        format="csr",
-    )
+    gen = _extended_generator(generator, transitions, dt=dt)
     qp = np.concatenate(forward_q)
     qm = np.concatenate(backward_q)
     pi = np.concatenate([weights] * len(transitions))
@@ -642,7 +655,13 @@ def extended_rate(
 
 
 def extended_current(
-    generator, forward_q, backward_q, weights, transitions, cv
+    generator,
+    forward_q,
+    backward_q,
+    weights,
+    transitions,
+    cv,
+    dt=None,
 ):
     """Compute the reactive current using extended committors.
 
@@ -662,6 +681,8 @@ def extended_current(
         (n_points, n_points).
     rxn_coords : (n_indices, n_points) ndarray of float
         Collective variable at each point.
+    dt : float, optional
+        Timestep of the transitions, if time-dependent.
 
     Returns
     -------
@@ -669,13 +690,43 @@ def extended_current(
         Reactive current at each point.
 
     """
-    gen = sparse.bmat(
-        [[generator.multiply(mij) for mij in mi] for mi in transitions],
-        format="csr",
-    )
+    gen = _extended_generator(generator, transitions, dt=dt)
     qp = np.concatenate(forward_q)
     qm = np.concatenate(backward_q)
     pi = np.concatenate([weights] * len(transitions))
     h = np.concatenate(cv)
     j = current(gen, qp, qm, pi, h)
     return j.reshape(len(transitions), len(weights)) * len(transitions)
+
+
+def _extended_generator(generator, transitions, dt=None):
+    """Compute the generator for extended DGA/TPT.
+
+    Parameters
+    ----------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
+    dt : float, optional
+        Timestep of the transitions, if time-dependent.
+
+    """
+    # time-independent term
+    xgen = sparse.bmat(
+        [[generator.multiply(mij) for mij in mi] for mi in transitions],
+        format="csr",
+    )
+    # time-dependent term
+    if dt is not None:
+        eye = sparse.eye(generator.shape[0])
+        xgen += (
+            sparse.bmat(
+                [[eye.multiply(mij) for mij in mi] for mi in transitions],
+                format="csr",
+            )
+            - sparse.eye(xgen.shape[0])
+        ) / dt
+    return xgen
