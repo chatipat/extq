@@ -1,6 +1,6 @@
-import numba as nb
 import numpy as np
-from scipy import sparse
+import scipy.sparse
+import scipy.sparse.linalg
 
 
 def generator_reversible_2d(potential, kT, x, y):
@@ -113,7 +113,7 @@ def _generator_reversible_helper(transitions, u, kT, ind, shape):
     data = np.concatenate(data)
     row_ind = np.concatenate(row_ind)
     col_ind = np.concatenate(col_ind)
-    return sparse.csr_matrix(
+    return scipy.sparse.csr_matrix(
         (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
     )
 
@@ -230,7 +230,7 @@ def _generator_irreversible_helper(transitions, ind, shape):
     data = np.concatenate(data)
     row_ind = np.concatenate(row_ind)
     col_ind = np.concatenate(col_ind)
-    return sparse.csr_matrix(
+    return scipy.sparse.csr_matrix(
         (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
     )
 
@@ -257,10 +257,11 @@ def forward_committor(generator, weights, in_domain, guess):
     """
     a = generator[in_domain, :][:, in_domain]
     b = -generator[in_domain, :] @ guess
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
         guess
-        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
+        @ coeffs
     )
 
 
@@ -285,14 +286,17 @@ def backward_committor(generator, weights, in_domain, guess):
 
     """
     adjoint_generator = (
-        sparse.diags(1.0 / weights) @ generator.T @ sparse.diags(weights)
+        scipy.sparse.diags(1.0 / weights)
+        @ generator.T
+        @ scipy.sparse.diags(weights)
     )
     a = adjoint_generator[in_domain, :][:, in_domain]
     b = -adjoint_generator[in_domain, :] @ guess
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
         guess
-        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
+        @ coeffs
     )
 
 
@@ -319,10 +323,11 @@ def forward_mfpt(generator, weights, in_domain, guess):
     """
     a = generator[in_domain, :][:, in_domain]
     b = -generator[in_domain, :] @ guess - 1.0
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
         guess
-        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
+        @ coeffs
     )
 
 
@@ -348,14 +353,17 @@ def backward_mfpt(generator, weights, in_domain, guess):
 
     """
     adjoint_generator = (
-        sparse.diags(1.0 / weights) @ generator.T @ sparse.diags(weights)
+        scipy.sparse.diags(1.0 / weights)
+        @ generator.T
+        @ scipy.sparse.diags(weights)
     )
     a = adjoint_generator[in_domain, :][:, in_domain]
     b = -adjoint_generator[in_domain, :] @ guess - 1.0
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
         guess
-        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
+        @ coeffs
     )
 
 
@@ -384,10 +392,11 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
     assert np.all(function[np.logical_not(in_domain)] == 0.0)
     a = generator[in_domain, :][:, in_domain]
     b = -generator[in_domain, :] @ guess - function[in_domain]
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
         guess
-        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
+        @ coeffs
     )
 
 
@@ -415,14 +424,17 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
     """
     assert np.all(function[np.logical_not(in_domain)] == 0.0)
     adjoint_generator = (
-        sparse.diags(1.0 / weights) @ generator.T @ sparse.diags(weights)
+        scipy.sparse.diags(1.0 / weights)
+        @ generator.T
+        @ scipy.sparse.diags(weights)
     )
     a = adjoint_generator[in_domain, :][:, in_domain]
     b = -adjoint_generator[in_domain, :] @ guess - function[in_domain]
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
         guess
-        + sparse.identity(len(weights), format="csr")[:, in_domain] @ coeffs
+        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
+        @ coeffs
     )
 
 
@@ -448,7 +460,7 @@ def reweight(generator):
 
     a = generator.T[mask, :][:, mask]
     b = -generator.T[mask, fixed_index]
-    coeffs = sparse.linalg.spsolve(a, b)
+    coeffs = scipy.sparse.linalg.spsolve(a, b)
 
     weights = np.empty(generator.shape[0])
     weights[fixed_index] = 1.0
@@ -715,18 +727,18 @@ def _extended_generator(generator, transitions, dt=None):
 
     """
     # time-independent term
-    xgen = sparse.bmat(
+    xgen = scipy.sparse.bmat(
         [[generator.multiply(mij) for mij in mi] for mi in transitions],
         format="csr",
     )
     # time-dependent term
     if dt is not None:
-        eye = sparse.eye(generator.shape[0])
+        eye = scipy.sparse.eye(generator.shape[0])
         xgen += (
-            sparse.bmat(
+            scipy.sparse.bmat(
                 [[eye.multiply(mij) for mij in mi] for mi in transitions],
                 format="csr",
             )
-            - sparse.eye(xgen.shape[0])
+            - scipy.sparse.eye(xgen.shape[0])
         ) / dt
     return xgen
