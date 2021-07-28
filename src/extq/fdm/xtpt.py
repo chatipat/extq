@@ -12,7 +12,7 @@ from .tpt import forward_mfpt
 from .tpt import rate
 
 
-def extended_forward_committor(
+def forward_extended_committor(
     generator,
     weights,
     transitions,
@@ -53,7 +53,7 @@ def extended_forward_committor(
     return qp.reshape(len(transitions), len(weights))
 
 
-def extended_backward_committor(
+def backward_extended_committor(
     generator,
     weights,
     transitions,
@@ -94,7 +94,7 @@ def extended_backward_committor(
     return qm.reshape(len(transitions), len(weights))
 
 
-def extended_forward_mfpt(
+def forward_extended_mfpt(
     generator,
     weights,
     transitions,
@@ -136,7 +136,7 @@ def extended_forward_mfpt(
     return mfpt.reshape(len(transitions), len(weights))
 
 
-def extended_backward_mfpt(
+def backward_extended_mfpt(
     generator,
     weights,
     transitions,
@@ -178,7 +178,7 @@ def extended_backward_mfpt(
     return mfpt.reshape(len(transitions), len(weights))
 
 
-def extended_forward_feynman_kac(
+def forward_extended_feynman_kac(
     generator,
     weights,
     transitions,
@@ -223,7 +223,7 @@ def extended_forward_feynman_kac(
     return soln.reshape(len(transitions), len(weights))
 
 
-def extended_backward_feynman_kac(
+def backward_extended_feynman_kac(
     generator,
     weights,
     transitions,
