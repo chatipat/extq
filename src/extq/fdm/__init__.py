@@ -12,6 +12,10 @@ from .tpt import forward_mfpt
 from .tpt import rate
 from .tpt import reweight
 from .xtpt import extended_backward_committor
+from .xtpt import extended_backward_feynman_kac
+from .xtpt import extended_backward_mfpt
 from .xtpt import extended_current
 from .xtpt import extended_forward_committor
+from .xtpt import extended_forward_feynman_kac
+from .xtpt import extended_forward_mfpt
 from .xtpt import extended_rate
