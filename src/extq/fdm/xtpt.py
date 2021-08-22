@@ -18,7 +18,7 @@ def forward_extended_committor(
     transitions,
     in_domain,
     guess,
-    dt=None,
+    time_transitions=None,
 ):
     """Compute the forward extended committor.
 
@@ -36,8 +36,8 @@ def forward_extended_committor(
         Whether each point is in the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -45,7 +45,7 @@ def forward_extended_committor(
         Forward extended committor at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     g = np.concatenate(guess)
@@ -59,7 +59,7 @@ def backward_extended_committor(
     transitions,
     in_domain,
     guess,
-    dt=None,
+    time_transitions=None,
 ):
     """Compute the backward extended committor.
 
@@ -77,8 +77,8 @@ def backward_extended_committor(
         Whether each point is in the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -86,7 +86,7 @@ def backward_extended_committor(
         Backward extended committor at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     g = np.concatenate(guess)
@@ -100,7 +100,7 @@ def forward_extended_mfpt(
     transitions,
     in_domain,
     guess,
-    dt=None,
+    time_transitions=None,
 ):
     """Compute the forward mean first passage time.
 
@@ -119,8 +119,8 @@ def forward_extended_mfpt(
     guess : (n_indices, n_points) ndarray of float
         Guess for the mean first passage time. Must obey boundary
         conditions.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -128,7 +128,7 @@ def forward_extended_mfpt(
         Forward mean first passage time at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     g = np.concatenate(guess)
@@ -142,7 +142,7 @@ def backward_extended_mfpt(
     transitions,
     in_domain,
     guess,
-    dt=None,
+    time_transitions=None,
 ):
     """Compute the backward mean first passage time.
 
@@ -161,8 +161,8 @@ def backward_extended_mfpt(
     guess : (n_indices, n_points) ndarray of float
         Guess for the mean first passage time. Must obey boundary
         conditions.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -170,7 +170,7 @@ def backward_extended_mfpt(
         Backward mean first passage time at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     g = np.concatenate(guess)
@@ -185,7 +185,7 @@ def forward_extended_feynman_kac(
     in_domain,
     function,
     guess,
-    dt=None,
+    time_transitions=None,
 ):
     """Solve the forward Feynman-Kac formula.
 
@@ -205,8 +205,8 @@ def forward_extended_feynman_kac(
         Function to integrate. Must be zero outside of the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the solution. Must obey boundary conditions.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -214,7 +214,7 @@ def forward_extended_feynman_kac(
         Solution of the Feynman-Kac formula at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     f = np.concatenate(function)
@@ -230,7 +230,7 @@ def backward_extended_feynman_kac(
     in_domain,
     function,
     guess,
-    dt=None,
+    time_transitions=None,
 ):
     """Solve the backward Feynman-Kac formula.
 
@@ -250,8 +250,8 @@ def backward_extended_feynman_kac(
         Function to integrate. Must be zero outside of the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the solution. Must obey boundary conditions.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -259,7 +259,7 @@ def backward_extended_feynman_kac(
         Solution of the Feynman-Kac formula at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     pi = np.concatenate([weights] * len(transitions))
     d = np.concatenate(in_domain)
     f = np.concatenate(function)
@@ -275,7 +275,7 @@ def extended_rate(
     weights,
     transitions,
     rxn_coords=None,
-    dt=None,
+    time_transitions=None,
 ):
     """Compute the TPT rate using extended committors.
 
@@ -293,8 +293,8 @@ def extended_rate(
         Reaction coordinate at each point. This must be zero in the
         reactant state and one in the product state. If None, estimate
         the rate without using a reaction coordinate.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -302,7 +302,7 @@ def extended_rate(
         TPT rate.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     qp = np.concatenate(forward_q)
     qm = np.concatenate(backward_q)
     pi = np.concatenate([weights] * len(transitions))
@@ -321,7 +321,7 @@ def extended_current(
     weights,
     transitions,
     cv,
-    dt=None,
+    time_transitions=None,
 ):
     """Compute the reactive current using extended committors.
 
@@ -341,8 +341,8 @@ def extended_current(
         (n_points, n_points).
     rxn_coords : (n_indices, n_points) ndarray of float
         Collective variable at each point.
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     Returns
     -------
@@ -350,7 +350,7 @@ def extended_current(
         Reactive current at each point.
 
     """
-    gen = _extended_generator(generator, transitions, dt=dt)
+    gen = _extended_generator(generator, transitions, time_transitions)
     qp = np.concatenate(forward_q)
     qm = np.concatenate(backward_q)
     pi = np.concatenate([weights] * len(transitions))
@@ -359,7 +359,7 @@ def extended_current(
     return j.reshape(len(transitions), len(weights)) * len(transitions)
 
 
-def _extended_generator(generator, transitions, dt=None):
+def _extended_generator(generator, transitions, time_transitions=None):
     """Compute the generator for extended DGA/TPT.
 
     Parameters
@@ -370,8 +370,8 @@ def _extended_generator(generator, transitions, dt=None):
         Possible transitions between indices. Each element
         transitions[i, j] may be a scalar or a sparse matrix of shape
         (n_points, n_points).
-    dt : float, optional
-        Timestep of the transitions, if time-dependent.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+        Time-dependent transitions between indices.
 
     """
     # time-independent term
@@ -380,13 +380,12 @@ def _extended_generator(generator, transitions, dt=None):
         format="csr",
     )
     # time-dependent term
-    if dt is not None:
-        eye = scipy.sparse.eye(generator.shape[0])
-        xgen += (
-            scipy.sparse.bmat(
-                [[eye.multiply(mij) for mij in mi] for mi in transitions],
-                format="csr",
-            )
-            - scipy.sparse.eye(xgen.shape[0])
-        ) / dt
+    if time_transitions is not None:
+        xgen += scipy.sparse.bmat(
+            [
+                [scipy.sparse.diags(mij) for mij in mi]
+                for mi in time_transitions
+            ],
+            format="csr",
+        )
     return xgen
