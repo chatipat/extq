@@ -2,13 +2,9 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 
-from .tpt import backward_committor
 from .tpt import backward_feynman_kac
-from .tpt import backward_mfpt
 from .tpt import current
-from .tpt import forward_committor
 from .tpt import forward_feynman_kac
-from .tpt import forward_mfpt
 from .tpt import rate
 
 
@@ -45,12 +41,15 @@ def forward_extended_committor(
         Forward extended committor at each point.
 
     """
-    gen = _extended_generator(generator, transitions, time_transitions)
-    pi = np.concatenate([weights] * len(transitions))
-    d = np.concatenate(in_domain)
-    g = np.concatenate(guess)
-    qp = forward_committor(gen, pi, d, g)
-    return qp.reshape(len(transitions), len(weights))
+    return forward_extended_feynman_kac(
+        generator,
+        weights,
+        transitions,
+        in_domain,
+        0.0,
+        guess,
+        time_transitions,
+    )
 
 
 def backward_extended_committor(
@@ -86,12 +85,15 @@ def backward_extended_committor(
         Backward extended committor at each point.
 
     """
-    gen = _extended_generator(generator, transitions, time_transitions)
-    pi = np.concatenate([weights] * len(transitions))
-    d = np.concatenate(in_domain)
-    g = np.concatenate(guess)
-    qm = backward_committor(gen, pi, d, g)
-    return qm.reshape(len(transitions), len(weights))
+    return backward_extended_feynman_kac(
+        generator,
+        weights,
+        transitions,
+        in_domain,
+        0.0,
+        guess,
+        time_transitions,
+    )
 
 
 def forward_extended_mfpt(
@@ -128,12 +130,15 @@ def forward_extended_mfpt(
         Forward mean first passage time at each point.
 
     """
-    gen = _extended_generator(generator, transitions, time_transitions)
-    pi = np.concatenate([weights] * len(transitions))
-    d = np.concatenate(in_domain)
-    g = np.concatenate(guess)
-    mfpt = forward_mfpt(gen, pi, d, g)
-    return mfpt.reshape(len(transitions), len(weights))
+    return forward_extended_feynman_kac(
+        generator,
+        weights,
+        transitions,
+        in_domain,
+        1.0,
+        guess,
+        time_transitions,
+    )
 
 
 def backward_extended_mfpt(
@@ -170,12 +175,15 @@ def backward_extended_mfpt(
         Backward mean first passage time at each point.
 
     """
-    gen = _extended_generator(generator, transitions, time_transitions)
-    pi = np.concatenate([weights] * len(transitions))
-    d = np.concatenate(in_domain)
-    g = np.concatenate(guess)
-    mfpt = backward_mfpt(gen, pi, d, g)
-    return mfpt.reshape(len(transitions), len(weights))
+    return backward_extended_feynman_kac(
+        generator,
+        weights,
+        transitions,
+        in_domain,
+        1.0,
+        guess,
+        time_transitions,
+    )
 
 
 def forward_extended_feynman_kac(
@@ -214,13 +222,9 @@ def forward_extended_feynman_kac(
         Solution of the Feynman-Kac formula at each point.
 
     """
+    pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    pi = np.concatenate([weights] * len(transitions))
-    d = np.concatenate(in_domain)
-    f = np.concatenate(function)
-    g = np.concatenate(guess)
-    soln = forward_feynman_kac(gen, pi, d, f, g)
-    return soln.reshape(len(transitions), len(weights))
+    return forward_feynman_kac(gen, pi, in_domain, function, guess)
 
 
 def backward_extended_feynman_kac(
@@ -259,13 +263,9 @@ def backward_extended_feynman_kac(
         Solution of the Feynman-Kac formula at each point.
 
     """
+    pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    pi = np.concatenate([weights] * len(transitions))
-    d = np.concatenate(in_domain)
-    f = np.concatenate(function)
-    g = np.concatenate(guess)
-    soln = backward_feynman_kac(gen, pi, d, f, g)
-    return soln.reshape(len(transitions), len(weights))
+    return backward_feynman_kac(gen, pi, in_domain, function, guess)
 
 
 def extended_rate(
@@ -302,16 +302,9 @@ def extended_rate(
         TPT rate.
 
     """
+    pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    qp = np.concatenate(forward_q)
-    qm = np.concatenate(backward_q)
-    pi = np.concatenate([weights] * len(transitions))
-    if rxn_coords is None:
-        h = None
-    else:
-        h = np.concatenate(rxn_coords)
-    r = rate(gen, qp, qm, pi, h)
-    return r * len(transitions)
+    return rate(gen, forward_q, backward_q, pi, rxn_coords) * len(transitions)
 
 
 def extended_current(
@@ -350,13 +343,9 @@ def extended_current(
         Reactive current at each point.
 
     """
+    pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    qp = np.concatenate(forward_q)
-    qm = np.concatenate(backward_q)
-    pi = np.concatenate([weights] * len(transitions))
-    h = np.concatenate(cv)
-    j = current(gen, qp, qm, pi, h)
-    return j.reshape(len(transitions), len(weights)) * len(transitions)
+    return current(gen, forward_q, backward_q, pi, cv) * len(transitions)
 
 
 def _extended_generator(generator, transitions, time_transitions=None):

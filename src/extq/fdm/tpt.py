@@ -23,14 +23,7 @@ def forward_committor(generator, weights, in_domain, guess):
         Forward committor at each point.
 
     """
-    a = generator[in_domain, :][:, in_domain]
-    b = -generator[in_domain, :] @ guess
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return (
-        guess
-        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
-        @ coeffs
-    )
+    return forward_feynman_kac(generator, weights, in_domain, 0.0, guess)
 
 
 def backward_committor(generator, weights, in_domain, guess):
@@ -53,19 +46,7 @@ def backward_committor(generator, weights, in_domain, guess):
         Backward committor at each point.
 
     """
-    adjoint_generator = (
-        scipy.sparse.diags(1.0 / weights)
-        @ generator.T
-        @ scipy.sparse.diags(weights)
-    )
-    a = adjoint_generator[in_domain, :][:, in_domain]
-    b = -adjoint_generator[in_domain, :] @ guess
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return (
-        guess
-        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
-        @ coeffs
-    )
+    return backward_feynman_kac(generator, weights, in_domain, 0.0, guess)
 
 
 def forward_mfpt(generator, weights, in_domain, guess):
@@ -89,14 +70,7 @@ def forward_mfpt(generator, weights, in_domain, guess):
         Forward mean first passage time at each point.
 
     """
-    a = generator[in_domain, :][:, in_domain]
-    b = -generator[in_domain, :] @ guess - 1.0
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return (
-        guess
-        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
-        @ coeffs
-    )
+    return forward_feynman_kac(generator, weights, in_domain, 1.0, guess)
 
 
 def backward_mfpt(generator, weights, in_domain, guess):
@@ -120,19 +94,7 @@ def backward_mfpt(generator, weights, in_domain, guess):
         Backward mean first passage time at each point.
 
     """
-    adjoint_generator = (
-        scipy.sparse.diags(1.0 / weights)
-        @ generator.T
-        @ scipy.sparse.diags(weights)
-    )
-    a = adjoint_generator[in_domain, :][:, in_domain]
-    b = -adjoint_generator[in_domain, :] @ guess - 1.0
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return (
-        guess
-        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
-        @ coeffs
-    )
+    return backward_feynman_kac(generator, weights, in_domain, 1.0, guess)
 
 
 def forward_feynman_kac(generator, weights, in_domain, function, guess):
@@ -157,15 +119,26 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
         Solution of the Feynman-Kac formula at each point.
 
     """
-    assert np.all(function[np.logical_not(in_domain)] == 0.0)
-    a = generator[in_domain, :][:, in_domain]
-    b = -generator[in_domain, :] @ guess - function[in_domain]
+    weights = np.asarray(weights)
+    in_domain = np.asarray(in_domain)
+    function = np.where(in_domain, function, 0.0)
+    guess = np.asarray(guess)
+
+    shape = weights.shape
+    assert in_domain.shape == shape
+    assert function.shape == shape
+    assert guess.shape == shape
+
+    d = in_domain.ravel()
+    f = function.ravel()
+    g = guess.ravel()
+
+    a = generator[d, :][:, d]
+    b = -generator[d, :] @ g - f[d]
     coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
-        guess
-        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
-        @ coeffs
-    )
+        g + scipy.sparse.identity(len(g), format="csr")[:, d] @ coeffs
+    ).reshape(shape)
 
 
 def backward_feynman_kac(generator, weights, in_domain, function, guess):
@@ -190,19 +163,12 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
         Solution of the Feynman-Kac formula at each point.
 
     """
-    assert np.all(function[np.logical_not(in_domain)] == 0.0)
+    pi = np.ravel(weights)
     adjoint_generator = (
-        scipy.sparse.diags(1.0 / weights)
-        @ generator.T
-        @ scipy.sparse.diags(weights)
+        scipy.sparse.diags(1.0 / pi) @ generator.T @ scipy.sparse.diags(pi)
     )
-    a = adjoint_generator[in_domain, :][:, in_domain]
-    b = -adjoint_generator[in_domain, :] @ guess - function[in_domain]
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return (
-        guess
-        + scipy.sparse.identity(len(weights), format="csr")[:, in_domain]
-        @ coeffs
+    return forward_feynman_kac(
+        adjoint_generator, weights, in_domain, function, guess
     )
 
 
@@ -261,13 +227,24 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
         TPT rate.
 
     """
+    weights = np.asarray(weights)
+    forward_q = np.asarray(forward_q)
+    backward_q = np.asarray(backward_q)
+
+    shape = weights.shape
+    assert forward_q.shape == shape
+    assert backward_q.shape == shape
+
+    pi_qm = (weights * backward_q).ravel()
+    qp = forward_q.ravel()
+
     if rxn_coords is None:
-        numer = (weights * backward_q) @ generator @ forward_q
+        numer = pi_qm @ generator @ qp
     else:
-        numer = (weights * backward_q) @ (
-            generator @ (forward_q * rxn_coords)
-            - rxn_coords * (generator @ forward_q)
-        )
+        rxn_coords = np.asarray(rxn_coords)
+        assert rxn_coords.shape == shape
+        h = rxn_coords.ravel()
+        numer = pi_qm @ (generator @ (qp * h) - h * (generator @ qp))
     denom = np.sum(weights)
     return numer / denom
 
@@ -294,13 +271,22 @@ def current(generator, forward_q, backward_q, weights, cv):
         Reactive current at each point.
 
     """
-    forward_flux = (weights * backward_q) * (
-        generator @ (forward_q * cv) - cv * (generator @ forward_q)
-    )
-    backward_flux = forward_q * (
-        generator.T @ ((weights * backward_q) * cv)
-        - cv * (generator.T @ (weights * backward_q))
-    )
+    weights = np.asarray(weights)
+    forward_q = np.asarray(forward_q)
+    backward_q = np.asarray(backward_q)
+
+    shape = weights.shape
+    assert forward_q.shape == shape
+    assert backward_q.shape == shape
+
+    cv = np.broadcast_to(cv, shape)
+
+    pi_qm = (weights * backward_q).ravel()
+    qp = forward_q.ravel()
+    h = cv.ravel()
+
+    forward_flux = pi_qm * (generator @ (qp * h) - h * (generator @ qp))
+    backward_flux = ((pi_qm * h) @ generator - (pi_qm @ generator) * h) * qp
     numer = 0.5 * (forward_flux - backward_flux)
     denom = np.sum(weights)
-    return numer / denom
+    return (numer / denom).reshape(shape)
