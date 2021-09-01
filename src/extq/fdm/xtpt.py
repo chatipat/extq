@@ -3,8 +3,11 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from .tpt import backward_feynman_kac
+from .tpt import combine_k
 from .tpt import current
+from .tpt import expectation
 from .tpt import forward_feynman_kac
+from .tpt import pointwise_expectation
 from .tpt import rate
 
 
@@ -348,6 +351,40 @@ def extended_current(
     return current(gen, forward_q, backward_q, pi, cv) * len(transitions)
 
 
+def extended_expectation(
+    generator,
+    forward_q,
+    backward_q,
+    weights,
+    transitions,
+    ks,
+    kt,
+    time_transitions=None,
+):
+    pi = np.array([weights] * len(transitions))
+    gen = _extended_generator(generator, transitions, time_transitions)
+    return expectation(
+        gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt
+    ) * len(transitions)
+
+
+def extended_pointwise_expectation(
+    generator,
+    forward_q,
+    backward_q,
+    weights,
+    transitions,
+    ks,
+    kt,
+    time_transitions=None,
+):
+    pi = np.array([weights] * len(transitions))
+    gen = _extended_generator(generator, transitions, time_transitions)
+    return pointwise_expectation(
+        gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt
+    ) * len(transitions)
+
+
 def _extended_generator(generator, transitions, time_transitions=None):
     """Compute the generator for extended DGA/TPT.
 
@@ -372,9 +409,32 @@ def _extended_generator(generator, transitions, time_transitions=None):
     if time_transitions is not None:
         xgen += scipy.sparse.bmat(
             [
-                [scipy.sparse.diags(mij) for mij in mi]
+                [scipy.sparse.diags(np.ravel(mij)) for mij in mi]
                 for mi in time_transitions
             ],
             format="csr",
         )
     return xgen
+
+
+def combine_extended_k(ks1, kt1, ks2, kt2):
+    ks1 = np.asarray(ks1, dtype=object)
+    ks2 = np.asarray(ks2, dtype=object)
+    kt1 = np.asarray(kt1)
+    kt2 = np.asarray(kt2)
+    ni = ks1.shape[0]
+    shape = kt1[0, 0].shape
+
+    assert ks1.shape == (ni, ni)
+    assert ks2.shape == (ni, ni)
+    assert kt1.shape == (ni, ni) + shape
+    assert kt2.shape == (ni, ni) + shape
+
+    ks = np.empty((ni, ni), dtype=object)
+    kt = np.zeros((ni, ni) + shape)
+    for i in range(ni):
+        for j in range(ni):
+            ks[i, j], kt[i, j] = combine_k(
+                ks1[i, j], kt1[i, j], ks2[i, j], kt2[i, j]
+            )
+    return ks, kt

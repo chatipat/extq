@@ -290,3 +290,59 @@ def current(generator, forward_q, backward_q, weights, cv):
     numer = 0.5 * (forward_flux - backward_flux)
     denom = np.sum(weights)
     return (numer / denom).reshape(shape)
+
+
+def expectation(generator, forward_q, backward_q, weights, ks, kt):
+    weights = np.asarray(weights)
+    forward_q = np.asarray(forward_q)
+    backward_q = np.asarray(backward_q)
+    kt = np.asarray(kt)
+
+    shape = weights.shape
+    assert forward_q.shape == shape
+    assert backward_q.shape == shape
+    assert kt.shape == shape
+
+    pi_qm = (weights * backward_q).ravel()
+    qp = forward_q.ravel()
+    gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
+
+    numer = pi_qm @ gen @ qp
+    denom = np.sum(weights)
+    return numer / denom
+
+
+def pointwise_expectation(generator, forward_q, backward_q, weights, ks, kt):
+    weights = np.asarray(weights)
+    forward_q = np.asarray(forward_q)
+    backward_q = np.asarray(backward_q)
+    kt = np.asarray(kt)
+
+    shape = weights.shape
+    assert forward_q.shape == shape
+    assert backward_q.shape == shape
+    assert kt.shape == shape
+
+    pi_qm = (weights * backward_q).ravel()
+    qp = forward_q.ravel()
+    gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
+
+    numer = 0.5 * (pi_qm * (gen @ qp) + (pi_qm @ gen) * qp)
+    denom = np.sum(weights)
+    return (numer / denom).reshape(shape)
+
+
+def combine_k(ks1, kt1, ks2, kt2):
+    kt1 = np.asarray(kt1)
+    kt2 = np.asarray(kt2)
+    shape = kt1.shape
+    size = kt1.size
+
+    assert ks1.shape == (size, size)
+    assert ks2.shape == (size, size)
+    assert kt1.shape == shape
+    assert kt2.shape == shape
+
+    ks = ks1.multiply(ks2)
+    kt = kt1.ravel() * ks2.diagonal() + kt2.ravel() * ks1.diagonal()
+    return ks, kt.reshape(shape)
