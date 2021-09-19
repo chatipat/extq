@@ -1,7 +1,7 @@
 import numba as nb
 import numpy as np
 
-from .extended import moving_matmul
+from ..extended import moving_matmul
 
 
 def extended_rate(

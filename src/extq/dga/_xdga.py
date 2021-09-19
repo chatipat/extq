@@ -1,10 +1,10 @@
 import numpy as np
-import scipy.linalg
 import scipy.sparse
-import scipy.sparse.linalg
 
-from .extended import backward_modified_transitions
-from .extended import forward_modified_transitions
+from ..extended import backward_modified_transitions
+from ..extended import forward_modified_transitions
+from ._utils import extended_transform
+from ._utils import solve
 
 
 def forward_extended_committor(
@@ -59,8 +59,8 @@ def forward_extended_committor(
         a += ai
         b += bi
 
-    coeffs = _solve(a, b)
-    return _transform(coeffs, basis, guess)
+    coeffs = solve(a, b)
+    return extended_transform(coeffs, basis, guess)
 
 
 def backward_extended_committor(
@@ -115,8 +115,8 @@ def backward_extended_committor(
         a += ai
         b += bi
 
-    coeffs = _solve(a, b)
-    return _transform(coeffs, basis, guess)
+    coeffs = solve(a, b)
+    return extended_transform(coeffs, basis, guess)
 
 
 def forward_extended_mfpt(
@@ -172,8 +172,8 @@ def forward_extended_mfpt(
         a += ai
         b += bi
 
-    coeffs = _solve(a, b)
-    return _transform(coeffs, basis, guess)
+    coeffs = solve(a, b)
+    return extended_transform(coeffs, basis, guess)
 
 
 def backward_extended_mfpt(
@@ -229,8 +229,8 @@ def backward_extended_mfpt(
         a += ai
         b += bi
 
-    coeffs = _solve(a, b)
-    return _transform(coeffs, basis, guess)
+    coeffs = solve(a, b)
+    return extended_transform(coeffs, basis, guess)
 
 
 def forward_extended_feynman_kac(
@@ -289,8 +289,8 @@ def forward_extended_feynman_kac(
         a += ai
         b += bi
 
-    coeffs = _solve(a, b)
-    return _transform(coeffs, basis, guess)
+    coeffs = solve(a, b)
+    return extended_transform(coeffs, basis, guess)
 
 
 def backward_extended_feynman_kac(
@@ -349,8 +349,8 @@ def backward_extended_feynman_kac(
         a += ai
         b += bi
 
-    coeffs = _solve(a, b)
-    return _transform(coeffs, basis, guess)
+    coeffs = solve(a, b)
+    return extended_transform(coeffs, basis, guess)
 
 
 def _forward_helper(x, y, w, m, d, f, g, lag):
@@ -415,17 +415,3 @@ def _backward_helper(x, y, w, m, d, f, g, lag):
         b -= wx.T @ gi
 
     return a, b
-
-
-def _solve(a, b):
-    if scipy.sparse.issparse(a):
-        return scipy.sparse.linalg.spsolve(a, b)
-    else:
-        return scipy.linalg.solve(a, b)
-
-
-def _transform(coeffs, basis, guess):
-    return [
-        np.array([yi @ coeffs + gi for yi, gi in zip(y, g)])
-        for y, g in zip(basis, guess)
-    ]
