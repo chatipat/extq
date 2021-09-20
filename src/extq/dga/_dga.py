@@ -2,6 +2,7 @@ import numba as nb
 import numpy as np
 import scipy.sparse
 
+from ..moving_semigroup import moving_semigroup
 from ..stop import backward_stop
 from ..stop import forward_stop
 from ._utils import solve
@@ -404,60 +405,64 @@ def reversible_feynman_kac(
 def _dga_helper(x, y, w, d, f, g, lag, *, forward=False, backward=False):
     assert forward or backward
     assert np.all(w[-lag:] == 0.0)
-
+    if np.ndim(f) == 0:
+        f = np.broadcast_to(f, len(d) - 1)
     a = 0.0
     b = 0.0
-
     if forward:
-        iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
-        assert np.all(iy < len(d))
-        if np.ndim(f) == 0:
-            if f == 0.0:
-                integral = 0.0
-            else:
-                ix = np.arange(len(d) - lag)
-                integral = f * (iy - ix)
-        else:
-            integral = _forward_feynman_kac_helper(iy, f, lag)
-        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
-        a += wx.T @ (y[iy] - y[:-lag])
-        b -= wx.T @ (g[iy] - g[:-lag] + integral)
-
+        m, integral = _forward_helper(d, f, g, lag)
+        xw = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        a += xw.T @ (scipy.sparse.diags(m) @ y[lag:] - y[:-lag])
+        b -= xw.T @ (scipy.sparse.diags(m) @ g[lag:] - g[:-lag] + integral)
     if backward:
-        iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
-        assert np.all(iy >= 0)
-        if np.ndim(f) == 0:
-            if f == 0.0:
-                integral = 0.0
-            else:
-                ix = np.arange(lag, len(d))
-                integral = f * (ix - iy)
-        else:
-            integral = _backward_feynman_kac_helper(iy, f, lag)
-        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
-        a += wx.T @ (y[iy] - y[lag:])
-        b -= wx.T @ (g[iy] - g[lag:] + integral)
-
+        m, integral = _backward_helper(d, f, g, lag)
+        xw = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        a += xw.T @ (scipy.sparse.diags(m) @ y[:-lag] - y[lag:])
+        b -= xw.T @ (scipy.sparse.diags(m) @ g[:-lag] - g[lag:] + integral)
     return a, b
 
 
 @nb.njit
-def _forward_feynman_kac_helper(iy, f, lag):
-    assert len(iy) + lag == len(f) + 1
-    result = np.zeros(len(iy))
-    for i in range(len(iy)):
-        assert iy[i] <= i + lag
-        for j in range(i, iy[i]):
-            result[i] += f[j]
-    return result
+def _forward_helper(d, f, g, lag):
+    nt = len(f)
+    assert len(d) == nt + 1
+    assert len(g) == nt + 1
+
+    a = np.empty((nt, 2))
+    for t in range(nt):
+        if d[t]:
+            a[t, 0] = 1.0
+            a[t, 1] = f[t]
+        else:
+            a[t, 0] = 0.0
+            a[t, 1] = g[t]
+
+    def op(in1, in2, out):
+        out[0] = in1[0] * in2[0]
+        out[1] = in1[1] + in1[0] * in2[1]
+
+    a = moving_semigroup(a, lag, op)
+    return a[:, 0], a[:, 1]
 
 
 @nb.njit
-def _backward_feynman_kac_helper(iy, f, lag):
-    assert len(iy) + lag == len(f) + 1
-    result = np.zeros(len(iy))
-    for i in range(len(iy)):
-        assert i <= iy[i]
-        for j in range(iy[i], i + lag):
-            result[i] += f[j]
-    return result
+def _backward_helper(d, f, g, lag):
+    nt = len(f)
+    assert len(d) == nt + 1
+    assert len(g) == nt + 1
+
+    a = np.empty((nt, 2))
+    for t in range(nt):
+        if d[t + 1]:
+            a[t, 0] = 1.0
+            a[t, 1] = f[t]
+        else:
+            a[t, 0] = 0.0
+            a[t, 1] = g[t + 1]
+
+    def op(in1, in2, out):
+        out[0] = in1[0] * in2[0]
+        out[1] = in1[1] * in2[0] + in2[1]
+
+    a = moving_semigroup(a, lag, op)
+    return a[:, 0], a[:, 1]
