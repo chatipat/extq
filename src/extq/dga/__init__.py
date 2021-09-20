@@ -4,6 +4,9 @@ from ._dga import backward_mfpt
 from ._dga import forward_committor
 from ._dga import forward_feynman_kac
 from ._dga import forward_mfpt
+from ._dga import reversible_committor
+from ._dga import reversible_feynman_kac
+from ._dga import reversible_mfpt
 from ._reweight import reweight
 from ._xdga import backward_extended_committor
 from ._xdga import backward_extended_feynman_kac
