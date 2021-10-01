@@ -1,8 +1,8 @@
+import numba as nb
 import numpy as np
 import scipy.sparse
 
-from ..extended import backward_modified_transitions
-from ..extended import forward_modified_transitions
+from ..moving_semigroup import moving_semigroup
 from ._utils import extended_transform
 from ._utils import solve
 
@@ -360,7 +360,14 @@ def _forward_helper(x, y, w, m, d, f, g, lag):
     dtype = np.result_type(*x, *y, w, m, g)
     if np.ndim(f) == 0:
         f = np.full((ni, ni, nt), f, dtype=dtype)
-    m = forward_modified_transitions(m, d, f, g, lag, dtype=dtype)
+
+    assert m.shape == (ni, ni, nt)
+    assert d.shape == (ni, nt + 1)
+    assert f.shape == (ni, ni, nt)
+    assert g.shape == (ni, nt + 1)
+
+    m = _forward_transitions_helper(ni, nt, m, d, f, g, lag, dtype)
+    m = np.moveaxis(m, 0, -1)
 
     a = 0.0
     b = 0.0
@@ -385,6 +392,22 @@ def _forward_helper(x, y, w, m, d, f, g, lag):
     return a, b
 
 
+@nb.njit
+def _forward_transitions_helper(ni, nt, m, d, f, g, lag, dtype):
+    r = np.zeros((nt, ni + 1, ni + 1), dtype=dtype)
+    for n in range(nt):
+        for i in range(ni):
+            if d[i, n]:
+                for j in range(ni):
+                    r[n, i, j] = m[i, j, n]
+                    r[n, i, ni] += m[i, j, n] * f[i, j, n]  # integral
+            else:
+                r[n, i, ni] = g[i, n]  # boundary conditions
+        r[n, ni, ni] = 1.0
+    r = moving_semigroup(r, lag, np.dot)
+    return r
+
+
 def _backward_helper(x, y, w, m, d, f, g, lag):
     assert np.all(w[-lag:] == 0.0)
 
@@ -392,7 +415,14 @@ def _backward_helper(x, y, w, m, d, f, g, lag):
     dtype = np.result_type(*x, *y, w, m, g)
     if np.ndim(f) == 0:
         f = np.full((ni, ni, nt), f, dtype=dtype)
-    m = backward_modified_transitions(m, d, f, g, lag, dtype=dtype)
+
+    assert m.shape == (ni, ni, nt)
+    assert d.shape == (ni, nt + 1)
+    assert f.shape == (ni, ni, nt)
+    assert g.shape == (ni, nt + 1)
+
+    m = _backward_transitions_helper(ni, nt, m, d, f, g, lag, dtype)
+    m = np.moveaxis(m, 0, -1)
 
     a = 0.0
     b = 0.0
@@ -415,3 +445,19 @@ def _backward_helper(x, y, w, m, d, f, g, lag):
         b -= wx.T @ gi
 
     return a, b
+
+
+@nb.njit
+def _backward_transitions_helper(ni, nt, m, d, f, g, lag, dtype):
+    r = np.zeros((nt, ni + 1, ni + 1), dtype=dtype)
+    for n in range(nt):
+        for j in range(ni):
+            if d[j, n + 1]:
+                for i in range(ni):
+                    r[n, i, j] = m[i, j, n]
+                    r[n, ni, j] += m[i, j, n] * f[i, j, n]  # integral
+            else:
+                r[n, ni, j] = g[j, n + 1]  # boundary conditions
+        r[n, ni, ni] = 1.0
+    r = moving_semigroup(r, lag, np.dot)
+    return r

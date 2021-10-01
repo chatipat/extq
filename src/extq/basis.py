@@ -3,7 +3,7 @@ import scipy.linalg
 import scipy.sparse
 
 
-def whiten(trajs, weights=None, rtol=None):
+def whiten(trajs, weights=None, rtol=None, with_mean=True, with_std=True):
     """Whiten the data using PCA.
 
     Parameters
@@ -15,6 +15,10 @@ def whiten(trajs, weights=None, rtol=None):
         If None, assign uniform weights.
     rtol : float, optional
         Relative tolerance to cutoff near-zero eigenvalues.
+    with_mean : bool, optional
+        If True, remove the mean of each feature before decorrelating.
+    with_std : bool, optional
+        If True, set variances to 1 after decorrelating.
 
     Returns
     -------
@@ -23,7 +27,8 @@ def whiten(trajs, weights=None, rtol=None):
 
     """
     # center the features
-    trajs = center(trajs)
+    if with_mean:
+        trajs = center(trajs)
 
     # compute the covariance matrix
     numer = 0.0
@@ -47,7 +52,9 @@ def whiten(trajs, weights=None, rtol=None):
         rtol = np.finfo(evals.dtype).eps * len(evals)
     tol = np.max(evals) * rtol
     num = np.sum(evals > tol, dtype=int)
-    coeffs = evecs[:, :num] / np.sqrt(evals[:num])
+    coeffs = evecs[:, :num]
+    if with_std:
+        coeffs /= np.sqrt(evals[:num])
     return [x @ coeffs for x in trajs]
 
 

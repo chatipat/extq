@@ -1,7 +1,7 @@
 import numba as nb
 import numpy as np
 
-from ..extended import moving_matmul
+from ..moving_semigroup import moving_semigroup
 
 
 def extended_rate(
@@ -93,7 +93,7 @@ def _extended_rate_helper(qp, qm, w, m, d, h, lag):
         a[t, 1, ni, 1, ni] = 1.0
 
     a = a.reshape(nf - 1, 2 * (ni + 1), 2 * (ni + 1))
-    a = moving_matmul(a, lag)
+    a = moving_semigroup(a, lag, np.dot)
     a = a.reshape(nf - lag, 2, (ni + 1), 2, (ni + 1))
     a = a[:, 0, :, 1, :]
 
@@ -210,7 +210,7 @@ def _extended_current_helper(qp, qm, w, m, d, f, lag):
     # note that the indices are effectively transposed here:
     # m[t, j, i] has i as the past and j as the future
     a = a.reshape(nf + lag - 2, 2 * (ni + 1), 2 * (ni + 1))
-    a = moving_matmul(a, lag)
+    a = moving_semigroup(a, lag, np.dot)
     a = a.reshape(nf - 1, 2, (ni + 1), 2, (ni + 1))
     a = a[:, 0, :, 1, :]
 

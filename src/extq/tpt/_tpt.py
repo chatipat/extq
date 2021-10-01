@@ -36,26 +36,44 @@ def rate(forward_q, backward_q, weights, in_domain, rxn_coord, lag):
         forward_q, backward_q, weights, in_domain, rxn_coord
     ):
         assert np.all(w[-lag:] == 0.0)
-        tp = forward_stop(d)
-        tm = backward_stop(d)
-        numer += _rate_helper(qp, qm, w, tp, tm, h, lag)
+        numer += _rate_helper(qp, qm, w, d, h, lag)
         denom += np.sum(w)
     return numer / denom
 
 
 @nb.njit
-def _rate_helper(qp, qm, w, tp, tm, h, lag):
-    result = 0.0
-    for start in range(len(w) - lag):
-        end = start + lag
-        total = 0.0
-        for i in range(start, end):
-            j = i + 1
-            ti = max(tm[i], start)
-            tj = min(tp[j], end)
-            total += qm[ti] * qp[tj] * (h[j] - h[i])
-        result += w[start] * total / lag
-    return result
+def _rate_helper(qp, qm, w, d, h, lag):
+    n = len(d)
+    tp = forward_stop(d)
+    tm = backward_stop(d)
+
+    total = 0.0
+
+    # fragments of reactive trajectories
+    for s in range(n - lag):
+        e = s + lag
+        all_d = tp[s] > e
+        # assert all_d == (tm[e] < s)
+        if all_d:
+            total += w[s] * qm[s] * qp[e] * (h[e] - h[s])  # D -> D
+        else:
+            if d[s]:
+                total += w[s] * qm[s] * qp[tp[s]] * (h[tp[s]] - h[s])  # D -> B
+            if d[e]:
+                total += w[s] * qm[tm[e]] * qp[e] * (h[e] - h[tm[e]])  # A -> D
+
+    # complete reactive trajectories
+    for s in range(n - 1):
+        if not d[s]:
+            e = tp[s + 1]
+            if e < n and s >= e - lag and qm[s] != 0.0 and qp[e] != 0.0:
+                wsum = 0.0
+                for i in range(max(0, e - lag), min(n - lag, s + 1)):
+                    wsum += w[i]
+                if wsum != 0.0:
+                    total += wsum * qm[s] * qp[e] * (h[e] - h[s])  # A -> B
+
+    return total / lag
 
 
 def current(forward_q, backward_q, weights, in_domain, cv, lag):
