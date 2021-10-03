@@ -61,7 +61,7 @@ def rate_matrix(
         qmd_h_qpdc = qmd[:-lag].T @ Hp @ qpdc[iy]
 
         # A -> B
-        qmdc_h_qpdc = _conv(qpdc, qmdc, w, tp, tm, h, lag)
+        qmdc_h_qpdc = _conv(qpdc, qmdc, w, tp, h, lag)
 
         nbasis = x.shape[1]
         mat = np.zeros((2 * (nbasis + 2), 2 * (nbasis + 2)))
@@ -95,15 +95,18 @@ def rate_matrix(
 
 
 @nb.njit
-def _conv(qp, qm, w, tp, tm, h, lag):
-    result = 0.0
-    for start in range(len(w) - lag):
-        end = start + lag
-        total = 0.0
-        for i in range(start, end):
-            j = i + 1
-            ti = max(tm[i], start)
-            tj = min(tp[j], end)
-            total += qm[ti] * qp[tj] * (h[j] - h[i])
-        result += w[start] * total
-    return result
+def _conv(qp, qm, w, tp, h, lag):
+    n = len(tp)
+    total = 0.0
+    s = tp[0]
+    while s < n - 1:
+        e = tp[s + 1]
+        if e < n:
+            c = qm[s] * qp[e] * (h[e] - h[s])
+            if c != 0.0:
+                wsum = 0.0
+                for i in range(max(0, e - lag), min(n - lag, s + 1)):
+                    wsum += w[i]
+                total += wsum * c
+        s = e
+    return total
