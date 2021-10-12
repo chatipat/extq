@@ -2,7 +2,9 @@ import numba as nb
 import numpy as np
 import scipy.sparse
 
+from ..stop import backward_integrate
 from ..stop import backward_stop
+from ..stop import forward_integrate
 from ..stop import forward_stop
 from ._utils import solve
 from ._utils import transform
@@ -231,7 +233,8 @@ def forward_feynman_kac(
         assert np.all(w[-lag:] == 0.0)
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
-        integral = _forward_feynman_kac_helper(iy, f, lag)
+        intf = forward_integrate(d, f)
+        integral = intf[:-lag] - intf[iy]
         wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
         a += wx.T @ (y[iy] - y[:-lag])
         b -= wx.T @ (g[iy] - g[:-lag] + integral)
@@ -282,31 +285,10 @@ def backward_feynman_kac(
         assert np.all(w[-lag:] == 0.0)
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
-        integral = _backward_feynman_kac_helper(iy, f, lag)
+        intf = backward_integrate(d, f)
+        integral = intf[lag:] - intf[iy]
         wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
         a += wx.T @ (y[iy] - y[lag:])
         b -= wx.T @ (g[iy] - g[lag:] + integral)
     coeffs = solve(a, b)
     return transform(coeffs, basis, guess)
-
-
-@nb.njit
-def _forward_feynman_kac_helper(iy, f, lag):
-    assert len(iy) + lag == len(f) + 1
-    result = np.zeros(len(iy))
-    for i in range(len(iy)):
-        assert iy[i] <= i + lag
-        for j in range(i, iy[i]):
-            result[i] += f[j]
-    return result
-
-
-@nb.njit
-def _backward_feynman_kac_helper(iy, f, lag):
-    assert len(iy) + lag == len(f) + 1
-    result = np.zeros(len(iy))
-    for i in range(len(iy)):
-        assert i <= iy[i]
-        for j in range(iy[i], i + lag):
-            result[i] += f[j]
-    return result
