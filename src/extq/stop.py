@@ -54,3 +54,63 @@ def backward_stop(in_domain):
             stop_time = t
         result[t] = stop_time
     return result
+
+
+@nb.njit
+def forward_integrate(in_domain, function):
+    """Integrate a function to the first exit time from the domain.
+
+    Parameters
+    ----------
+    in_domain : (N,) ndarray of bool
+        Input trajectory indicating whether each frame is in the domain.
+    function : (N,) ndarray of float
+        Value of the integrand at each frame.
+
+    Returns
+    -------
+    (N,) ndarray of float
+        Integral of the function from the current time to the first exit
+        time from the domain.
+
+    """
+    n = len(in_domain)
+    result = np.empty(n, dtype=np.int32)
+    integral = 0.0
+    for t in range(n - 1, -1, -1):
+        if in_domain[t]:
+            integral += function[t]
+        else:
+            integral = 0.0
+        result[t] = integral
+    return result
+
+
+@nb.njit
+def backward_integrate(in_domain, function):
+    """Integrate a function from the last entry time into the domain.
+
+    Parameters
+    ----------
+    in_domain : (N,) ndarray of bool
+        Input trajectory indicating whether each frame is in the domain.
+    function : (N,) ndarray of float
+        Value of the integrand at each frame.
+
+    Returns
+    -------
+    (N,) ndarray of float
+        Integrate the function from the last entry time into the domain
+        to the current time.
+
+    """
+    n = len(in_domain)
+    result = np.empty(n, dtype=np.int32)
+    integral = 0.0
+    for t in range(n):
+        if in_domain[t]:
+            integral += function[t]
+        else:
+            integral = 0.0
+        result[t] = integral
+    return result
