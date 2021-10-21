@@ -63,31 +63,48 @@ def rate_matrix(
         # A -> B
         qmdc_h_qpdc = _conv(qpdc, qmdc, w, tp, h, lag)
 
-        nbasis = x.shape[1]
-        mat = np.zeros((2 * (nbasis + 2), 2 * (nbasis + 2)))
-        amat = mat[: nbasis + 2, : nbasis + 2]
-        bmat = mat[nbasis + 2 :, nbasis + 2 :]
-        cmat = mat[: nbasis + 2, nbasis + 2 :]
-        # upper left
-        amat[:nbasis, :nbasis] = x_y
-        amat[-2, :nbasis] = qmd_y
-        amat[-1, :nbasis] = qmdc_y
-        amat[-1, -1] = wsum
-        # lower right
-        bmat[:nbasis, :nbasis] = x_y
-        bmat[:nbasis, -2] = x_qpd
-        bmat[:nbasis, -1] = x_qpdc
-        bmat[-1, -1] = wsum
-        # upper right
-        cmat[:nbasis, :nbasis] = x_h_y
-        cmat[:nbasis, -2] = x_h_qpd
-        cmat[:nbasis, -1] = x_h_qpdc
-        cmat[-2, :nbasis] = qmd_h_y
-        cmat[-1, :nbasis] = qmdc_h_y
-        cmat[-2, -2] = qmd_h_qpd
-        cmat[-2, -1] = qmd_h_qpdc
-        cmat[-1, -2] = qmdc_h_qpd
-        cmat[-1, -1] = qmdc_h_qpdc
+        if scipy.sparse.issparse(x):
+            mat = scipy.sparse.bmat(
+                [
+                    [x_y, None, None]
+                    + [x_h_y, x_h_qpd[:, None], x_h_qpdc[:, None]],
+                    [qmd_y[None, :], 0, 0]
+                    + [qmd_h_y[None, :], qmd_h_qpd, qmd_h_qpdc],
+                    [qmdc_y[None, :], 0, wsum]
+                    + [qmdc_h_y[None, :], qmdc_h_qpd, qmdc_h_qpdc],
+                    [None, None, None]
+                    + [x_y, x_qpd[:, None], x_qpdc[:, None]],
+                    [None, None, None] + [None, 0, 0],
+                    [None, None, None] + [None, 0, wsum],
+                ],
+                format="csr",
+            )
+        else:
+            nbasis = x.shape[1]
+            mat = np.zeros((2 * (nbasis + 2), 2 * (nbasis + 2)))
+            amat = mat[: nbasis + 2, : nbasis + 2]
+            bmat = mat[nbasis + 2 :, nbasis + 2 :]
+            cmat = mat[: nbasis + 2, nbasis + 2 :]
+            # upper left
+            amat[:nbasis, :nbasis] = x_y
+            amat[-2, :nbasis] = qmd_y
+            amat[-1, :nbasis] = qmdc_y
+            amat[-1, -1] = wsum
+            # lower right
+            bmat[:nbasis, :nbasis] = x_y
+            bmat[:nbasis, -2] = x_qpd
+            bmat[:nbasis, -1] = x_qpdc
+            bmat[-1, -1] = wsum
+            # upper right
+            cmat[:nbasis, :nbasis] = x_h_y
+            cmat[:nbasis, -2] = x_h_qpd
+            cmat[:nbasis, -1] = x_h_qpdc
+            cmat[-2, :nbasis] = qmd_h_y
+            cmat[-1, :nbasis] = qmdc_h_y
+            cmat[-2, -2] = qmd_h_qpd
+            cmat[-2, -1] = qmd_h_qpdc
+            cmat[-1, -2] = qmdc_h_qpd
+            cmat[-1, -1] = qmdc_h_qpdc
 
         numer += mat
         denom += wsum

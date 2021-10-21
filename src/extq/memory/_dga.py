@@ -62,12 +62,22 @@ def forward_committor_matrix(
         wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
         wsum = np.sum(w[:-lag])
 
-        nbasis = x.shape[1]
-        mat = np.zeros((nbasis + 2, nbasis + 2))
-        mat[:nbasis, :nbasis] = wx.T @ y[iy]
-        mat[:nbasis, -2] = wx.T @ gd[iy]
-        mat[:nbasis, -1] = wx.T @ gdc[iy]
-        mat[-1, -1] = wsum
+        if scipy.sparse.issparse(x):
+            mat = scipy.sparse.bmat(
+                [
+                    [wx.T @ y[iy], wx.T @ gd[iy, None], wx.T @ gdc[iy, None]],
+                    [None, 0, 0],
+                    [None, 0, wsum],
+                ],
+                format="csr",
+            )
+        else:
+            nbasis = x.shape[1]
+            mat = np.zeros((nbasis + 2, nbasis + 2))
+            mat[:nbasis, :nbasis] = wx.T @ y[iy]
+            mat[:nbasis, -2] = wx.T @ gd[iy]
+            mat[:nbasis, -1] = wx.T @ gdc[iy]
+            mat[-1, -1] = wsum
 
         numer += mat
         denom += wsum
@@ -89,12 +99,22 @@ def backward_committor_matrix(
         wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
         wsum = np.sum(w[:-lag])
 
-        nbasis = x.shape[1]
-        mat = np.zeros((nbasis + 2, nbasis + 2))
-        mat[:nbasis, :nbasis] = wx.T @ y[iy]
-        mat[:nbasis, -2] = wx.T @ gd[iy]
-        mat[:nbasis, -1] = wx.T @ gdc[iy]
-        mat[-1, -1] = wsum
+        if scipy.sparse.issparse(x):
+            mat = scipy.sparse.bmat(
+                [
+                    [wx.T @ y[iy], wx.T @ gd[iy, None], wx.T @ gdc[iy, None]],
+                    [None, 0, 0],
+                    [None, 0, wsum],
+                ],
+                format="csr",
+            )
+        else:
+            nbasis = x.shape[1]
+            mat = np.zeros((nbasis + 2, nbasis + 2))
+            mat[:nbasis, :nbasis] = wx.T @ y[iy]
+            mat[:nbasis, -2] = wx.T @ gd[iy]
+            mat[:nbasis, -1] = wx.T @ gdc[iy]
+            mat[-1, -1] = wsum
 
         numer += mat
         denom += wsum
