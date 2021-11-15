@@ -75,7 +75,7 @@ def forward_integrate(in_domain, function):
 
     """
     n = len(in_domain)
-    result = np.empty(n, dtype=np.int32)
+    result = np.empty(n)
     integral = 0.0
     for t in range(n - 1, -1, -1):
         if in_domain[t]:
@@ -105,7 +105,7 @@ def backward_integrate(in_domain, function):
 
     """
     n = len(in_domain)
-    result = np.empty(n, dtype=np.int32)
+    result = np.empty(n)
     integral = 0.0
     for t in range(n):
         if in_domain[t]:
