@@ -3,45 +3,10 @@ import scipy.linalg
 import scipy.sparse
 import scipy.sparse.linalg
 
-from ..dga._utils import solve
 
-
-def forward_committor(mat, basis, weights, guess, test_basis=None):
-    if test_basis is None:
-        test_basis = basis
-
-    basis = np.asarray(basis)
-    test_basis = np.asarray(test_basis)
-    weights = np.asarray(weights)
+def committor_transform(coeffs, basis, guess):
     guess = np.asarray(guess)
-
-    shape = weights.shape
-    assert guess.shape == shape
-    assert test_basis.shape == basis.shape
-
-    w = np.ravel(weights)
-    g = np.ravel(guess)
-
-    c0 = test_basis.T @ scipy.sparse.diags(w) @ basis
-    g0 = test_basis.T @ scipy.sparse.diags(w) @ g
-
-    ct = mat[:-2, :-2]
-    gt = mat[:-2, -2] + mat[:-2, -1]
-
-    coeffs = solve(ct - c0, -(gt - g0))
-    return (basis @ coeffs + guess).reshape(shape)
-
-
-def backward_committor(mat, basis, weights, guess, test_basis=None):
-    return forward_committor(
-        mat.T, basis, weights, guess, test_basis=test_basis
-    )
-
-
-def rate(mat, lag):
-    n = mat.shape[0] // 2
-    ct = mat[:n, n:]
-    return (ct[-2, -2] + ct[-2, -1] + ct[-1, -2] + ct[-1, -1]) / lag
+    return (basis @ coeffs + np.ravel(guess)).reshape(guess.shape)
 
 
 def forward_committor_generator(generator, weights, in_domain, guess):

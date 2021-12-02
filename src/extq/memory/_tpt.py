@@ -20,35 +20,36 @@ def rate_matrix(
     for x, y, qp, qm, w, d, h in zip(
         basis, basis, forward_q, backward_q, weights, in_domain, rxn_coord
     ):
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[len(w) - lag :] == 0.0)
+        last = -lag if lag > 0 else None
 
         t = np.arange(len(d))
         tp = forward_stop(d)
         tm = backward_stop(d)
-        iy = np.minimum(tp[:-lag], t[lag:])
-        ix = np.maximum(tm[lag:], t[:-lag])
-        all_d = np.logical_and(iy == t[lag:], ix == t[:-lag]).astype(float)
+        iy = np.minimum(tp[:last], t[lag:])
+        ix = np.maximum(tm[lag:], t[:last])
+        all_d = np.logical_and(iy == t[lag:], ix == t[:last]).astype(float)
 
         qpdc = np.where(d, 0.0, qp)
         qmdc = np.where(d, 0.0, qm)
         qpd = np.where(d, qp, 0.0)
         qmd = np.where(d, qm, 0.0)
 
-        W = scipy.sparse.diags(w[:-lag])
-        Hp = scipy.sparse.diags(w[:-lag] * (h[iy] - h[:-lag]))
-        Hm = scipy.sparse.diags(w[:-lag] * (h[lag:] - h[ix]))
-        Wd = scipy.sparse.diags(w[:-lag] * all_d)
-        Hd = scipy.sparse.diags(w[:-lag] * all_d * (h[lag:] - h[:-lag]))
-        wsum = np.sum(w[:-lag])
+        W = scipy.sparse.diags(w[:last])
+        Hp = scipy.sparse.diags(w[:last] * (h[iy] - h[:last]))
+        Hm = scipy.sparse.diags(w[:last] * (h[lag:] - h[ix]))
+        Wd = scipy.sparse.diags(w[:last] * all_d)
+        Hd = scipy.sparse.diags(w[:last] * all_d * (h[lag:] - h[:last]))
+        wsum = np.sum(w[:last])
 
         # D -> D
-        x_y = x[:-lag].T @ Wd @ y[lag:]
-        qmd_y = qmd[:-lag].T @ Wd @ y[lag:]
-        x_qpd = x[:-lag].T @ Wd @ qpd[lag:]
-        x_h_y = x[:-lag].T @ Hd @ y[lag:]
-        qmd_h_y = qmd[:-lag].T @ Hd @ y[lag:]
-        x_h_qpd = x[:-lag].T @ Hd @ qpd[lag:]
-        qmd_h_qpd = qmd[:-lag].T @ Hd @ qpd[lag:]
+        x_y = x[:last].T @ Wd @ y[lag:]
+        qmd_y = qmd[:last].T @ Wd @ y[lag:]
+        x_qpd = x[:last].T @ Wd @ qpd[lag:]
+        x_h_y = x[:last].T @ Hd @ y[lag:]
+        qmd_h_y = qmd[:last].T @ Hd @ y[lag:]
+        x_h_qpd = x[:last].T @ Hd @ qpd[lag:]
+        qmd_h_qpd = qmd[:last].T @ Hd @ qpd[lag:]
 
         # A -> D
         qmdc_y = qmdc[ix].T @ W @ y[lag:]
@@ -56,9 +57,9 @@ def rate_matrix(
         qmdc_h_qpd = qmdc[ix].T @ Hm @ qpd[lag:]
 
         # D -> B
-        x_qpdc = x[:-lag].T @ W @ qpdc[iy]
-        x_h_qpdc = x[:-lag].T @ Hp @ qpdc[iy]
-        qmd_h_qpdc = qmd[:-lag].T @ Hp @ qpdc[iy]
+        x_qpdc = x[:last].T @ W @ qpdc[iy]
+        x_h_qpdc = x[:last].T @ Hp @ qpdc[iy]
+        qmd_h_qpdc = qmd[:last].T @ Hp @ qpdc[iy]
 
         # A -> B
         qmdc_h_qpdc = _conv(qpdc, qmdc, w, tp, h, lag)
