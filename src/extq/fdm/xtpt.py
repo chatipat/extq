@@ -5,9 +5,9 @@ import scipy.sparse.linalg
 from .tpt import backward_feynman_kac
 from .tpt import combine_k
 from .tpt import current
-from .tpt import expectation
 from .tpt import forward_feynman_kac
-from .tpt import pointwise_expectation
+from .tpt import integral
+from .tpt import pointwise_integral
 from .tpt import rate
 
 
@@ -307,7 +307,7 @@ def extended_rate(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return rate(gen, forward_q, backward_q, pi, rxn_coords) * len(transitions)
+    return rate(gen, forward_q, backward_q, pi, rxn_coords)
 
 
 def extended_current(
@@ -348,10 +348,10 @@ def extended_current(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return current(gen, forward_q, backward_q, pi, cv) * len(transitions)
+    return current(gen, forward_q, backward_q, pi, cv)
 
 
-def extended_expectation(
+def extended_integral(
     generator,
     forward_q,
     backward_q,
@@ -363,12 +363,10 @@ def extended_expectation(
 ):
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return expectation(
-        gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt
-    ) * len(transitions)
+    return integral(gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt)
 
 
-def extended_pointwise_expectation(
+def extended_pointwise_integral(
     generator,
     forward_q,
     backward_q,
@@ -380,9 +378,9 @@ def extended_pointwise_expectation(
 ):
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return pointwise_expectation(
+    return pointwise_integral(
         gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt
-    ) * len(transitions)
+    )
 
 
 def _extended_generator(generator, transitions, time_transitions=None):

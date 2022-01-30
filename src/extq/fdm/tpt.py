@@ -239,14 +239,12 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
     qp = forward_q.ravel()
 
     if rxn_coords is None:
-        numer = pi_qm @ generator @ qp
+        return pi_qm @ generator @ qp
     else:
         rxn_coords = np.asarray(rxn_coords)
         assert rxn_coords.shape == shape
         h = rxn_coords.ravel()
-        numer = pi_qm @ (generator @ (qp * h) - h * (generator @ qp))
-    denom = np.sum(weights)
-    return numer / denom
+        return pi_qm @ (generator @ (qp * h) - h * (generator @ qp))
 
 
 def current(generator, forward_q, backward_q, weights, cv):
@@ -287,12 +285,11 @@ def current(generator, forward_q, backward_q, weights, cv):
 
     forward_flux = pi_qm * (generator @ (qp * h) - h * (generator @ qp))
     backward_flux = ((pi_qm * h) @ generator - (pi_qm @ generator) * h) * qp
-    numer = 0.5 * (forward_flux - backward_flux)
-    denom = np.sum(weights)
-    return (numer / denom).reshape(shape)
+    result = 0.5 * (forward_flux - backward_flux)
+    return result.reshape(shape)
 
 
-def expectation(generator, forward_q, backward_q, weights, ks, kt):
+def integral(generator, forward_q, backward_q, weights, ks, kt):
     weights = np.asarray(weights)
     forward_q = np.asarray(forward_q)
     backward_q = np.asarray(backward_q)
@@ -307,12 +304,10 @@ def expectation(generator, forward_q, backward_q, weights, ks, kt):
     qp = forward_q.ravel()
     gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
 
-    numer = pi_qm @ gen @ qp
-    denom = np.sum(weights)
-    return numer / denom
+    return pi_qm @ gen @ qp
 
 
-def pointwise_expectation(generator, forward_q, backward_q, weights, ks, kt):
+def pointwise_integral(generator, forward_q, backward_q, weights, ks, kt):
     weights = np.asarray(weights)
     forward_q = np.asarray(forward_q)
     backward_q = np.asarray(backward_q)
@@ -327,9 +322,8 @@ def pointwise_expectation(generator, forward_q, backward_q, weights, ks, kt):
     qp = forward_q.ravel()
     gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
 
-    numer = 0.5 * (pi_qm * (gen @ qp) + (pi_qm @ gen) * qp)
-    denom = np.sum(weights)
-    return (numer / denom).reshape(shape)
+    result = 0.5 * (pi_qm * (gen @ qp) + (pi_qm @ gen) * qp)
+    return result.reshape(shape)
 
 
 def combine_k(ks1, kt1, ks2, kt2):
