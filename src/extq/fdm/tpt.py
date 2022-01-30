@@ -8,10 +8,10 @@ def forward_committor(generator, weights, in_domain, guess):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     weights : (M,) ndarray of float
-        Reweighting factor to the invariant distribution for each point.
+        Change of measure to the invariant distribution for each point.
     in_domain : (M,) ndarray of bool
         Whether each point is in the domain.
     guess : (M,) ndarray of float
@@ -31,10 +31,10 @@ def backward_committor(generator, weights, in_domain, guess):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     weights : (M,) ndarray of float
-        Reweighting factor to the invariant distribution for each point.
+        Change of measure to the invariant distribution for each point.
     in_domain : (M,) ndarray of bool
         Whether each point is in the domain.
     guess : (M,) ndarray of float
@@ -54,7 +54,7 @@ def forward_mfpt(generator, weights, in_domain, guess):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     weights : (M,) ndarray of float
         Change of measure to the invariant distribution for each point.
@@ -78,7 +78,7 @@ def backward_mfpt(generator, weights, in_domain, guess):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     weights : (M,) ndarray of float
         Change of measure to the invariant distribution for each point.
@@ -102,7 +102,7 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     weights : (M,) ndarray of float
         Change of measure to the invariant distribution for each point.
@@ -146,7 +146,7 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     weights : (M,) ndarray of float
         Change of measure to the invariant distribution for each point.
@@ -173,17 +173,17 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
 
 
 def reweight(generator):
-    """Compute the reweighting factors to the invariant distribution.
+    """Compute the change of measure to the invariant distribution.
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
 
     Returns
     -------
     (M,) ndarray of float
-        Reweighting factor at each point.
+        Change of measure at each point.
 
     """
     # w, v = sparse.linalg.eigs(tmat.T, k=1, which="LR")
@@ -208,14 +208,14 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     forward_q : (M,) ndarray of float
         Forward committor at each point.
     backward_q : (M,) ndarray of float
         Backward committor at each point.
     weights : (M,) ndarray of float.
-        Reweighting factor at each point.
+        Change of measure at each point.
     rxn_coords : (M,) ndarray of float, optional
         Reaction coordinate at each point. This must be zero in the
         reactant state and one in the product state. If None, estimate
@@ -252,14 +252,14 @@ def current(generator, forward_q, backward_q, weights, cv):
 
     Parameters
     ----------
-    generator : (M, M) sparse matrix
+    generator : (M, M) sparse matrix of float
         Generator matrix.
     forward_q : (M,) ndarray of float
         Forward committor at each point.
     backward_q : (M,) ndarray of float
         Backward committor at each point.
     weights : (M,) ndarray of float.
-        Reweighting factor at each point.
+        Change of measure at each point.
     cv : (M,) ndarray of float
         Collective variable at each point.
 
@@ -290,6 +290,29 @@ def current(generator, forward_q, backward_q, weights, cv):
 
 
 def integral(generator, forward_q, backward_q, weights, ks, kt):
+    """Integrate a TPT objective function over the reaction ensemble.
+
+    Parameter
+    ---------
+    generator : (M, M) sparse matrix of float
+        Generator matrix.
+    forward_q : (M,) ndarray of float
+        Forward committor at each point.
+    backward_q : (M,) ndarray of float
+        Backward committor at each point.
+    weights : (M,) ndarray of float.
+        Change of measure at each point.
+    ks : (M, M) sparse matrix of float
+        Spatial part of the integrand of the objective function.
+    kt : (M,) ndarray of float
+        Temporal part of the integrand of the objective function.
+
+    Returns
+    -------
+    float
+        Integral of the objective function over the reaction ensemble.
+
+    """
     weights = np.asarray(weights)
     forward_q = np.asarray(forward_q)
     backward_q = np.asarray(backward_q)
@@ -308,6 +331,29 @@ def integral(generator, forward_q, backward_q, weights, ks, kt):
 
 
 def pointwise_integral(generator, forward_q, backward_q, weights, ks, kt):
+    """Calculate the contribution of each point to a TPT integral.
+
+    Parameter
+    ---------
+    generator : (M, M) sparse matrix of float
+        Generator matrix.
+    forward_q : (M,) ndarray of float
+        Forward committor at each point.
+    backward_q : (M,) ndarray of float
+        Backward committor at each point.
+    weights : (M,) ndarray of float.
+        Change of measure at each point.
+    ks : (M, M) sparse matrix of float
+        Spatial part of the integrand of the objective function.
+    kt : (M,) ndarray of float
+        Temporal part of the integrand of the objective function.
+
+    Returns
+    -------
+    (M,) ndarray of float
+        Contribution of each point to the TPT integral.
+
+    """
     weights = np.asarray(weights)
     forward_q = np.asarray(forward_q)
     backward_q = np.asarray(backward_q)
@@ -327,6 +373,23 @@ def pointwise_integral(generator, forward_q, backward_q, weights, ks, kt):
 
 
 def combine_k(ks1, kt1, ks2, kt2):
+    """Combine TPT objective functions.
+
+    Parameters
+    ----------
+    ks1, ks2 : (M, M) sparse matrix of float
+        Spatial part of the integrand of each input objective function.
+    kt1, kt2 : (M,) ndarray of float
+        Temporal part of the integrand of each input objective function.
+
+    Returns
+    -------
+    ks : (M, M) sparse matrix of float
+        Spatial part of the integrand of the combined objective function.
+    kt : (M,) ndarray of float
+        Temporal part of the integrand of the combined objective function.
+
+    """
     kt1 = np.asarray(kt1)
     kt2 = np.asarray(kt2)
     shape = kt1.shape

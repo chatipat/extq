@@ -35,7 +35,7 @@ def forward_extended_committor(
         Whether each point is in the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -79,7 +79,7 @@ def backward_extended_committor(
         Whether each point is in the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -124,7 +124,7 @@ def forward_extended_mfpt(
     guess : (n_indices, n_points) ndarray of float
         Guess for the mean first passage time. Must obey boundary
         conditions.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -169,7 +169,7 @@ def backward_extended_mfpt(
     guess : (n_indices, n_points) ndarray of float
         Guess for the mean first passage time. Must obey boundary
         conditions.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -216,7 +216,7 @@ def forward_extended_feynman_kac(
         Function to integrate. Must be zero outside of the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the solution. Must obey boundary conditions.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -257,7 +257,7 @@ def backward_extended_feynman_kac(
         Function to integrate. Must be zero outside of the domain.
     guess : (n_indices, n_points) ndarray of float
         Guess for the solution. Must obey boundary conditions.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -292,11 +292,15 @@ def extended_rate(
         Backward extended committor at each point.
     weights : (n_points,) ndarray of float.
         Change of measure to the invariant distribution at each point.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
     rxn_coords : (n_indices, n_points) ndarray of float, optional
         Reaction coordinate at each point. This must be zero in the
         reactant state and one in the product state. If None, estimate
         the rate without using a reaction coordinate.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -335,9 +339,9 @@ def extended_current(
         Possible transitions between indices. Each element
         transitions[i, j] may be a scalar or a sparse matrix of shape
         (n_points, n_points).
-    rxn_coords : (n_indices, n_points) ndarray of float
+    cv : (n_indices, n_points) ndarray of float
         Collective variable at each point.
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     Returns
@@ -361,6 +365,35 @@ def extended_integral(
     kt,
     time_transitions=None,
 ):
+    """Integrate an extended TPT objective function over the reaction ensemble.
+
+    Parameter
+    ---------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    forward_q : (n_indices, n_points) ndarray of float
+        Forward extended committor at each point.
+    backward_q : (n_indices, n_points) ndarray of float
+        Backward extended committor at each point.
+    weights : (n_points,) ndarray of float.
+        Change of measure to the invariant distribution at each point.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
+    ks : (n_indices, n_indices) array-like of (n_points, n_points) sparse matrix of float
+        Spatial part of the integrand of the objective function.
+    kt : (n_indices, n_points) ndarray of float
+        Temporal part of the integrand of the objective function.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
+        Time-dependent transitions between indices.
+
+    Returns
+    -------
+    float
+        Integral of the objective function over the reaction ensemble.
+
+    """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
     return integral(gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt)
@@ -376,6 +409,35 @@ def extended_pointwise_integral(
     kt,
     time_transitions=None,
 ):
+    """Calculate the contribution of each point to an extended TPT integral.
+
+    Parameter
+    ---------
+    generator : (n_points, n_points) sparse matrix of float
+        Generator matrix.
+    forward_q : (n_indices, n_points) ndarray of float
+        Forward extended committor at each point.
+    backward_q : (n_indices, n_points) ndarray of float
+        Backward extended committor at each point.
+    weights : (n_points,) ndarray of float.
+        Change of measure to the invariant distribution at each point.
+    transitions : (n_indices, n_indices) array-like
+        Possible transitions between indices. Each element
+        transitions[i, j] may be a scalar or a sparse matrix of shape
+        (n_points, n_points).
+    ks : (n_indices, n_indices) array-like of (n_points, n_points) sparse matrix of float
+        Spatial part of the integrand of the objective function.
+    kt : (n_indices, n_points) ndarray of float
+        Temporal part of the integrand of the objective function.
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
+        Time-dependent transitions between indices.
+
+    Returns
+    -------
+    (n_indices, n_points) ndarray of float
+        Contribution of each point to the extended TPT integral.
+
+    """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
     return pointwise_integral(
@@ -394,7 +456,7 @@ def _extended_generator(generator, transitions, time_transitions=None):
         Possible transitions between indices. Each element
         transitions[i, j] may be a scalar or a sparse matrix of shape
         (n_points, n_points).
-    time_transitions : (n_indices, n_indices, n_points) ndarray of float
+    time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
 
     """
@@ -416,6 +478,23 @@ def _extended_generator(generator, transitions, time_transitions=None):
 
 
 def combine_extended_k(ks1, kt1, ks2, kt2):
+    """Combine extended TPT transition functions.
+
+    Parameters
+    ----------
+    ks1, ks2 : (n_indices, n_indices) array-like of (n_points, n_points) sparse matrix of float
+        Spatial part of each input transition function.
+    kt1, kt2 : (n_indices, n_indices, n_points) ndarray of float
+        Temporal part of each input transition function.
+
+    Returns
+    -------
+    ks : (n_indices, n_indices) ndarray of (n_points, n_points) sparse matrix of float
+        Spatial part of the combined transition function.
+    kt : (n_indices, n_indices, n_points) ndarray of float
+        Temporal part of the combined transition function.
+
+    """
     ks1 = np.asarray(ks1, dtype=object)
     ks2 = np.asarray(ks2, dtype=object)
     kt1 = np.asarray(kt1)
