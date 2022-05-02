@@ -544,10 +544,11 @@ def _reweight_transform(coeffs, x_w, w):
     u = [[o]]
     x = [[c, x_w]]
 
-    result = _transform_left(coeffs, x, w, u)
+    wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
+    result = bmatmul(wu, bmatmul(_blocks(x), coeffs[:, None]))
     assert result.shape == (1, 1)
-    assert result[0, 0].ndim == 2 and result[0, 0].shape[1] == 1
-    return result[0, 0][:, 0]
+    assert result[0, 0].ndim == 2
+    return result[0, 0]
 
 
 def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag):
@@ -584,12 +585,14 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
 
     v = [[d, g], [None, o]]
     y = [[y_f, None], [None, c]]
-    result = _transform_right(coeffs, y, v)
+
+    v = bmap(lambda a: scipy.sparse.diags(a), _blocks(v))
+    result = bmatmul(v, bmatmul(_blocks(y), coeffs[:, None]))
     assert result.shape == (2, 1)
-    assert result[0, 0].ndim == 2 and result[0, 0].shape[1] == 1
-    assert result[1, 0].ndim == 2 and result[1, 0].shape[1] == 1
+    assert result[0, 0].ndim == 2
+    assert result[1, 0].ndim == 2
     assert np.all(result[1, 0] == 1.0)
-    return result[0, 0][:, 0]
+    return result[0, 0]
 
 
 def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag):
@@ -627,11 +630,12 @@ def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
     u = [[o, None], [g, d]]
     x = [[c, x_w, None], [None, None, x_b]]
 
-    result = _transform_left(coeffs, x, w, u)
+    wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
+    result = bmatmul(wu, bmatmul(_blocks(x), coeffs[:, None]))
     assert result.shape == (2, 1)
-    assert result[0, 0].ndim == 2 and result[0, 0].shape[1] == 1
-    assert result[1, 0].ndim == 2 and result[1, 0].shape[1] == 1
-    return result[1, 0][:, 0] / result[0, 0][:, 0]
+    assert result[0, 0].ndim == 2
+    assert result[1, 0].ndim == 2
+    return result[1, 0] / result[0, 0]
 
 
 def _reweight_integral_matrix(x_w, y_w, w, v, lag):
@@ -864,16 +868,6 @@ def _build(x, y, w, m, u, v, lag):
     x = bmap(lambda a: a[:last].T, _blocks(x)).T
     y = bmap(lambda a: a[lag:], _blocks(y))
     return bmatmul(x, bmatmul(umv, y))
-
-
-def _transform_right(coeffs, y, v):
-    v = bmap(lambda a: scipy.sparse.diags(a), _blocks(v))
-    return bmatmul(v, bmatmul(_blocks(y), coeffs))
-
-
-def _transform_left(coeffs, x, w, u):
-    u = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
-    return bmatmul(u, bmatmul(_blocks(x), coeffs))
 
 
 def _blocks(blocks):

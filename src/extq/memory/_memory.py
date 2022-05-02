@@ -51,7 +51,7 @@ def extrapolate(bmats, bmems, lag):
 
 
 def _memory(mats):
-    mems = []
+    mems = [None] * (len(mats) - 2)
     for t in range(len(mats) - 2):
         mems[t] = (
             mats[t + 2]
