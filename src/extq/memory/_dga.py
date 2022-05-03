@@ -859,7 +859,7 @@ def _moving_matmul(m, lag):
 
 def _build(x, y, w, m, u, v, lag):
     assert lag >= 0
-    assert np.all(w[len(w) - lag] == 0.0)
+    assert np.all(w[len(w) - lag :] == 0.0)
     last = -lag if lag > 0 else None
     m = bmap(lambda a: scipy.sparse.diags(w[:last] * a), _blocks(m))
     u = bmap(lambda a: scipy.sparse.diags(a[:last]), _blocks(u)).T
