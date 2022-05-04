@@ -79,9 +79,9 @@ def from_blocks(blocks, shape=None):
     if shape is not None:
         assert bshape(blocks) == shape
     if any_sparse(blocks):
-        return scipy.sparse.bmat(blocks, format="csr")
+        return scipy.sparse.bmat(blocks.copy(), format="csr")
     else:
-        return scipy.sparse.bmat(blocks).toarray()
+        return scipy.sparse.bmat(blocks.copy()).toarray()
 
 
 def to_blocks(mat, shape):
