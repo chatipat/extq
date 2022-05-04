@@ -547,7 +547,6 @@ def _reweight_transform(coeffs, x_w, w):
     wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
     result = bmatmul(wu, bmatmul(_blocks(x), coeffs[:, None]))
     assert result.shape == (1, 1)
-    assert result[0, 0].ndim == 2
     return result[0, 0]
 
 
@@ -589,8 +588,6 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
     v = bmap(lambda a: scipy.sparse.diags(a), _blocks(v))
     result = bmatmul(v, bmatmul(_blocks(y), coeffs[:, None]))
     assert result.shape == (2, 1)
-    assert result[0, 0].ndim == 2
-    assert result[1, 0].ndim == 2
     assert np.all(result[1, 0] == 1.0)
     return result[0, 0]
 
@@ -633,8 +630,6 @@ def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
     wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
     result = bmatmul(wu, bmatmul(_blocks(x), coeffs[:, None]))
     assert result.shape == (2, 1)
-    assert result[0, 0].ndim == 2
-    assert result[1, 0].ndim == 2
     return result[1, 0] / result[0, 0]
 
 
@@ -810,7 +805,7 @@ def _solve_observable(bgen_lr, bgen_ul, bgen_ur):
     result = bmatmul(
         backward_coeffs[None, :], bmatmul(bgen_ur, forward_coeffs[:, None])
     )
-    assert result.shape == (1, 1) and result[0, 0].ndim == 0
+    assert result.shape == (1, 1)
     return result[0, 0]
 
 
