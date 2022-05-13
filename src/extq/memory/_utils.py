@@ -55,6 +55,21 @@ def bmatmul(a, b):
     return c
 
 
+def bmatmul_mul(a, b):
+    m, l = a.shape
+    _, n = b.shape
+    assert b.shape == (l, n)
+    c = np.full((m, n), None)
+    for i in range(m):
+        for j in range(n):
+            for k in range(l):
+                if a[i, k] is not None and b[k, j] is not None:
+                    if c[i, j] is None:
+                        c[i, j] = 0
+                    c[i, j] += a[i, k] * b[k, j]
+    return c
+
+
 def bshape(blocks):
     br, bc = blocks.shape
     rows = [None] * br

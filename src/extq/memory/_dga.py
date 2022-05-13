@@ -1,13 +1,13 @@
-import numba as nb
 import numpy as np
 import scipy.linalg
 import scipy.sparse
 import scipy.sparse.linalg
 
-from ..moving_semigroup import moving_semigroup
+from ..moving_matmul import moving_matmul
 from ._utils import badd
 from ._utils import bmap
 from ._utils import bmatmul
+from ._utils import bmatmul_mul
 from ._utils import bshape
 from ._utils import from_blocks
 from ._utils import to_blockvec
@@ -527,7 +527,7 @@ def _reweight_matrix(x_w, y_w, w, lag):
         m[0, 0] = np.ones(len(w))
     else:
         m[0, 0] = np.ones(len(w) - 1)
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [[o]]
     v = [[o]]
@@ -566,7 +566,7 @@ def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag):
         m[0, 0] = d[:-1] * d[1:]
         m[0, 1] = d[:-1] * (b[1:] + f_f)
         m[1, 1] = np.ones(len(w) - 1)
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [[d, None], [None, o]]
     v = [[d, g], [None, o]]
@@ -608,7 +608,7 @@ def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag):
         m[0, 0] = np.ones(len(w) - 1)
         m[0, 1] = (a[:-1] + f_b) * d[1:]
         m[1, 1] = d[:-1] * d[1:]
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [[o, None], [g, d]]
     v = [[o, None], [None, d]]
@@ -646,7 +646,7 @@ def _reweight_integral_matrix(x_w, y_w, w, v, lag):
         m[0, 0] = np.ones(len(w) - 1)
         m[0, 1] = v
         m[1, 1] = np.ones(len(w) - 1)
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [[o, None], [None, o]]
     v = [[o, None], [None, o]]
@@ -678,7 +678,7 @@ def _forward_integral_matrix(x_w, y_w, x_f, y_f, w, d_f, v, f_f, g_f, lag):
         m[1, 1] = d[:-1] * d[1:]
         m[1, 2] = d[:-1] * (b[1:] + f_f)
         m[2, 2] = np.ones(len(w) - 1)
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [[o, None, None], [None, d, None], [None, None, o]]
     v = [[o, None, None], [None, d, g], [None, None, o]]
@@ -710,7 +710,7 @@ def _backward_integral_matrix(x_w, y_w, x_b, y_b, w, d_b, v, f_b, g_b, lag):
         m[1, 1] = d[:-1] * d[1:]
         m[1, 2] = d[:-1] * v
         m[2, 2] = np.ones(len(w) - 1)
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [[o, None, None], [g, d, None], [None, None, o]]
     v = [[o, None, None], [None, d, None], [None, None, o]]
@@ -755,7 +755,7 @@ def _integral_matrix(
         m[2, 2] = df[:-1] * df[1:]
         m[2, 3] = df[:-1] * (b[1:] + f_f)
         m[3, 3] = np.ones(len(w) - 1)
-        m = _moving_matmul(m, lag)
+        m = moving_matmul(m, lag)
 
     u = [
         [o, None, None, None],
@@ -816,50 +816,15 @@ def _solve(a, b):
         return scipy.linalg.solve(a, b)
 
 
-def _moving_matmul(m, lag):
-    assert lag > 0
-    assert m.ndim == 2
-    assert m.shape[0] == m.shape[1]
-
-    # find number of transitions `n`
-    # and assert all entries have the same `n`
-    n = None
-    for i in range(m.shape[0]):
-        for j in range(m.shape[1]):
-            if m[i, j] is not None:
-                if n is None:
-                    n = len(m[i, j])
-                assert len(m[i, j]) == n
-    assert n is not None
-
-    # convert blocks to dense array and apply moving matmul
-    a = np.zeros((n, m.shape[0], m.shape[1]))
-    for i in range(m.shape[0]):
-        for j in range(m.shape[1]):
-            if m[i, j] is not None:
-                a[:, i, j] = m[i, j]
-    a = moving_semigroup(a, lag, _matmul)
-    assert a.shape == (n + 1 - lag, m.shape[0], m.shape[1])
-
-    # convert result to blocks with same sparsity pattern
-    mlag = np.full(m.shape, None)
-    for i in range(m.shape[0]):
-        for j in range(m.shape[1]):
-            if m[i, j] is None:
-                assert np.all(a[:, i, j] == 0.0)
-            else:
-                mlag[i, j] = a[:, i, j]
-    return mlag
-
-
 def _build(x, y, w, m, u, v, lag):
     assert lag >= 0
     assert np.all(w[len(w) - lag :] == 0.0)
     last = -lag if lag > 0 else None
-    m = bmap(lambda a: scipy.sparse.diags(w[:last] * a), _blocks(m))
-    u = bmap(lambda a: scipy.sparse.diags(a[:last]), _blocks(u)).T
-    v = bmap(lambda a: scipy.sparse.diags(a[lag:]), _blocks(v))
-    umv = bmatmul(u, bmatmul(m, v))
+    m = bmap(lambda a: w[:last] * a, _blocks(m))
+    u = bmap(lambda a: a[:last], _blocks(u)).T
+    v = bmap(lambda a: a[lag:], _blocks(v))
+    umv = bmatmul_mul(u, bmatmul_mul(m, v))
+    umv = bmap(lambda a: scipy.sparse.diags(a, format="csr"), umv)
     x = bmap(lambda a: a[:last].T, _blocks(x)).T
     y = bmap(lambda a: a[lag:], _blocks(y))
     return bmatmul(x, bmatmul(umv, y))
@@ -876,8 +841,3 @@ def _add(mat, acc=None):
         return mat
     else:
         return badd(mat, acc)
-
-
-@nb.njit
-def _matmul(a, b, c):
-    np.dot(a, b, c)
