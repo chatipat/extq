@@ -544,9 +544,9 @@ def _reweight_transform(coeffs, x_w, w):
     u = [[o]]
     x = [[c, x_w]]
 
-    wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
+    wu = bmap(lambda a: w * a, _blocks(u))
     result = bmatmul(
-        operator.matmul,
+        operator.mul,
         wu,
         bmatmul(operator.matmul, _blocks(x), coeffs[:, None]),
     )
@@ -589,9 +589,9 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
     v = [[d, g], [None, o]]
     y = [[y_f, None], [None, c]]
 
-    v = bmap(lambda a: scipy.sparse.diags(a), _blocks(v))
+    v = _blocks(v)
     result = bmatmul(
-        operator.matmul,
+        operator.mul,
         v,
         bmatmul(operator.matmul, _blocks(y), coeffs[:, None]),
     )
@@ -635,9 +635,9 @@ def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
     u = [[o, None], [g, d]]
     x = [[c, x_w, None], [None, None, x_b]]
 
-    wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
+    wu = bmap(lambda a: w * a, _blocks(u))
     result = bmatmul(
-        operator.matmul,
+        operator.mul,
         wu,
         bmatmul(operator.matmul, _blocks(x), coeffs[:, None]),
     )
@@ -835,10 +835,11 @@ def _build(x, y, w, m, u, v, lag):
     u = bmap(lambda a: a[:last], _blocks(u)).T
     v = bmap(lambda a: a[lag:], _blocks(v))
     umv = bmatmul(operator.mul, u, bmatmul(operator.mul, m, v))
-    umv = bmap(lambda a: scipy.sparse.diags(a, format="csr"), umv)
     x = bmap(lambda a: a[:last].T, _blocks(x)).T
     y = bmap(lambda a: a[lag:], _blocks(y))
-    return bmatmul(operator.matmul, x, bmatmul(operator.matmul, umv, y))
+    umvy = bmatmul(_scale, umv, y)
+    xumvy = bmatmul(operator.matmul, x, umvy)
+    return xumvy
 
 
 def _blocks(blocks):
@@ -852,3 +853,14 @@ def _add(mat, acc=None):
         return mat
     else:
         return badd(mat, acc)
+
+
+def _scale(w, x):
+    if scipy.sparse.issparse(x):
+        x = x.tocsr()
+        return scipy.sparse.csr_matrix(
+            (x.data * np.repeat(w, np.diff(x.indptr)), x.indices, x.indptr),
+            shape=x.shape,
+        )
+    else:
+        return x * w[:, None]
