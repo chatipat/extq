@@ -26,7 +26,5 @@ from ._dga import reweight_transform
 from ._dga import tpt_integral_matrix
 from ._memory import extrapolate
 from ._memory import generator
-from ._memory import generator_with_memory
 from ._memory import identity
-from ._memory import identity_with_memory
 from ._memory import memory

@@ -1,13 +1,13 @@
-import numpy as np
-import scipy.linalg
-import scipy.sparse
-import scipy.sparse.linalg
+import operator
 
+import numpy as np
+import scipy.sparse
+
+from .. import linalg
 from ..moving_matmul import moving_matmul
 from ._utils import badd
 from ._utils import bmap
 from ._utils import bmatmul
-from ._utils import bmatmul_mul
 from ._utils import bshape
 from ._utils import from_blocks
 from ._utils import to_blockvec
@@ -545,7 +545,11 @@ def _reweight_transform(coeffs, x_w, w):
     x = [[c, x_w]]
 
     wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
-    result = bmatmul(wu, bmatmul(_blocks(x), coeffs[:, None]))
+    result = bmatmul(
+        operator.matmul,
+        wu,
+        bmatmul(operator.matmul, _blocks(x), coeffs[:, None]),
+    )
     assert result.shape == (1, 1)
     return result[0, 0]
 
@@ -586,7 +590,11 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
     y = [[y_f, None], [None, c]]
 
     v = bmap(lambda a: scipy.sparse.diags(a), _blocks(v))
-    result = bmatmul(v, bmatmul(_blocks(y), coeffs[:, None]))
+    result = bmatmul(
+        operator.matmul,
+        v,
+        bmatmul(operator.matmul, _blocks(y), coeffs[:, None]),
+    )
     assert result.shape == (2, 1)
     assert np.all(result[1, 0] == 1.0)
     return result[0, 0]
@@ -628,7 +636,11 @@ def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
     x = [[c, x_w, None], [None, None, x_b]]
 
     wu = bmap(lambda a: scipy.sparse.diags(w * a), _blocks(u))
-    result = bmatmul(wu, bmatmul(_blocks(x), coeffs[:, None]))
+    result = bmatmul(
+        operator.matmul,
+        wu,
+        bmatmul(operator.matmul, _blocks(x), coeffs[:, None]),
+    )
     assert result.shape == (2, 1)
     return result[1, 0] / result[0, 0]
 
@@ -788,14 +800,18 @@ def _integral_matrix(
 def _solve_forward(bgen):
     shape = bshape(bgen)
     gen = from_blocks(bgen)
-    coeffs = np.concatenate([_solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]])
+    coeffs = np.concatenate(
+        [linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]]
+    )
     return to_blockvec(coeffs, shape[1])
 
 
 def _solve_backward(bgen):
     shape = bshape(bgen)
     gen = from_blocks(bgen)
-    coeffs = np.concatenate([[1.0], _solve(gen.T[1:, 1:], -gen.T[1:, 0])])
+    coeffs = np.concatenate(
+        [[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])]
+    )
     return to_blockvec(coeffs, shape[0])
 
 
@@ -803,17 +819,12 @@ def _solve_observable(bgen_lr, bgen_ul, bgen_ur):
     forward_coeffs = _solve_forward(bgen_lr)
     backward_coeffs = _solve_backward(bgen_ul)
     result = bmatmul(
-        backward_coeffs[None, :], bmatmul(bgen_ur, forward_coeffs[:, None])
+        operator.matmul,
+        backward_coeffs[None, :],
+        bmatmul(operator.matmul, bgen_ur, forward_coeffs[:, None]),
     )
     assert result.shape == (1, 1)
     return result[0, 0]
-
-
-def _solve(a, b):
-    if scipy.sparse.issparse(a):
-        return scipy.sparse.linalg.spsolve(a, b)
-    else:
-        return scipy.linalg.solve(a, b)
 
 
 def _build(x, y, w, m, u, v, lag):
@@ -823,11 +834,11 @@ def _build(x, y, w, m, u, v, lag):
     m = bmap(lambda a: w[:last] * a, _blocks(m))
     u = bmap(lambda a: a[:last], _blocks(u)).T
     v = bmap(lambda a: a[lag:], _blocks(v))
-    umv = bmatmul_mul(u, bmatmul_mul(m, v))
+    umv = bmatmul(operator.mul, u, bmatmul(operator.mul, m, v))
     umv = bmap(lambda a: scipy.sparse.diags(a, format="csr"), umv)
     x = bmap(lambda a: a[:last].T, _blocks(x)).T
     y = bmap(lambda a: a[lag:], _blocks(y))
-    return bmatmul(x, bmatmul(umv, y))
+    return bmatmul(operator.matmul, x, bmatmul(operator.matmul, umv, y))
 
 
 def _blocks(blocks):

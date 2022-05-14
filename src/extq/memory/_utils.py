@@ -1,31 +1,29 @@
+import operator
+
 import numpy as np
-import scipy.linalg
 import scipy.sparse
-import scipy.sparse.linalg
 
 
 def bmap(f, a):
-    m, n = a.shape
-    b = np.full((m, n), None)
-    for i in range(m):
-        for j in range(n):
-            if a[i, j] is not None:
-                b[i, j] = f(a[i, j])
-    return b
+    def helper(x):
+        if x is None:
+            return None
+        else:
+            return f(x)
+
+    return np.vectorize(helper, otypes=[object])(a)
 
 
 def bmap2(f, a, b):
-    m, n = a.shape
-    assert b.shape == (m, n)
-    c = np.full((m, n), None)
-    for i in range(m):
-        for j in range(n):
-            if a[i, j] is None:
-                assert b[i, j] is None
-            else:
-                assert b[i, j] is not None
-                c[i, j] = f(a[i, j], b[i, j])
-    return c
+    def helper(x, y):
+        if x is None:
+            assert y is None
+            return None
+        else:
+            assert y is not None
+            return f(x, y)
+
+    return np.vectorize(helper, otypes=[object])(a, b)
 
 
 def btranspose(a):
@@ -33,14 +31,14 @@ def btranspose(a):
 
 
 def badd(a, b):
-    return bmap2(lambda x, y: x + y, a, b)
+    return bmap2(operator.add, a, b)
 
 
 def bsub(a, b):
-    return bmap2(lambda x, y: x - y, a, b)
+    return bmap2(operator.sub, a, b)
 
 
-def bmatmul(a, b):
+def bmatmul(f, a, b):
     m, l = a.shape
     _, n = b.shape
     assert b.shape == (l, n)
@@ -51,22 +49,7 @@ def bmatmul(a, b):
                 if a[i, k] is not None and b[k, j] is not None:
                     if c[i, j] is None:
                         c[i, j] = 0
-                    c[i, j] += a[i, k] @ b[k, j]
-    return c
-
-
-def bmatmul_mul(a, b):
-    m, l = a.shape
-    _, n = b.shape
-    assert b.shape == (l, n)
-    c = np.full((m, n), None)
-    for i in range(m):
-        for j in range(n):
-            for k in range(l):
-                if a[i, k] is not None and b[k, j] is not None:
-                    if c[i, j] is None:
-                        c[i, j] = 0
-                    c[i, j] += a[i, k] * b[k, j]
+                    c[i, j] += f(a[i, k], b[k, j])
     return c
 
 
@@ -128,10 +111,3 @@ def any_sparse(blocks):
                 if scipy.sparse.issparse(blocks[i, j]):
                     return True
     return False
-
-
-def inv(m):
-    if scipy.sparse.issparse(m):
-        return scipy.sparse.linalg.inv(m)
-    else:
-        return scipy.linalg.inv(m)
