@@ -583,10 +583,9 @@ def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag):
 def _forward_transform(coeffs, y_f, d_f, g_f):
     c = np.ones((len(g_f), 1))
     d = np.where(d_f, 1.0, 0.0)
-    g = np.where(d_f, g_f, 0.0)
     o = np.ones(len(g_f))
 
-    v = [[d, g], [None, o]]
+    v = [[d, g_f], [None, o]]
     y = [[y_f, None], [None, c]]
 
     v = _blocks(v)
@@ -629,10 +628,9 @@ def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag):
 def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
     c = np.ones((len(w), 1))
     d = np.where(d_b, 1.0, 0.0)
-    g = np.where(d_b, g_b, 0.0)
     o = np.ones(len(w))
 
-    u = [[o, None], [g, d]]
+    u = [[o, None], [g_b, d]]
     x = [[c, x_w, None], [None, None, x_b]]
 
     wu = bmap(lambda a: w * a, _blocks(u))
