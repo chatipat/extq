@@ -1,10 +1,9 @@
 import numba as nb
 import numpy as np
-import scipy.sparse
 
+from .. import linalg
 from ..moving_semigroup import moving_semigroup
 from ._utils import extended_transform
-from ._utils import solve
 
 
 def forward_extended_committor(
@@ -59,7 +58,7 @@ def forward_extended_committor(
         a += ai
         b += bi
 
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return extended_transform(coeffs, basis, guess)
 
 
@@ -115,7 +114,7 @@ def backward_extended_committor(
         a += ai
         b += bi
 
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return extended_transform(coeffs, basis, guess)
 
 
@@ -172,7 +171,7 @@ def forward_extended_mfpt(
         a += ai
         b += bi
 
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return extended_transform(coeffs, basis, guess)
 
 
@@ -229,7 +228,7 @@ def backward_extended_mfpt(
         a += ai
         b += bi
 
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return extended_transform(coeffs, basis, guess)
 
 
@@ -289,7 +288,7 @@ def forward_extended_feynman_kac(
         a += ai
         b += bi
 
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return extended_transform(coeffs, basis, guess)
 
 
@@ -349,7 +348,7 @@ def backward_extended_feynman_kac(
         a += ai
         b += bi
 
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return extended_transform(coeffs, basis, guess)
 
 
@@ -373,14 +372,14 @@ def _forward_helper(x, y, w, m, d, f, g, lag):
     b = 0.0
 
     for i in range(ni):
-        wx = scipy.sparse.diags(w[:-lag]) @ x[i][:-lag]
+        wx = linalg.scale_rows(w[:-lag], x[i][:-lag])
 
         yi = 0.0
         gi = 0.0
 
         for j in range(ni):
-            yi += scipy.sparse.diags(m[i, j]) @ y[j][lag:]
-            gi += scipy.sparse.diags(m[i, j]) @ g[j][lag:]
+            yi += linalg.scale_rows(m[i, j], y[j][lag:])
+            gi += linalg.scale_rows(m[i, j], g[j][lag:])
         gi += m[i, ni]  # integral and boundary conditions
 
         yi -= y[i][:-lag]
@@ -428,14 +427,14 @@ def _backward_helper(x, y, w, m, d, f, g, lag):
     b = 0.0
 
     for i in range(ni):
-        wx = scipy.sparse.diags(w[:-lag]) @ x[i][lag:]
+        wx = linalg.scale_rows(w[:-lag], x[i][lag:])
 
         yi = 0.0
         gi = 0.0
 
         for j in range(ni):
-            yi += scipy.sparse.diags(m[j, i]) @ y[j][:-lag]
-            gi += scipy.sparse.diags(m[j, i]) @ g[j][:-lag]
+            yi += linalg.scale_rows(m[j, i], y[j][:-lag])
+            gi += linalg.scale_rows(m[j, i], g[j][:-lag])
         gi += m[ni, i]  # integral and boundary conditions
 
         yi -= y[i][lag:]

@@ -1,14 +1,4 @@
 import numpy as np
-import scipy.linalg
-import scipy.sparse
-import scipy.sparse.linalg
-
-
-def solve(a, b):
-    if scipy.sparse.issparse(a):
-        return scipy.sparse.linalg.spsolve(a, b)
-    else:
-        return scipy.linalg.solve(a, b)
 
 
 def transform(coeffs, basis, guess):

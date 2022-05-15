@@ -1,7 +1,6 @@
 import numpy as np
-import scipy.sparse
 
-from ._utils import solve
+from .. import linalg
 
 
 def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
@@ -49,8 +48,8 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
     b = 0.0
     for x, y, w in zip(test_basis, basis, guess):
         assert np.all(w[-maxlag:] == 0.0)
-        wdx = scipy.sparse.diags(w[:-lag]) @ (x[lag:] - x[:-lag])
+        wdx = linalg.scale_rows(w[:-lag], x[lag:] - x[:-lag])
         a += wdx.T @ y[:-lag]
         b -= np.ravel(wdx.sum(axis=0))
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess)]

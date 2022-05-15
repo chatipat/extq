@@ -1,12 +1,10 @@
-import numba as nb
 import numpy as np
-import scipy.sparse
 
+from .. import linalg
 from ..stop import backward_integrate
 from ..stop import backward_stop
 from ..stop import forward_integrate
 from ..stop import forward_stop
-from ._utils import solve
 from ._utils import transform
 
 
@@ -46,10 +44,10 @@ def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         assert np.all(w[-lag:] == 0.0)
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
-        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        wx = linalg.scale_rows(w[:-lag], x[:-lag])
         a += wx.T @ (y[iy] - y[:-lag])
         b -= wx.T @ (g[iy] - g[:-lag])
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
 
@@ -89,10 +87,10 @@ def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         assert np.all(w[-lag:] == 0.0)
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
-        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        wx = linalg.scale_rows(w[:-lag], x[lag:])
         a += wx.T @ (y[iy] - y[lag:])
         b -= wx.T @ (g[iy] - g[lag:])
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
 
@@ -136,10 +134,10 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
         integral = iy - ix
-        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        wx = linalg.scale_rows(w[:-lag], x[:-lag])
         a += wx.T @ (y[iy] - y[:-lag])
         b -= wx.T @ (g[iy] - g[:-lag] + integral)
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
 
@@ -183,10 +181,10 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
         integral = ix - iy
-        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        wx = linalg.scale_rows(w[:-lag], x[lag:])
         a += wx.T @ (y[iy] - y[lag:])
         b -= wx.T @ (g[iy] - g[lag:] + integral)
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
 
@@ -235,10 +233,10 @@ def forward_feynman_kac(
         assert np.all(iy < len(d))
         intf = forward_integrate(d, f)
         integral = intf[:-lag] - intf[iy]
-        wx = scipy.sparse.diags(w[:-lag]) @ x[:-lag]
+        wx = linalg.scale_rows(w[:-lag], x[:-lag])
         a += wx.T @ (y[iy] - y[:-lag])
         b -= wx.T @ (g[iy] - g[:-lag] + integral)
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
 
@@ -287,8 +285,8 @@ def backward_feynman_kac(
         assert np.all(iy >= 0)
         intf = backward_integrate(d, f)
         integral = intf[lag:] - intf[iy]
-        wx = scipy.sparse.diags(w[:-lag]) @ x[lag:]
+        wx = linalg.scale_rows(w[:-lag], x[lag:])
         a += wx.T @ (y[iy] - y[lag:])
         b -= wx.T @ (g[iy] - g[lag:] + integral)
-    coeffs = solve(a, b)
+    coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)

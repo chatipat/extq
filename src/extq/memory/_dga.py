@@ -1,7 +1,6 @@
 import operator
 
 import numpy as np
-import scipy.sparse
 
 from .. import linalg
 from ..moving_matmul import moving_matmul
@@ -835,7 +834,7 @@ def _build(x, y, w, m, u, v, lag):
     umv = bmatmul(operator.mul, u, bmatmul(operator.mul, m, v))
     x = bmap(lambda a: a[:last].T, _blocks(x)).T
     y = bmap(lambda a: a[lag:], _blocks(y))
-    umvy = bmatmul(_scale, umv, y)
+    umvy = bmatmul(linalg.scale_rows, umv, y)
     xumvy = bmatmul(operator.matmul, x, umvy)
     return xumvy
 
@@ -851,14 +850,3 @@ def _add(mat, acc=None):
         return mat
     else:
         return badd(mat, acc)
-
-
-def _scale(w, x):
-    if scipy.sparse.issparse(x):
-        x = x.tocsr()
-        return scipy.sparse.csr_matrix(
-            (x.data * np.repeat(w, np.diff(x.indptr)), x.indices, x.indptr),
-            shape=x.shape,
-        )
-    else:
-        return x * w[:, None]
