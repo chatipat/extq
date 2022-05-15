@@ -15,10 +15,10 @@ from ._utils import to_blockvec
 def reweight_matrix(basis, weights, lag, test=None):
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, w in zip(basis, test, weights):
-        result = _add(_reweight_matrix(x_w, y_w, w, lag), result)
-    return result
+    return _sum(
+        _reweight_matrix(x_w, y_w, w, lag)
+        for x_w, y_w, w in zip(basis, test, weights)
+    )
 
 
 def reweight_solve(bgen):
@@ -35,19 +35,19 @@ def reweight_transform(coeffs, basis, weights):
 def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
     if test is None:
         test = basis
-    result = None
-    for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess):
-        result = _add(_forward_matrix(x_f, y_f, w, in_d, 0.0, g, lag), result)
-    return result
+    return _sum(
+        _forward_matrix(x_f, y_f, w, in_d, 0.0, g, lag)
+        for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess)
+    )
 
 
 def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
     if test is None:
         test = basis
-    result = None
-    for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess):
-        result = _add(_forward_matrix(x_f, y_f, w, in_d, 1.0, g, lag), result)
-    return result
+    return _sum(
+        _forward_matrix(x_f, y_f, w, in_d, 1.0, g, lag)
+        for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess)
+    )
 
 
 def forward_feynman_kac_matrix(
@@ -55,12 +55,12 @@ def forward_feynman_kac_matrix(
 ):
     if test is None:
         test = basis
-    result = None
-    for x_f, y_f, w, in_d, f, g in zip(
-        test, basis, weights, in_domain, function, guess
-    ):
-        result = _add(_forward_matrix(x_f, y_f, w, in_d, f, g, lag), result)
-    return result
+    return _sum(
+        _forward_matrix(x_f, y_f, w, in_d, f, g, lag)
+        for x_f, y_f, w, in_d, f, g in zip(
+            test, basis, weights, in_domain, function, guess
+        )
+    )
 
 
 def forward_solve(bgen):
@@ -81,15 +81,12 @@ def backward_committor_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
-        w_basis, w_test, basis, test, weights, in_domain, guess
-    ):
-        result = _add(
-            _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 0.0, g_b, lag),
-            result,
+    return _sum(
+        _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 0.0, g_b, lag)
+        for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
+            w_basis, w_test, basis, test, weights, in_domain, guess
         )
-    return result
+    )
 
 
 def backward_mfpt_matrix(
@@ -99,15 +96,12 @@ def backward_mfpt_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
-        w_basis, w_test, basis, test, weights, in_domain, guess
-    ):
-        result = _add(
-            _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 1.0, g_b, lag),
-            result,
+    return _sum(
+        _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 1.0, g_b, lag)
+        for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
+            w_basis, w_test, basis, test, weights, in_domain, guess
         )
-    return result
+    )
 
 
 def backward_feynman_kac_matrix(
@@ -125,21 +119,19 @@ def backward_feynman_kac_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_b, y_b, w, in_d, f, g in zip(
-        w_basis,
-        w_test,
-        basis,
-        test,
-        weights,
-        in_domain,
-        function,
-        guess,
-    ):
-        result = _add(
-            _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, f, g, lag), result
+    return _sum(
+        _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, f, g, lag)
+        for x_w, y_w, x_b, y_b, w, in_d, f, g in zip(
+            w_basis,
+            w_test,
+            basis,
+            test,
+            weights,
+            in_domain,
+            function,
+            guess,
         )
-    return result
+    )
 
 
 def backward_solve(bgen):
@@ -156,10 +148,10 @@ def backward_transform(coeffs, w_basis, basis, weights, in_domain, guess):
 def reweight_integral_matrix(basis, weights, values, lag, test=None):
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, w, v in zip(basis, test, weights, values):
-        result = _add(_reweight_integral_matrix(x_w, y_w, w, v, lag), result)
-    return result
+    return _sum(
+        _reweight_integral_matrix(x_w, y_w, w, v, lag)
+        for x_w, y_w, w, v in zip(basis, test, weights, values)
+    )
 
 
 def reweight_integral_solve(bgen):
@@ -182,17 +174,12 @@ def forward_committor_integral_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_f, y_f, w, in_d, v, g in zip(
-        w_basis, w_test, test, basis, weights, in_domain, values, guess
-    ):
-        result = _add(
-            _forward_integral_matrix(
-                x_w, y_w, x_f, y_f, w, in_d, v, 0.0, g, lag
-            ),
-            result,
+    return _sum(
+        _forward_integral_matrix(x_w, y_w, x_f, y_f, w, in_d, v, 0.0, g, lag)
+        for x_w, y_w, x_f, y_f, w, in_d, v, g in zip(
+            w_basis, w_test, test, basis, weights, in_domain, values, guess
         )
-    return result
+    )
 
 
 def forward_mfpt_integral_matrix(
@@ -210,17 +197,12 @@ def forward_mfpt_integral_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_f, y_f, w, in_d, v, g in zip(
-        w_basis, w_test, test, basis, weights, in_domain, values, guess
-    ):
-        result = _add(
-            _forward_integral_matrix(
-                x_w, y_w, x_f, y_f, w, in_d, v, 1.0, g, lag
-            ),
-            result,
+    return _sum(
+        _forward_integral_matrix(x_w, y_w, x_f, y_f, w, in_d, v, 1.0, g, lag)
+        for x_w, y_w, x_f, y_f, w, in_d, v, g in zip(
+            w_basis, w_test, test, basis, weights, in_domain, values, guess
         )
-    return result
+    )
 
 
 def forward_feynman_kac_integral_matrix(
@@ -239,25 +221,20 @@ def forward_feynman_kac_integral_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_f, y_f, w, in_d, v, f, g in zip(
-        w_basis,
-        w_test,
-        test,
-        basis,
-        weights,
-        in_domain,
-        values,
-        function,
-        guess,
-    ):
-        result = _add(
-            _forward_integral_matrix(
-                x_w, y_w, x_f, y_f, w, in_d, v, f, g, lag
-            ),
-            result,
+    return _sum(
+        _forward_integral_matrix(x_w, y_w, x_f, y_f, w, in_d, v, f, g, lag)
+        for x_w, y_w, x_f, y_f, w, in_d, v, f, g in zip(
+            w_basis,
+            w_test,
+            test,
+            basis,
+            weights,
+            in_domain,
+            values,
+            function,
+            guess,
         )
-    return result
+    )
 
 
 def forward_integral_solve(bgen):
@@ -280,24 +257,19 @@ def backward_committor_integral_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_b, y_b, w, in_d, v, g in zip(
-        w_basis,
-        w_test,
-        basis,
-        test,
-        weights,
-        in_domain,
-        values,
-        guess,
-    ):
-        result = _add(
-            _backward_integral_matrix(
-                x_w, y_w, x_b, y_b, w, in_d, v, 0.0, g, lag
-            ),
-            result,
+    return _sum(
+        _backward_integral_matrix(x_w, y_w, x_b, y_b, w, in_d, v, 0.0, g, lag)
+        for x_w, y_w, x_b, y_b, w, in_d, v, g in zip(
+            w_basis,
+            w_test,
+            basis,
+            test,
+            weights,
+            in_domain,
+            values,
+            guess,
         )
-    return result
+    )
 
 
 def backward_mfpt_integral_matrix(
@@ -315,24 +287,19 @@ def backward_mfpt_integral_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_b, y_b, w, in_d, v, g in zip(
-        w_basis,
-        w_test,
-        basis,
-        test,
-        weights,
-        in_domain,
-        values,
-        guess,
-    ):
-        result = _add(
-            _backward_integral_matrix(
-                x_w, y_w, x_b, y_b, w, in_d, v, 1.0, g, lag
-            ),
-            result,
+    return _sum(
+        _backward_integral_matrix(x_w, y_w, x_b, y_b, w, in_d, v, 1.0, g, lag)
+        for x_w, y_w, x_b, y_b, w, in_d, v, g in zip(
+            w_basis,
+            w_test,
+            basis,
+            test,
+            weights,
+            in_domain,
+            values,
+            guess,
         )
-    return result
+    )
 
 
 def backward_feynman_kac_integral_matrix(
@@ -351,25 +318,20 @@ def backward_feynman_kac_integral_matrix(
         w_test = w_basis
     if test is None:
         test = basis
-    result = None
-    for x_w, y_w, x_b, y_b, w, in_d, v, f, g in zip(
-        w_basis,
-        w_test,
-        basis,
-        test,
-        weights,
-        in_domain,
-        function,
-        values,
-        guess,
-    ):
-        result = _add(
-            _backward_integral_matrix(
-                x_w, y_w, x_b, y_b, w, in_d, v, f, g, lag
-            ),
-            result,
+    return _sum(
+        _backward_integral_matrix(x_w, y_w, x_b, y_b, w, in_d, v, f, g, lag)
+        for x_w, y_w, x_b, y_b, w, in_d, v, f, g in zip(
+            w_basis,
+            w_test,
+            basis,
+            test,
+            weights,
+            in_domain,
+            function,
+            values,
+            guess,
         )
-    return result
+    )
 
 
 def backward_integral_solve(bgen):
@@ -397,41 +359,38 @@ def tpt_integral_matrix(
         b_test = b_basis
     if f_test is None:
         f_test = f_basis
-    result = None
-    for x_w, y_w, x_b, y_b, x_f, y_f, w, in_d, v, g_b, g_f in zip(
-        w_basis,
-        w_test,
-        b_basis,
-        b_test,
-        f_test,
-        f_basis,
-        weights,
-        in_domain,
-        values,
-        b_guess,
-        f_guess,
-    ):
-        result = _add(
-            _integral_matrix(
-                x_w,
-                y_w,
-                x_b,
-                y_b,
-                x_f,
-                y_f,
-                w,
-                in_d,
-                in_d,
-                v,
-                0.0,
-                0.0,
-                g_b,
-                g_f,
-                lag,
-            ),
-            result,
+    return _sum(
+        _integral_matrix(
+            x_w,
+            y_w,
+            x_b,
+            y_b,
+            x_f,
+            y_f,
+            w,
+            in_d,
+            in_d,
+            v,
+            0.0,
+            0.0,
+            g_b,
+            g_f,
+            lag,
         )
-    return result
+        for x_w, y_w, x_b, y_b, x_f, y_f, w, in_d, v, g_b, g_f in zip(
+            w_basis,
+            w_test,
+            b_basis,
+            b_test,
+            f_test,
+            f_basis,
+            weights,
+            in_domain,
+            values,
+            b_guess,
+            f_guess,
+        )
+    )
 
 
 def integral_matrix(
@@ -457,59 +416,56 @@ def integral_matrix(
         b_test = b_basis
     if f_test is None:
         f_test = f_basis
-    result = None
-    for (
-        x_w,
-        y_w,
-        x_b,
-        y_b,
-        x_f,
-        y_f,
-        w,
-        d_b,
-        d_f,
-        v,
-        f_b,
-        f_f,
-        g_b,
-        g_f,
-    ) in zip(
-        w_basis,
-        w_test,
-        b_basis,
-        b_test,
-        f_test,
-        f_basis,
-        weights,
-        b_domain,
-        f_domain,
-        values,
-        b_function,
-        f_function,
-        b_guess,
-        f_guess,
-    ):
-        result = _add(
-            _integral_matrix(
-                x_w,
-                y_w,
-                x_b,
-                y_b,
-                x_f,
-                y_f,
-                w,
-                d_b,
-                d_f,
-                v,
-                f_b,
-                f_f,
-                g_b,
-                g_f,
-                lag,
-            ),
-            result,
+    return _sum(
+        _integral_matrix(
+            x_w,
+            y_w,
+            x_b,
+            y_b,
+            x_f,
+            y_f,
+            w,
+            d_b,
+            d_f,
+            v,
+            f_b,
+            f_f,
+            g_b,
+            g_f,
+            lag,
         )
-    return result
+        for (
+            x_w,
+            y_w,
+            x_b,
+            y_b,
+            x_f,
+            y_f,
+            w,
+            d_b,
+            d_f,
+            v,
+            f_b,
+            f_f,
+            g_b,
+            g_f,
+        ) in zip(
+            w_basis,
+            w_test,
+            b_basis,
+            b_test,
+            f_test,
+            f_basis,
+            weights,
+            b_domain,
+            f_domain,
+            values,
+            b_function,
+            f_function,
+            b_guess,
+            f_guess,
+        )
+    )
 
 
 def integral_solve(bgen):
@@ -845,8 +801,11 @@ def _blocks(blocks):
     return result
 
 
-def _add(mat, acc=None):
-    if acc is None:
-        return mat
-    else:
-        return badd(mat, acc)
+def _sum(mats):
+    result = None
+    for mat in mats:
+        if result is None:
+            result = mat
+        else:
+            result = badd(mat, result)
+    return result
