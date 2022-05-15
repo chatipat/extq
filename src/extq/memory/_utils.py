@@ -73,6 +73,12 @@ def bshape(blocks):
     return (tuple(rows), tuple(cols))
 
 
+def asblocks(blocks, ndim=2):
+    result = np.empty(_shape(blocks, ndim), dtype=object)
+    result[:] = blocks
+    return result
+
+
 def from_blocks(blocks, shape=None):
     if shape is not None:
         assert bshape(blocks) == shape
@@ -111,3 +117,74 @@ def any_sparse(blocks):
                 if scipy.sparse.issparse(blocks[i, j]):
                     return True
     return False
+
+
+def bconcatenate_lag(blocks, left=0, right=0):
+    def helper(mats):
+        if mats[0] is None:
+            assert all(mat is None for mat in mats)
+            return None
+        else:
+            assert all(mat is not None for mat in mats)
+            return concatenate_lag(mats, left=left, right=right)
+
+    blocks = asblocks(blocks, ndim=3)
+    blocks = np.moveaxis(blocks, 0, -1)
+    blocks = asblocks(blocks.tolist(), ndim=2)
+    return np.vectorize(helper, otypes=[object])(blocks)
+
+
+def concatenate_lag(mats, left=0, right=0):
+    assert len(mats) > 0
+    assert left >= 0 and right >= 0
+    start = left
+    stop = -right if right > 0 else None
+    if len(mats) == 1:
+        return mats[0][start:stop]
+    if all(scipy.sparse.issparse(mat) for mat in mats):
+        data = []
+        indices = []
+        indptr = []
+        nrow = 0
+        ncol = None
+        offset = 0
+        for mat in mats:
+            mat = mat.tocsr()
+            nrow += mat.shape[0] - (left + right)
+            if ncol is None:
+                ncol = mat.shape[1]
+            assert ncol == mat.shape[1]
+            s = mat.indptr[start:stop]
+            data.append(mat.data[s[0] : s[-1]])
+            indices.append(mat.indices[s[0] : s[-1]])
+            indptr.append(s[:-1] + (offset - s[0]))
+            offset += s[-1] - s[0]
+        indptr.append([offset])
+        return scipy.sparse.csr_matrix(
+            (
+                np.concatenate(data),
+                np.concatenate(indices),
+                np.concatenate(indptr),
+            ),
+            shape=(nrow, ncol),
+        )
+    else:
+        return np.concatenate(
+            [_asdense(mat)[start:stop] for mat in mats], axis=0
+        )
+
+
+def _shape(a, n):
+    assert n >= 1
+    shape = [len(a)]
+    for _ in range(n - 1):
+        a = a[0]
+        shape.append(len(a))
+    return shape
+
+
+def _asdense(mat):
+    if scipy.sparse.issparse(mat):
+        return mat.toarray()
+    else:
+        return np.asarray(mat)

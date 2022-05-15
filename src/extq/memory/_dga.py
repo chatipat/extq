@@ -4,7 +4,9 @@ import numpy as np
 
 from .. import linalg
 from ..moving_matmul import moving_matmul
+from ._utils import asblocks
 from ._utils import badd
+from ._utils import bconcatenate_lag
 from ._utils import bmap
 from ._utils import bmatmul
 from ._utils import bshape
@@ -12,13 +14,14 @@ from ._utils import from_blocks
 from ._utils import to_blockvec
 
 
-def reweight_matrix(basis, weights, lag, test=None):
+def reweight_matrix(basis, weights, lag, test=None, chunks=1):
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _reweight_matrix(x_w, y_w, w, lag)
         for x_w, y_w, w in zip(basis, test, weights)
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def reweight_solve(bgen):
@@ -32,35 +35,42 @@ def reweight_transform(coeffs, basis, weights):
     return result
 
 
-def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
-    if test is None:
-        test = basis
-    return _sum(
-        _forward_matrix(x_f, y_f, w, in_d, 0.0, g, lag)
-        for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess)
-    )
-
-
-def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
-    if test is None:
-        test = basis
-    return _sum(
-        _forward_matrix(x_f, y_f, w, in_d, 1.0, g, lag)
-        for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess)
-    )
-
-
-def forward_feynman_kac_matrix(
-    basis, weights, in_domain, function, guess, lag, test=None
+def forward_committor_matrix(
+    basis, weights, in_domain, guess, lag, test=None, chunks=1
 ):
     if test is None:
         test = basis
-    return _sum(
+    terms = (
+        _forward_matrix(x_f, y_f, w, in_d, 0.0, g, lag)
+        for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess)
+    )
+    return _sum(terms, lag, chunks=chunks)
+
+
+def forward_mfpt_matrix(
+    basis, weights, in_domain, guess, lag, test=None, chunks=1
+):
+    if test is None:
+        test = basis
+    terms = (
+        _forward_matrix(x_f, y_f, w, in_d, 1.0, g, lag)
+        for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess)
+    )
+    return _sum(terms, lag, chunks=chunks)
+
+
+def forward_feynman_kac_matrix(
+    basis, weights, in_domain, function, guess, lag, test=None, chunks=1
+):
+    if test is None:
+        test = basis
+    terms = (
         _forward_matrix(x_f, y_f, w, in_d, f, g, lag)
         for x_f, y_f, w, in_d, f, g in zip(
             test, basis, weights, in_domain, function, guess
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def forward_solve(bgen):
@@ -75,33 +85,51 @@ def forward_transform(coeffs, basis, in_domain, guess):
 
 
 def backward_committor_matrix(
-    w_basis, basis, weights, in_domain, guess, lag, w_test=None, test=None
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    w_test=None,
+    test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 0.0, g_b, lag)
         for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
             w_basis, w_test, basis, test, weights, in_domain, guess
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def backward_mfpt_matrix(
-    w_basis, basis, weights, in_domain, guess, lag, w_test=None, test=None
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    w_test=None,
+    test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 1.0, g_b, lag)
         for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
             w_basis, w_test, basis, test, weights, in_domain, guess
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def backward_feynman_kac_matrix(
@@ -114,12 +142,13 @@ def backward_feynman_kac_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, f, g, lag)
         for x_w, y_w, x_b, y_b, w, in_d, f, g in zip(
             w_basis,
@@ -132,6 +161,7 @@ def backward_feynman_kac_matrix(
             guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def backward_solve(bgen):
@@ -145,13 +175,14 @@ def backward_transform(coeffs, w_basis, basis, weights, in_domain, guess):
     return result
 
 
-def reweight_integral_matrix(basis, weights, values, lag, test=None):
+def reweight_integral_matrix(basis, weights, values, lag, test=None, chunks=1):
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _reweight_integral_matrix(x_w, y_w, w, v, lag)
         for x_w, y_w, w, v in zip(basis, test, weights, values)
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def reweight_integral_solve(bgen):
@@ -169,17 +200,19 @@ def forward_committor_integral_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _forward_integral_matrix(x_w, y_w, x_f, y_f, w, in_d, v, 0.0, g, lag)
         for x_w, y_w, x_f, y_f, w, in_d, v, g in zip(
             w_basis, w_test, test, basis, weights, in_domain, values, guess
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def forward_mfpt_integral_matrix(
@@ -192,17 +225,19 @@ def forward_mfpt_integral_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _forward_integral_matrix(x_w, y_w, x_f, y_f, w, in_d, v, 1.0, g, lag)
         for x_w, y_w, x_f, y_f, w, in_d, v, g in zip(
             w_basis, w_test, test, basis, weights, in_domain, values, guess
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def forward_feynman_kac_integral_matrix(
@@ -216,12 +251,13 @@ def forward_feynman_kac_integral_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _forward_integral_matrix(x_w, y_w, x_f, y_f, w, in_d, v, f, g, lag)
         for x_w, y_w, x_f, y_f, w, in_d, v, f, g in zip(
             w_basis,
@@ -235,6 +271,7 @@ def forward_feynman_kac_integral_matrix(
             guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def forward_integral_solve(bgen):
@@ -252,12 +289,13 @@ def backward_committor_integral_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _backward_integral_matrix(x_w, y_w, x_b, y_b, w, in_d, v, 0.0, g, lag)
         for x_w, y_w, x_b, y_b, w, in_d, v, g in zip(
             w_basis,
@@ -270,6 +308,7 @@ def backward_committor_integral_matrix(
             guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def backward_mfpt_integral_matrix(
@@ -282,12 +321,13 @@ def backward_mfpt_integral_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _backward_integral_matrix(x_w, y_w, x_b, y_b, w, in_d, v, 1.0, g, lag)
         for x_w, y_w, x_b, y_b, w, in_d, v, g in zip(
             w_basis,
@@ -300,6 +340,7 @@ def backward_mfpt_integral_matrix(
             guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def backward_feynman_kac_integral_matrix(
@@ -313,12 +354,13 @@ def backward_feynman_kac_integral_matrix(
     lag,
     w_test=None,
     test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
     if test is None:
         test = basis
-    return _sum(
+    terms = (
         _backward_integral_matrix(x_w, y_w, x_b, y_b, w, in_d, v, f, g, lag)
         for x_w, y_w, x_b, y_b, w, in_d, v, f, g in zip(
             w_basis,
@@ -332,6 +374,7 @@ def backward_feynman_kac_integral_matrix(
             guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def backward_integral_solve(bgen):
@@ -352,6 +395,7 @@ def tpt_integral_matrix(
     w_test=None,
     b_test=None,
     f_test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
@@ -359,7 +403,7 @@ def tpt_integral_matrix(
         b_test = b_basis
     if f_test is None:
         f_test = f_basis
-    return _sum(
+    terms = (
         _integral_matrix(
             x_w,
             y_w,
@@ -391,6 +435,7 @@ def tpt_integral_matrix(
             f_guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def integral_matrix(
@@ -409,6 +454,7 @@ def integral_matrix(
     w_test=None,
     b_test=None,
     f_test=None,
+    chunks=1,
 ):
     if w_test is None:
         w_test = w_basis
@@ -416,7 +462,7 @@ def integral_matrix(
         b_test = b_basis
     if f_test is None:
         f_test = f_basis
-    return _sum(
+    terms = (
         _integral_matrix(
             x_w,
             y_w,
@@ -466,6 +512,7 @@ def integral_matrix(
             f_guess,
         )
     )
+    return _sum(terms, lag, chunks=chunks)
 
 
 def integral_solve(bgen):
@@ -489,7 +536,7 @@ def _reweight_matrix(x_w, y_w, w, lag):
     x = [[c, x_w]]
     y = [[c, y_w]]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _reweight_transform(coeffs, x_w, w):
@@ -499,11 +546,11 @@ def _reweight_transform(coeffs, x_w, w):
     u = [[o]]
     x = [[c, x_w]]
 
-    wu = bmap(lambda a: w * a, _blocks(u))
+    wu = bmap(lambda a: w * a, asblocks(u))
     result = bmatmul(
         operator.mul,
         wu,
-        bmatmul(operator.matmul, _blocks(x), coeffs[:, None]),
+        bmatmul(operator.matmul, asblocks(x), coeffs[:, None]),
     )
     assert result.shape == (1, 1)
     return result[0, 0]
@@ -532,7 +579,7 @@ def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag):
     x = [[x_f, None], [None, c]]
     y = [[y_f, None], [None, c]]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _forward_transform(coeffs, y_f, d_f, g_f):
@@ -543,11 +590,11 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
     v = [[d, g_f], [None, o]]
     y = [[y_f, None], [None, c]]
 
-    v = _blocks(v)
+    v = asblocks(v)
     result = bmatmul(
         operator.mul,
         v,
-        bmatmul(operator.matmul, _blocks(y), coeffs[:, None]),
+        bmatmul(operator.matmul, asblocks(y), coeffs[:, None]),
     )
     assert result.shape == (2, 1)
     assert np.all(result[1, 0] == 1.0)
@@ -577,7 +624,7 @@ def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag):
     x = [[c, x_w, None], [None, None, x_b]]
     y = [[c, y_w, None], [None, None, y_b]]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
@@ -588,11 +635,11 @@ def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
     u = [[o, None], [g_b, d]]
     x = [[c, x_w, None], [None, None, x_b]]
 
-    wu = bmap(lambda a: w * a, _blocks(u))
+    wu = bmap(lambda a: w * a, asblocks(u))
     result = bmatmul(
         operator.mul,
         wu,
-        bmatmul(operator.matmul, _blocks(x), coeffs[:, None]),
+        bmatmul(operator.matmul, asblocks(x), coeffs[:, None]),
     )
     assert result.shape == (2, 1)
     return result[1, 0] / result[0, 0]
@@ -618,7 +665,7 @@ def _reweight_integral_matrix(x_w, y_w, w, v, lag):
     x = [[c, x_w, None], [None, None, c]]
     y = [[c, y_w, None], [None, None, c]]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _forward_integral_matrix(x_w, y_w, x_f, y_f, w, d_f, v, f_f, g_f, lag):
@@ -650,7 +697,7 @@ def _forward_integral_matrix(x_w, y_w, x_f, y_f, w, d_f, v, f_f, g_f, lag):
     x = [[c, x_w, None, None], [None, None, x_f, None], [None, None, None, c]]
     y = [[c, y_w, None, None], [None, None, y_f, None], [None, None, None, c]]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _backward_integral_matrix(x_w, y_w, x_b, y_b, w, d_b, v, f_b, g_b, lag):
@@ -682,7 +729,7 @@ def _backward_integral_matrix(x_w, y_w, x_b, y_b, w, d_b, v, f_b, g_b, lag):
     x = [[c, x_w, None, None], [None, None, x_b, None], [None, None, None, c]]
     y = [[c, y_w, None, None], [None, None, y_b, None], [None, None, None, c]]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _integral_matrix(
@@ -747,7 +794,7 @@ def _integral_matrix(
         [None, None, None, None, c],
     ]
 
-    return _build(x, y, w, m, u, v, lag)
+    return x, y, w, m, u, v
 
 
 def _solve_forward(bgen):
@@ -780,32 +827,49 @@ def _solve_observable(bgen_lr, bgen_ul, bgen_ur):
     return result[0, 0]
 
 
-def _build(x, y, w, m, u, v, lag):
-    assert lag >= 0
-    assert np.all(w[len(w) - lag :] == 0.0)
-    last = -lag if lag > 0 else None
-    m = bmap(lambda a: w[:last] * a, _blocks(m))
-    u = bmap(lambda a: a[:last], _blocks(u)).T
-    v = bmap(lambda a: a[lag:], _blocks(v))
-    umv = bmatmul(operator.mul, u, bmatmul(operator.mul, m, v))
-    x = bmap(lambda a: a[:last].T, _blocks(x)).T
-    y = bmap(lambda a: a[lag:], _blocks(y))
-    umvy = bmatmul(linalg.scale_rows, umv, y)
-    xumvy = bmatmul(operator.matmul, x, umvy)
-    return xumvy
-
-
-def _blocks(blocks):
-    result = np.empty((len(blocks), len(blocks[0])), dtype=object)
-    result[:] = blocks
-    return result
-
-
-def _sum(mats):
-    result = None
-    for mat in mats:
-        if result is None:
-            result = mat
+def _sum(terms, lag, chunks=1):
+    mat = None
+    for c in _chunk(terms, chunks):
+        xwy = _sum_chunks(c, lag)
+        if mat is None:
+            mat = xwy
         else:
-            result = badd(mat, result)
-    return result
+            mat = badd(xwy, mat)
+    return mat
+
+
+def _sum_chunks(terms, lag):
+    assert lag >= 0
+    last = -lag if lag > 0 else None
+    xlist = []
+    ylist = []
+    wlist = []
+    for x, y, w, m, u, v in terms:
+        assert np.all(w[len(w) - lag :] == 0.0)
+        m = bmap(lambda a: w[:last] * a, asblocks(m))
+        u = bmap(lambda a: a[:last], asblocks(u)).T
+        v = bmap(lambda a: a[lag:], asblocks(v))
+        w = bmatmul(operator.mul, u, bmatmul(operator.mul, m, v))
+        xlist.append(x)
+        ylist.append(y)
+        wlist.append(w)
+    x = bconcatenate_lag(xlist, 0, lag)
+    y = bconcatenate_lag(ylist, lag, 0)
+    w = bconcatenate_lag(wlist, 0, 0)
+    x = bmap(lambda a: a.T, x).T
+    y = bmatmul(linalg.scale_rows, w, y)
+    return bmatmul(operator.matmul, x, y)
+
+
+def _chunk(a, n=None):
+    if n is None:
+        yield list(a)
+        return
+    c = []
+    for x in a:
+        c.append(x)
+        if len(c) == n:
+            yield c
+            c = []
+    if len(c) > 0:
+        yield c
