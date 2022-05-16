@@ -22,7 +22,7 @@ def scale_rows(a, b):
     if scipy.sparse.issparse(b):
         b = b.tocsr()
         return scipy.sparse.csr_matrix(
-            (np.repeat(a, np.diff(b.indptr)), b.indices, b.indptr),
+            (np.repeat(a, np.diff(b.indptr)) * b.data, b.indices, b.indptr),
             shape=b.shape,
         )
     else:
