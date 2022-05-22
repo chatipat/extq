@@ -3,7 +3,13 @@ import operator
 import numpy as np
 
 from .. import linalg
-from ..moving_matmul import moving_matmul
+from ._kernel import backward_integral_kernel
+from ._kernel import backward_kernel
+from ._kernel import forward_integral_kernel
+from ._kernel import forward_kernel
+from ._kernel import integral_kernel
+from ._kernel import reweight_integral_kernel
+from ._kernel import reweight_kernel
 from ._utils import asblocks
 from ._utils import badd
 from ._utils import bconcatenate_lag
@@ -522,21 +528,10 @@ def integral_solve(bgen):
 
 def _reweight_matrix(x_w, y_w, w, lag):
     c = np.ones((len(w), 1))
-    o = np.ones(len(w))
-
-    m = np.full((1, 1), None)
-    if lag == 0:
-        m[0, 0] = np.ones(len(w))
-    else:
-        m[0, 0] = np.ones(len(w) - 1)
-        m = moving_matmul(m, lag)
-
-    u = [[o]]
-    v = [[o]]
     x = [[c, x_w]]
     y = [[c, y_w]]
-
-    return x, y, w, m, u, v
+    m = reweight_kernel(w, lag)
+    return x, y, m
 
 
 def _reweight_transform(coeffs, x_w, w):
@@ -558,28 +553,10 @@ def _reweight_transform(coeffs, x_w, w):
 
 def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag):
     c = np.ones((len(w), 1))
-    d = np.where(d_f, 1.0, 0.0)
-    b = np.where(d_f, 0.0, g_f)
-    g = np.where(d_f, g_f, 0.0)
-    o = np.ones(len(w))
-
-    m = np.full((2, 2), None)
-    if lag == 0:
-        m[0, 0] = d
-        m[0, 1] = np.zeros(len(w))
-        m[1, 1] = np.ones(len(w))
-    else:
-        m[0, 0] = d[:-1] * d[1:]
-        m[0, 1] = d[:-1] * (b[1:] + f_f)
-        m[1, 1] = np.ones(len(w) - 1)
-        m = moving_matmul(m, lag)
-
-    u = [[d, None], [None, o]]
-    v = [[d, g], [None, o]]
     x = [[x_f, None], [None, c]]
     y = [[y_f, None], [None, c]]
-
-    return x, y, w, m, u, v
+    m = forward_kernel(w, d_f, f_f, g_f, lag)
+    return x, y, m
 
 
 def _forward_transform(coeffs, y_f, d_f, g_f):
@@ -603,28 +580,10 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
 
 def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag):
     c = np.ones((len(w), 1))
-    d = np.where(d_b, 1.0, 0.0)
-    a = np.where(d_b, 0.0, g_b)
-    g = np.where(d_b, g_b, 0.0)
-    o = np.ones(len(w))
-
-    m = np.full((2, 2), None)
-    if lag == 0:
-        m[0, 0] = np.ones(len(w))
-        m[0, 1] = np.zeros(len(w))
-        m[1, 1] = d
-    else:
-        m[0, 0] = np.ones(len(w) - 1)
-        m[0, 1] = (a[:-1] + f_b) * d[1:]
-        m[1, 1] = d[:-1] * d[1:]
-        m = moving_matmul(m, lag)
-
-    u = [[o, None], [g, d]]
-    v = [[o, None], [None, d]]
     x = [[c, x_w, None], [None, None, x_b]]
     y = [[c, y_w, None], [None, None, y_b]]
-
-    return x, y, w, m, u, v
+    m = backward_kernel(w, d_b, f_b, g_b, lag)
+    return x, y, m
 
 
 def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
@@ -647,140 +606,32 @@ def _backward_transform(coeffs, x_w, x_b, w, d_b, g_b):
 
 def _reweight_integral_matrix(x_w, y_w, w, v, lag):
     c = np.ones((len(w), 1))
-    o = np.ones(len(w))
-
-    m = np.full((2, 2), None)
-    if lag == 0:
-        m[0, 0] = np.ones(len(w))
-        m[0, 1] = np.zeros(len(w))
-        m[1, 1] = np.ones(len(w))
-    else:
-        m[0, 0] = np.ones(len(w) - 1)
-        m[0, 1] = v
-        m[1, 1] = np.ones(len(w) - 1)
-        m = moving_matmul(m, lag)
-
-    u = [[o, None], [None, o]]
-    v = [[o, None], [None, o]]
     x = [[c, x_w, None], [None, None, c]]
     y = [[c, y_w, None], [None, None, c]]
-
-    return x, y, w, m, u, v
+    m = reweight_integral_kernel(w, v, lag)
+    return x, y, m
 
 
 def _forward_integral_matrix(x_w, y_w, x_f, y_f, w, d_f, v, f_f, g_f, lag):
     c = np.ones((len(w), 1))
-    d = np.where(d_f, 1.0, 0.0)
-    b = np.where(d_f, 0.0, g_f)
-    g = np.where(d_f, g_f, 0.0)
-    o = np.ones(len(w))
-
-    m = np.full((3, 3), None)
-    if lag == 0:
-        m[0, 0] = np.ones(len(w))
-        m[0, 1] = np.zeros(len(w))
-        m[0, 2] = np.zeros(len(w))
-        m[1, 1] = d
-        m[1, 2] = np.zeros(len(w))
-        m[2, 2] = np.ones(len(w))
-    else:
-        m[0, 0] = np.ones(len(w) - 1)
-        m[0, 1] = v * d[1:]
-        m[0, 2] = v * b[1:]
-        m[1, 1] = d[:-1] * d[1:]
-        m[1, 2] = d[:-1] * (b[1:] + f_f)
-        m[2, 2] = np.ones(len(w) - 1)
-        m = moving_matmul(m, lag)
-
-    u = [[o, None, None], [None, d, None], [None, None, o]]
-    v = [[o, None, None], [None, d, g], [None, None, o]]
     x = [[c, x_w, None, None], [None, None, x_f, None], [None, None, None, c]]
     y = [[c, y_w, None, None], [None, None, y_f, None], [None, None, None, c]]
-
-    return x, y, w, m, u, v
+    m = forward_integral_kernel(w, d_f, v, f_f, g_f, lag)
+    return x, y, m
 
 
 def _backward_integral_matrix(x_w, y_w, x_b, y_b, w, d_b, v, f_b, g_b, lag):
     c = np.ones((len(w), 1))
-    d = np.where(d_b, 1.0, 0.0)
-    a = np.where(d_b, 0.0, g_b)
-    g = np.where(d_b, g_b, 0.0)
-    o = np.ones(len(w))
-
-    m = np.full((3, 3), None)
-    if lag == 0:
-        m[0, 0] = np.ones(len(w))
-        m[0, 1] = np.zeros(len(w))
-        m[0, 2] = np.zeros(len(w))
-        m[1, 1] = d
-        m[1, 2] = np.zeros(len(w))
-        m[2, 2] = np.ones(len(w))
-    else:
-        m[0, 0] = np.ones(len(w) - 1)
-        m[0, 1] = (a[:-1] + f_b) * d[1:]
-        m[0, 2] = a[:-1] * v
-        m[1, 1] = d[:-1] * d[1:]
-        m[1, 2] = d[:-1] * v
-        m[2, 2] = np.ones(len(w) - 1)
-        m = moving_matmul(m, lag)
-
-    u = [[o, None, None], [g, d, None], [None, None, o]]
-    v = [[o, None, None], [None, d, None], [None, None, o]]
     x = [[c, x_w, None, None], [None, None, x_b, None], [None, None, None, c]]
     y = [[c, y_w, None, None], [None, None, y_b, None], [None, None, None, c]]
-
-    return x, y, w, m, u, v
+    m = backward_integral_kernel(w, d_b, v, f_b, g_b, lag)
+    return x, y, m
 
 
 def _integral_matrix(
     x_w, y_w, x_b, y_b, x_f, y_f, w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag
 ):
     c = np.ones((len(w), 1))
-    db = np.where(d_b, 1.0, 0.0)
-    df = np.where(d_f, 1.0, 0.0)
-    a = np.where(d_b, 0.0, g_b)
-    b = np.where(d_f, 0.0, g_f)
-    gb = np.where(d_b, g_b, 0.0)
-    gf = np.where(d_f, g_f, 0.0)
-    o = np.ones(len(w))
-
-    m = np.full((4, 4), None)
-    if lag == 0:
-        m[0, 0] = np.ones(len(w))
-        m[0, 1] = np.zeros(len(w))
-        m[0, 2] = np.zeros(len(w))
-        m[0, 3] = np.zeros(len(w))
-        m[1, 1] = db
-        m[1, 2] = np.zeros(len(w))
-        m[1, 3] = np.zeros(len(w))
-        m[2, 2] = df
-        m[2, 3] = np.zeros(len(w))
-        m[3, 3] = np.ones(len(w))
-    else:
-        m[0, 0] = np.ones(len(w) - 1)
-        m[0, 1] = (a[:-1] + f_b) * db[1:]
-        m[0, 2] = a[:-1] * v * df[1:]
-        m[0, 3] = a[:-1] * v * b[1:]
-        m[1, 1] = db[:-1] * db[1:]
-        m[1, 2] = db[:-1] * v * df[1:]
-        m[1, 3] = db[:-1] * v * b[1:]
-        m[2, 2] = df[:-1] * df[1:]
-        m[2, 3] = df[:-1] * (b[1:] + f_f)
-        m[3, 3] = np.ones(len(w) - 1)
-        m = moving_matmul(m, lag)
-
-    u = [
-        [o, None, None, None],
-        [gb, db, None, None],
-        [None, None, df, None],
-        [None, None, None, o],
-    ]
-    v = [
-        [o, None, None, None],
-        [None, db, None, None],
-        [None, None, df, gf],
-        [None, None, None, o],
-    ]
     x = [
         [c, x_w, None, None, None],
         [None, None, x_b, None, None],
@@ -793,8 +644,8 @@ def _integral_matrix(
         [None, None, None, y_f, None],
         [None, None, None, None, c],
     ]
-
-    return x, y, w, m, u, v
+    m = integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag)
+    return x, y, m
 
 
 def _solve_forward(bgen):
@@ -840,25 +691,19 @@ def _sum(terms, lag, chunks=1):
 
 def _sum_chunks(terms, lag):
     assert lag >= 0
-    last = -lag if lag > 0 else None
     xlist = []
     ylist = []
-    wlist = []
-    for x, y, w, m, u, v in terms:
-        assert np.all(w[len(w) - lag :] == 0.0)
-        m = bmap(lambda a: w[:last] * a, asblocks(m))
-        u = bmap(lambda a: a[:last], asblocks(u)).T
-        v = bmap(lambda a: a[lag:], asblocks(v))
-        w = bmatmul(operator.mul, u, bmatmul(operator.mul, m, v))
+    mlist = []
+    for x, y, m in terms:
         xlist.append(x)
         ylist.append(y)
-        wlist.append(w)
+        mlist.append(m)
     x = bconcatenate_lag(xlist, 0, lag)
     y = bconcatenate_lag(ylist, lag, 0)
-    w = bconcatenate_lag(wlist, 0, 0)
+    m = bconcatenate_lag(mlist, 0, 0)
     x = bmap(lambda a: a.T, x).T
-    y = bmatmul(linalg.scale_rows, w, y)
-    return bmatmul(operator.matmul, x, y)
+    my = bmatmul(linalg.scale_rows, m, y)
+    return bmatmul(operator.matmul, x, my)
 
 
 def _chunk(a, n=None):
