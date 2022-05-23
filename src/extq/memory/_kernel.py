@@ -7,13 +7,8 @@ from ..moving_matmul import _mm4
 from ..moving_semigroup import moving_semigroup
 
 
-def reweight_kernel(w, lag):
-    m = _reweight_kernel(w, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _reweight_kernel(w, lag):
+def reweight_kernel(w, lag):
     _check_lag(w, lag)
     m = np.zeros((1, 1, len(w) - lag))
     for t in range(len(w) - lag):
@@ -21,14 +16,8 @@ def _reweight_kernel(w, lag):
     return m
 
 
-def forward_kernel(w, d_f, f_f, g_f, lag):
-    f_f = np.broadcast_to(f_f, len(w) - 1)
-    m = _forward_kernel(w, d_f, f_f, g_f, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _forward_kernel(w, d_f, f_f, g_f, lag):
+def forward_kernel(w, d_f, f_f, g_f, lag):
     _check_lag(w, lag)
     assert d_f.ndim == 1 and len(d_f) == len(w)
     assert f_f.ndim == 1 and len(f_f) == len(w) - 1
@@ -60,14 +49,8 @@ def _forward_kernel(w, d_f, f_f, g_f, lag):
         return m
 
 
-def backward_kernel(w, d_b, f_b, g_b, lag):
-    f_b = np.broadcast_to(f_b, len(w) - 1)
-    m = _backward_kernel(w, d_b, f_b, g_b, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _backward_kernel(w, d_b, f_b, g_b, lag):
+def backward_kernel(w, d_b, f_b, g_b, lag):
     _check_lag(w, lag)
     assert d_b.ndim == 1 and len(d_b) == len(w)
     assert f_b.ndim == 1 and len(f_b) == len(w) - 1
@@ -99,13 +82,8 @@ def _backward_kernel(w, d_b, f_b, g_b, lag):
         return m
 
 
-def reweight_integral_kernel(w, v, lag):
-    m = _reweight_integral_kernel(w, v, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _reweight_integral_kernel(w, v, lag):
+def reweight_integral_kernel(w, v, lag):
     _check_lag(w, lag)
     assert v.ndim == 1 and len(v) == len(w) - 1
     if lag == 0:
@@ -134,14 +112,8 @@ def _reweight_integral_kernel(w, v, lag):
         return m
 
 
-def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
-    f_f = np.broadcast_to(f_f, len(w) - 1)
-    m = _forward_integral_kernel(w, d_f, v, f_f, g_f, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
+def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
     _check_lag(w, lag)
     assert d_f.ndim == 1 and len(d_f) == len(w)
     assert v.ndim == 1 and len(v) == len(w) - 1
@@ -191,14 +163,8 @@ def _forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
         return m
 
 
-def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
-    f_b = np.broadcast_to(f_b, len(w) - 1)
-    m = _backward_integral_kernel(w, d_b, v, f_b, g_b, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
+def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
     _check_lag(w, lag)
     assert d_b.ndim == 1 and len(d_b) == len(w)
     assert v.ndim == 1 and len(v) == len(w) - 1
@@ -248,15 +214,8 @@ def _backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
         return m
 
 
-def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
-    f_f = np.broadcast_to(f_f, len(w) - 1)
-    f_b = np.broadcast_to(f_b, len(w) - 1)
-    m = _integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag)
-    return _upper_blocks(m)
-
-
 @nb.njit
-def _integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
+def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
     _check_lag(w, lag)
     assert d_b.ndim == 1 and len(d_b) == len(w)
     assert d_f.ndim == 1 and len(d_f) == len(w)
@@ -340,12 +299,3 @@ def _check_lag(w, lag):
     assert len(w) > lag
     for t in range(len(w) - lag, len(w)):
         assert w[t] == 0.0
-
-
-def _upper_blocks(m):
-    n = len(m)
-    result = np.full((n, n), None)
-    for i in range(n):
-        for j in range(i, n):
-            result[i, j] = m[i, j]
-    return result
