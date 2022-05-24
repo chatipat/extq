@@ -25,40 +25,53 @@ def generator(bmats, bmems=None):
 
 def memory(bmats):
     shape = bshape(bmats[0])
-    p = from_blocks(bmats[0], shape)
-    pinv = linalg.inv(p)
-    mats = [from_blocks(bmat, shape) @ pinv for bmat in bmats]
+    mats = [from_blocks(bmat, shape) for bmat in bmats]
     mems = _memory(mats)
-    bmems = [to_blocks(mem @ p, shape) for mem in mems]
+    bmems = [to_blocks(mem, shape) for mem in mems]
     return bmems
 
 
 def extrapolate(bmats, bmems, lag):
     shape = bshape(bmats[0])
-    p = from_blocks(bmats[0], shape)
-    pinv = linalg.inv(p)
-    mats = [from_blocks(bmat, shape) @ pinv for bmat in bmats]
-    mems = [from_blocks(bmem, shape) @ pinv for bmem in bmems]
+    mats = [from_blocks(bmat, shape) for bmat in bmats]
+    mems = [from_blocks(bmem, shape) for bmem in bmems]
     xmats = _extrapolate(mats, mems, lag)
-    bxmats = [to_blocks(xmat @ p, shape) for xmat in xmats]
+    bxmats = [to_blocks(xmat, shape) for xmat in xmats]
     return bxmats
 
 
 def _memory(mats):
-    mems = [None] * (len(mats) - 2)
+    inv = linalg.inv(mats[0])
+    tmat = inv @ mats[1]
+    temp = []
+    mems = []
     for t in range(len(mats) - 2):
-        mems[t] = (
+        mems.append(
             mats[t + 2]
-            - mats[t + 1] @ mats[1]
-            - sum(mats[t - s] @ mems[s] for s in range(t))
+            - mats[t + 1] @ tmat
+            - sum(mats[t - s] @ temp[s] for s in range(t))
         )
+        temp.append(inv @ mems[t])
     return mems
 
 
 def _extrapolate(mats, mems, lag):
-    xmats = list(mats) + [None] * (lag + 1 - len(mats))
-    for t in range(len(mats), lag + 1):
-        xmats[t] = xmats[t - 1] @ xmats[1] + sum(
-            xmats[t - s - 2] @ mems[s] for s in range(min(t - 1, len(mems)))
-        )
+    inv = linalg.inv(mats[0])
+    tmat = inv @ mats[1]
+    temp = [inv @ mem for mem in mems]
+    xmats = []
+    for t in range(lag + 1):
+        if t < len(mats):
+            xmats.append(mats[t])
+        elif t < len(mems) + 2:
+            xmats.append(
+                xmats[t - 1] @ tmat
+                + mems[t - 2]
+                + sum(xmats[t - s - 2] @ temp[s] for s in range(t - 2))
+            )
+        else:
+            xmats[t].append(
+                xmats[t - 1] @ tmat
+                + sum(xmats[t - s - 2] @ temp[s] for s in range(len(mems)))
+            )
     return xmats
