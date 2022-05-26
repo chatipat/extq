@@ -1,5 +1,3 @@
-import operator
-
 import numpy as np
 
 from .. import linalg
@@ -11,10 +9,6 @@ from ._kernel import integral_kernel
 from ._kernel import reweight_integral_kernel
 from ._kernel import reweight_kernel
 from ._tlcc import wtlcc_dense as _build
-from ._utils import bmatmul
-from ._utils import bshape
-from ._utils import from_blocks
-from ._utils import to_blockvec
 
 
 def reweight_matrix(basis, weights, lag, test=None):
@@ -23,11 +17,11 @@ def reweight_matrix(basis, weights, lag, test=None):
     mat = None
     for x_w, y_w, w in zip(basis, test, weights):
         mat = _reweight_matrix(x_w, y_w, w, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
-def reweight_solve(bgen):
-    return _solve_backward(bgen)
+def reweight_solve(gen):
+    return _solve_backward(gen)
 
 
 def reweight_transform(coeffs, basis, weights):
@@ -43,7 +37,7 @@ def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
     mat = None
     for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess):
         mat = _forward_matrix(x_f, y_f, w, in_d, 0.0, g, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
 def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
@@ -52,7 +46,7 @@ def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
     mat = None
     for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess):
         mat = _forward_matrix(x_f, y_f, w, in_d, 1.0, g, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
 def forward_feynman_kac_matrix(
@@ -65,11 +59,11 @@ def forward_feynman_kac_matrix(
         test, basis, weights, in_domain, function, guess
     ):
         mat = _forward_matrix(x_f, y_f, w, in_d, f, g, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
-def forward_solve(bgen):
-    return _solve_forward(bgen)
+def forward_solve(gen):
+    return _solve_forward(gen)
 
 
 def forward_transform(coeffs, basis, in_domain, guess):
@@ -91,7 +85,7 @@ def backward_committor_matrix(
         w_basis, w_test, basis, test, weights, in_domain, guess
     ):
         mat = _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 0.0, g_b, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
 def backward_mfpt_matrix(
@@ -106,7 +100,7 @@ def backward_mfpt_matrix(
         w_basis, w_test, basis, test, weights, in_domain, guess
     ):
         mat = _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 1.0, g_b, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
 def backward_feynman_kac_matrix(
@@ -129,11 +123,11 @@ def backward_feynman_kac_matrix(
         w_basis, w_test, basis, test, weights, in_domain, function, guess
     ):
         mat = _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, f, g, lag, mat)
-    return mat
+    return _bmat(mat)
 
 
-def backward_solve(bgen):
-    return _solve_backward(bgen)
+def backward_solve(gen):
+    return _solve_backward(gen)
 
 
 def backward_transform(coeffs, w_basis, basis, in_domain, guess):
@@ -149,12 +143,7 @@ def reweight_integral_matrix(basis, weights, values, lag, test=None):
     mat = None
     for x_w, y_w, w, v in zip(basis, test, weights, values):
         mat = _reweight_integral_matrix(x_w, y_w, w, v, lag, mat)
-    return mat
-
-
-def reweight_integral_solve(bgen):
-    assert bgen.shape == (3, 3)
-    return _solve_observable(bgen[2:, 2:], bgen[:2, :2], bgen[:2, 2:])
+    return _bmat(mat)
 
 
 def forward_committor_integral_matrix(
@@ -179,7 +168,7 @@ def forward_committor_integral_matrix(
         mat = _forward_integral_matrix(
             x_w, y_w, x_f, y_f, w, in_d, v, 0.0, g, lag, mat
         )
-    return mat
+    return _bmat(mat)
 
 
 def forward_mfpt_integral_matrix(
@@ -204,7 +193,7 @@ def forward_mfpt_integral_matrix(
         mat = _forward_integral_matrix(
             x_w, y_w, x_f, y_f, w, in_d, v, 1.0, g, lag, mat
         )
-    return mat
+    return _bmat(mat)
 
 
 def forward_feynman_kac_integral_matrix(
@@ -238,12 +227,7 @@ def forward_feynman_kac_integral_matrix(
         mat = _forward_integral_matrix(
             x_w, y_w, x_f, y_f, w, in_d, v, f, g, lag, mat
         )
-    return mat
-
-
-def forward_integral_solve(bgen):
-    assert bgen.shape == (4, 4)
-    return _solve_observable(bgen[2:, 2:], bgen[:2, :2], bgen[:2, 2:])
+    return _bmat(mat)
 
 
 def backward_committor_integral_matrix(
@@ -275,7 +259,7 @@ def backward_committor_integral_matrix(
         mat = _backward_integral_matrix(
             x_w, y_w, x_b, y_b, w, in_d, v, 0.0, g, lag, mat
         )
-    return mat
+    return _bmat(mat)
 
 
 def backward_mfpt_integral_matrix(
@@ -307,7 +291,7 @@ def backward_mfpt_integral_matrix(
         mat = _backward_integral_matrix(
             x_w, y_w, x_b, y_b, w, in_d, v, 1.0, g, lag, mat
         )
-    return mat
+    return _bmat(mat)
 
 
 def backward_feynman_kac_integral_matrix(
@@ -341,12 +325,7 @@ def backward_feynman_kac_integral_matrix(
         mat = _backward_integral_matrix(
             x_w, y_w, x_b, y_b, w, in_d, v, f, g, lag, mat
         )
-    return mat
-
-
-def backward_integral_solve(bgen):
-    assert bgen.shape == (4, 4)
-    return _solve_observable(bgen[3:, 3:], bgen[:3, :3], bgen[:3, 3:])
+    return _bmat(mat)
 
 
 def tpt_integral_matrix(
@@ -401,7 +380,7 @@ def tpt_integral_matrix(
             lag,
             mat,
         )
-    return mat
+    return _bmat(mat)
 
 
 def integral_matrix(
@@ -477,12 +456,11 @@ def integral_matrix(
             lag,
             mat,
         )
-    return mat
+    return _bmat(mat)
 
 
-def integral_solve(bgen):
-    assert bgen.shape == (5, 5)
-    return _solve_observable(bgen[3:, 3:], bgen[:3, :3], bgen[:3, 3:])
+def integral_solve(gen, eye):
+    return _solve_integral(gen, eye)
 
 
 def _reweight_matrix(x_w, y_w, w, lag, mat):
@@ -499,8 +477,7 @@ def _reweight_matrix(x_w, y_w, w, lag, mat):
 
 
 def _reweight_transform(coeffs, x_w, w):
-    assert coeffs.shape == (2,)
-    return w * (coeffs[0] + x_w @ coeffs[1])
+    return w * (coeffs[0] + x_w @ coeffs[1:])
 
 
 def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag, mat):
@@ -517,8 +494,7 @@ def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag, mat):
 
 
 def _forward_transform(coeffs, y_f, d_f, g_f):
-    assert coeffs.shape == (2,)
-    return g_f + np.where(d_f, y_f @ coeffs[0], 0.0) / coeffs[1]
+    return g_f + np.where(d_f, y_f @ coeffs[:-1], 0.0) / coeffs[-1]
 
 
 def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag, mat):
@@ -539,9 +515,9 @@ def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag, mat):
 
 
 def _backward_transform(coeffs, x_w, x_b, d_b, g_b):
-    assert coeffs.shape == (3,)
-    com = coeffs[0] + x_w @ coeffs[1]
-    return g_b + np.where(d_b, x_b @ coeffs[2], 0.0) / com
+    n = x_w.shape[1] + 1
+    com = coeffs[0] + x_w @ coeffs[1:n]
+    return g_b + np.where(d_b, x_b @ coeffs[n:], 0.0) / com
 
 
 def _reweight_integral_matrix(x_w, y_w, w, v, lag, mat):
@@ -647,31 +623,48 @@ def _integral_matrix(
     return mat
 
 
-def _solve_forward(bgen):
-    shape = bshape(bgen)
-    gen = from_blocks(bgen)
-    coeffs = np.concatenate(
-        [linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]]
-    )
-    return to_blockvec(coeffs, shape[1])
+def _solve_forward(gen):
+    return np.concatenate([linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]])
 
 
-def _solve_backward(bgen):
-    shape = bshape(bgen)
-    gen = from_blocks(bgen)
-    coeffs = np.concatenate(
-        [[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])]
-    )
-    return to_blockvec(coeffs, shape[0])
+def _solve_backward(gen):
+    return np.concatenate([[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])])
 
 
-def _solve_observable(bgen_lr, bgen_ul, bgen_ur):
-    forward_coeffs = _solve_forward(bgen_lr)
-    backward_coeffs = _solve_backward(bgen_ul)
-    result = bmatmul(
-        operator.matmul,
-        backward_coeffs[None, :],
-        bmatmul(operator.matmul, bgen_ur, forward_coeffs[:, None]),
-    )
-    assert result.shape == (1, 1)
-    return result[0, 0]
+def _solve_integral(gen, eye):
+    mat = linalg.solve(eye, gen)
+    forward_coeffs = _solve_forward(mat[1:, 1:])
+    backward_coeffs = _solve_backward(mat[:-1, :-1])
+    return backward_coeffs @ mat[:-1, 1:] @ forward_coeffs
+
+
+def _bmat(blocks):
+    s0, s1 = _bshape(blocks)
+    si = np.cumsum(np.concatenate([[0], s0]))
+    sj = np.cumsum(np.concatenate([[0], s1]))
+    mat = np.zeros((si[-1], sj[-1]))
+    for i in range(len(s0)):
+        for j in range(len(s1)):
+            if blocks[i, j] is not None:
+                mat[si[i] : si[i + 1], sj[j] : sj[j + 1]] = blocks[i, j]
+    return mat
+
+
+def _bshape(blocks):
+    br, bc = blocks.shape
+    rows = [None] * br
+    cols = [None] * bc
+    for i in range(br):
+        for j in range(bc):
+            if blocks[i, j] is not None:
+                r, c = blocks[i, j].shape
+                if rows[i] is None:
+                    rows[i] = r
+                if cols[j] is None:
+                    cols[j] = c
+                assert (rows[i], cols[j]) == (r, c)
+    for r in rows:
+        assert r is not None
+    for c in cols:
+        assert c is not None
+    return (tuple(rows), tuple(cols))

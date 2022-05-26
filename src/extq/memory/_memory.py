@@ -1,46 +1,15 @@
 from .. import linalg
-from ._utils import badd
-from ._utils import bmap
-from ._utils import bshape
-from ._utils import bsub
-from ._utils import from_blocks
-from ._utils import to_blocks
 
 
-def identity(bmats, bmems=None):
-    result = bmats[0]
-    if bmems is not None:
-        for n, bmem in enumerate(bmems, start=1):
-            result = badd(bmap(lambda a: a * n, bmem), result)
-    return result
+def identity(mats, mems=[]):
+    return mats[0] + sum((s + 1) * mems[s] for s in range(len(mems)))
 
 
-def generator(bmats, bmems=None):
-    result = bsub(bmats[1], bmats[0])
-    if bmems is not None:
-        for bmem in bmems:
-            result = badd(bmem, result)
-    return result
+def generator(mats, mems=[]):
+    return mats[1] - mats[0] + sum(mems[s] for s in range(len(mems)))
 
 
-def memory(bmats):
-    shape = bshape(bmats[0])
-    mats = [from_blocks(bmat, shape) for bmat in bmats]
-    mems = _memory(mats)
-    bmems = [to_blocks(mem, shape) for mem in mems]
-    return bmems
-
-
-def extrapolate(bmats, bmems, lag):
-    shape = bshape(bmats[0])
-    mats = [from_blocks(bmat, shape) for bmat in bmats]
-    mems = [from_blocks(bmem, shape) for bmem in bmems]
-    xmats = _extrapolate(mats, mems, lag)
-    bxmats = [to_blocks(xmat, shape) for xmat in xmats]
-    return bxmats
-
-
-def _memory(mats):
+def memory(mats):
     inv = linalg.inv(mats[0])
     tmat = inv @ mats[1]
     temp = []
@@ -55,7 +24,7 @@ def _memory(mats):
     return mems
 
 
-def _extrapolate(mats, mems, lag):
+def extrapolate(mats, mems, lag):
     inv = linalg.inv(mats[0])
     tmat = inv @ mats[1]
     temp = [inv @ mem for mem in mems]

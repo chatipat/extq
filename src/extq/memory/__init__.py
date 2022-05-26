@@ -2,7 +2,6 @@ from ._dga import backward_committor_integral_matrix
 from ._dga import backward_committor_matrix
 from ._dga import backward_feynman_kac_integral_matrix
 from ._dga import backward_feynman_kac_matrix
-from ._dga import backward_integral_solve
 from ._dga import backward_mfpt_integral_matrix
 from ._dga import backward_mfpt_matrix
 from ._dga import backward_solve
@@ -11,7 +10,6 @@ from ._dga import forward_committor_integral_matrix
 from ._dga import forward_committor_matrix
 from ._dga import forward_feynman_kac_integral_matrix
 from ._dga import forward_feynman_kac_matrix
-from ._dga import forward_integral_solve
 from ._dga import forward_mfpt_integral_matrix
 from ._dga import forward_mfpt_matrix
 from ._dga import forward_solve
@@ -19,7 +17,6 @@ from ._dga import forward_transform
 from ._dga import integral_matrix
 from ._dga import integral_solve
 from ._dga import reweight_integral_matrix
-from ._dga import reweight_integral_solve
 from ._dga import reweight_matrix
 from ._dga import reweight_solve
 from ._dga import reweight_transform
