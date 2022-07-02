@@ -8,7 +8,429 @@ from ._kernel import forward_kernel
 from ._kernel import integral_kernel
 from ._kernel import reweight_integral_kernel
 from ._kernel import reweight_kernel
+from ._memory import generator
+from ._memory import identity
+from ._memory import memory
 from ._tlcc import wtlcc_dense as _build
+
+
+def reweight(basis, weights, lag, mem=0, test=None):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(reweight_matrix(basis, weights, t, test=test))
+    return _reweight(mats, basis, weights)
+
+
+def _reweight(mats, basis, weights):
+    mems = memory(mats)
+    gen = generator(mats, mems)
+    coeffs = reweight_solve(gen)
+    return reweight_transform(coeffs, basis, weights)
+
+
+def forward_committor(basis, weights, in_domain, guess, lag, mem=0, test=None):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            forward_committor_matrix(
+                basis, weights, in_domain, guess, t, test=test
+            )
+        )
+    return _forward(mats, basis, in_domain, guess)
+
+
+def forward_mfpt(basis, weights, in_domain, guess, lag, mem=0, test=None):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            forward_mfpt_matrix(basis, weights, in_domain, guess, t, test=test)
+        )
+    return _forward(mats, basis, in_domain, guess)
+
+
+def forward_feynman_kac(
+    basis, weights, in_domain, function, guess, lag, mem=0, test=None
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            forward_feynman_kac_matrix(
+                basis, weights, in_domain, function, guess, t, test=test
+            )
+        )
+    return _forward(mats, basis, in_domain, guess)
+
+
+def _forward(mats, basis, in_domain, guess):
+    mems = memory(mats)
+    gen = generator(mats, mems)
+    coeffs = forward_solve(gen)
+    return forward_transform(coeffs, basis, in_domain, guess)
+
+
+def backward_committor(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            backward_committor_matrix(
+                w_basis,
+                basis,
+                weights,
+                in_domain,
+                guess,
+                t,
+                w_test=w_test,
+                test=test,
+            )
+        )
+    return _backward(mats, w_basis, basis, in_domain, guess)
+
+
+def backward_mfpt(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            backward_mfpt_matrix(
+                w_basis,
+                basis,
+                weights,
+                in_domain,
+                guess,
+                t,
+                w_test=w_test,
+                test=test,
+            )
+        )
+    return _backward(mats, w_basis, basis, in_domain, guess)
+
+
+def backward_feynman_kac(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    function,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            backward_feynman_kac_matrix(
+                w_basis,
+                basis,
+                weights,
+                in_domain,
+                function,
+                guess,
+                t,
+                w_test=w_test,
+                test=test,
+            )
+        )
+    return _backward(mats, w_basis, basis, in_domain, guess)
+
+
+def _backward(mats, w_basis, basis, in_domain, guess):
+    mems = memory(mats)
+    gen = generator(mats, mems)
+    coeffs = backward_solve(gen)
+    return backward_transform(coeffs, w_basis, basis, in_domain, guess)
+
+
+def reweight_integral(basis, weights, values, lag, mem=0, test=None):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            reweight_integral_matrix(basis, weights, values, t, test=test)
+        )
+    return _integral(mats, lag, mem)
+
+
+def forward_committor_integral(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    values,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            forward_committor_integral_matrix(
+                w_basis,
+                basis,
+                weights,
+                in_domain,
+                values,
+                guess,
+                t,
+                w_test=w_test,
+                test=test,
+            )
+        )
+    return _integral(mats, lag, mem)
+
+
+def forward_mfpt_integral(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    values,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            forward_mfpt_integral_matrix(
+                w_basis,
+                basis,
+                weights,
+                in_domain,
+                values,
+                guess,
+                t,
+                w_test=w_test,
+                test=test,
+            )
+        )
+    return _integral(mats, lag, mem)
+
+
+def forward_feynman_kac_integral(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    values,
+    function,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            forward_feynman_kac_integral_matrix(
+                w_basis,
+                basis,
+                weights,
+                in_domain,
+                values,
+                function,
+                guess,
+                t,
+                w_test=w_test,
+                test=test,
+            )
+        )
+    return _integral(mats, lag, mem)
+
+
+def backward_committor_integral(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    values,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        backward_committor_integral_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            values,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
+        )
+    return _integral(mats, lag, mem)
+
+
+def backward_mfpt_integral(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    values,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        backward_mfpt_integral_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            values,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
+        )
+    return _integral(mats, lag, mem)
+
+
+def backward_feynman_kac_integral(
+    w_basis,
+    basis,
+    weights,
+    in_domain,
+    values,
+    function,
+    guess,
+    lag,
+    mem=0,
+    w_test=None,
+    test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        backward_feynman_kac_integral_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            values,
+            function,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
+        )
+    return _integral(mats, lag, mem)
+
+
+def tpt_integral(
+    w_basis,
+    b_basis,
+    f_basis,
+    weights,
+    in_domain,
+    values,
+    b_guess,
+    f_guess,
+    lag,
+    mem=0,
+    w_test=None,
+    b_test=None,
+    f_test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            tpt_integral_matrix(
+                w_basis,
+                b_basis,
+                f_basis,
+                weights,
+                in_domain,
+                values,
+                b_guess,
+                f_guess,
+                t,
+                w_test=w_test,
+                b_test=b_test,
+                f_test=f_test,
+            )
+        )
+    return _integral(mats, lag, mem)
+
+
+def integral(
+    w_basis,
+    b_basis,
+    f_basis,
+    weights,
+    b_domain,
+    f_domain,
+    values,
+    b_function,
+    f_function,
+    b_guess,
+    f_guess,
+    lag,
+    mem=0,
+    w_test=None,
+    b_test=None,
+    f_test=None,
+):
+    mats = []
+    for t in _memlags(lag, mem):
+        mats.append(
+            integral_matrix(
+                w_basis,
+                b_basis,
+                f_basis,
+                weights,
+                b_domain,
+                f_domain,
+                values,
+                b_function,
+                f_function,
+                b_guess,
+                f_guess,
+                t,
+                w_test=w_test,
+                b_test=b_test,
+                f_test=f_test,
+            )
+        )
+    return _integral(mats, lag, mem)
+
+
+def _integral(mats, lag, mem):
+    mems = memory(mats)
+    gen = generator(mats, mems)
+    eye = identity(mats, mems)
+    return integral_solve(gen, eye) / (lag // (mem + 1))
 
 
 def reweight_matrix(basis, weights, lag, test=None):
@@ -668,3 +1090,8 @@ def _bshape(blocks):
     for c in cols:
         assert c is not None
     return (tuple(rows), tuple(cols))
+
+
+def _memlags(lag, mem):
+    assert lag % (mem + 1) == 0
+    return np.arange(0, lag + 1, lag // (mem + 1))
