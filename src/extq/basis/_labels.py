@@ -12,13 +12,13 @@ def labels_to_basis(labels, num=None, sparse=True):
 
 
 def _labels_to_basis(indices, cols, sparse=True, mask=None):
-    assert np.all(indices >= 0) and np.all(indices < cols)
     rows = len(indices)
     row_ind = np.arange(rows)
     col_ind = indices
     if mask is not None:
         row_ind = row_ind[mask]
         col_ind = col_ind[mask]
+    assert np.all(col_ind >= 0) and np.all(col_ind < cols)
     if sparse:
         return scipy.sparse.csr_matrix(
             (np.ones(len(row_ind)), (row_ind, col_ind)), shape=(rows, cols)
