@@ -1,3 +1,4 @@
+from . import fdm
 from ._dga import backward_committor_integral_matrix
 from ._dga import backward_committor_matrix
 from ._dga import backward_feynman_kac_integral_matrix
