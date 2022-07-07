@@ -24,7 +24,10 @@ def uniform_weights(trajs, maxlag):
     weights = []
     for traj in trajs:
         w = np.ones(np.shape(traj)[0])
-        w[len(w) - maxlag :] = 0.0
+        if maxlag > len(w):
+            w[:] = 0.0
+        else:
+            w[len(w) - maxlag :] = 0.0
         weights.append(w)
     return weights
 
