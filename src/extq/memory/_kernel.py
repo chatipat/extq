@@ -296,6 +296,5 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
 def _check_lag(w, lag):
     assert lag >= 0
     assert w.ndim == 1
-    assert len(w) > lag
-    for t in range(len(w) - lag, len(w)):
+    for t in range(max(len(w) - lag, 0), len(w)):
         assert w[t] == 0.0
