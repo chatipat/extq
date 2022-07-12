@@ -1,4 +1,11 @@
 from . import fdm
+from ._dga import (
+    ReweightMemory,
+    ForwardCommittorMemory,
+    MFPTMemory,
+    BackwardCommittorMemory,
+    MLPTMemory,
+)
 from ._dga import backward_committor
 from ._dga import backward_committor_integral
 from ._dga import backward_committor_integral_matrix
