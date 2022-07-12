@@ -24,30 +24,35 @@ class StatisticMemory(ABC):
     """
 
     def __init__(self, lag, memlag=0):
-        self.lag = lag
-        self.memlag = memlag
-        self.mats = None
-        self.coeffs = None
-        self.mem = None
-        self.gen = None
-        self.result = None
+        self._lag = lag
+        self._memlag = memlag
+        self._mats = None
+        self._coeffs = None
+        self._mem = None
+        self._gen = None
+        self._result = None
 
+    @property
     @abstractmethod
     def mats(self):
+        """Each subclass must implement approrpriate method to computes
+        correlation matrices"""
         pass
 
     @property
     def mem(self):
-        if self.mem is None:
-            self.mem = memory(self.mats)
-        return self.mem
+        """Computes the memory matrices from the correlation matrices"""
+        if self._mem is None:
+            self._mem = memory(self.mats)
+        return self._mem
 
     @property
     def gen(self):
-        if self.gen is None:
-            self.gen = generator(self.mats, self.mem)
-        return self.gen
+        if self._gen is None:
+            self._gen = generator(self.mats, mems=self.mem)
+        return self._gen
 
+    @property
     @abstractmethod
     def coeffs(self):
         pass
@@ -55,6 +60,12 @@ class StatisticMemory(ABC):
     @abstractmethod
     def solve(self):
         pass
+
+    @property
+    def result(self):
+        if self._result is None:
+            return self.solve()
+        return self._result
 
 
 class IntegralMemory(StatisticMemory):
@@ -71,10 +82,10 @@ class IntegralMemory(StatisticMemory):
         raise NotImplementedError("Coefficients not available!")
 
     def solve(self):
-        if self.result is None:
-            eye = identity(mats, mems)
-            self.result = integral_solve(gen, eye) / (lag // (memlag + 1))
-        return self.result
+        if self._result is None:
+            eye = identity(self.mats, self.mem)
+            self._result = integral_solve(self.gen, eye) / (self._lag // (self._memlag + 1))
+        return self._result
 
 
 class ReweightMemory(StatisticMemory):
@@ -87,39 +98,44 @@ class ReweightMemory(StatisticMemory):
     basis : array-like of ndarray (n_frames, n_basis)
     weights : array-like ndarray (n_frames,)
         Weights for basis
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
     test : optional, array-like of ndarray (n_frames, n_basis)
         Test basis
     """
 
     def __init__(self, basis, weights, lag, mem=0, test=None):
         super().__init__(lag, memlag=mem)
-        self.basis = basis
-        self.weights = weights
-        self.test = test
+        self._basis = basis
+        self._weights = weights
+        self._test = test
 
+    @property
     def mats(self):
-        if self.mats is None:
+        if self._mats is None:
             mats = []
-            for t in _memlags(self.lag, self.mem):
+            for t in _memlags(self._lag, self._memlag):
                 mats.append(
                     reweight_matrix(
-                        self.basis, self.weights, t, test=self.test
+                        self._basis, self._weights, t, test=self._test
                     )
                 )
-            self.mats = mats
-        return self.mats
+            self._mats = mats
+        return self._mats
 
+    @property
     def coeffs(self):
-        if self.coeffs is None:
-            self.coeffs = reweight_solve(self.gen)
-        return self.coeffs
+        if self._coeffs is None:
+            self._coeffs = reweight_solve(self.gen)
+        return self._coeffs
 
     def solve(self):
-        if self.result is None:
-            self.result = reweight_transform(
-                self.coeffs, self.basis, self.weights
+        if self._result is None:
+            self._result = reweight_transform(
+                self.coeffs, self._basis, self._weights
             )
-        return self.result
+        return self._result
 
 
 class ForwardCommittorMemory(StatisticMemory):
@@ -136,6 +152,9 @@ class ForwardCommittorMemory(StatisticMemory):
         Whether each frame is in the domain or not
     guess : array-like of ndarray of float (n_frames,)
         Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
     test : optional, array-like of ndarray (n_frames, n_basis)
         Test basis
     """
@@ -144,40 +163,42 @@ class ForwardCommittorMemory(StatisticMemory):
         self, basis, weights, in_domain, guess, lag, mem=0, test=None
     ):
         super().__init__(lag, memlag=mem)
-        self.basis = basis
-        self.weights = weights
-        self.in_domain = in_domain
-        self.guess = guess
-        self.test = test
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._guess = guess
+        self._test = test
 
+    @property
     def mats(self):
-        if self.mats is None:
+        if self._mats is None:
             mats = []
-            for t in _memlags(self.lag, self.mem):
+            for t in _memlags(self._lag, self._memlag):
                 mats.append(
                     forward_committor_matrix(
-                        self.basis,
-                        self.weights,
-                        self.in_domain,
-                        self.guess,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._guess,
                         t,
-                        test=self.test,
+                        test=self._test,
                     )
                 )
-            self.mats = mats
-        return self.mats
+            self._mats = mats
+        return self._mats
 
+    @property
     def coeffs(self):
-        if self.coeffs is None:
-            self.coeffs = forward_solve(self.gen)
-        return self.coeffs
+        if self._coeffs is None:
+            self._coeffs = forward_solve(self.gen)
+        return self._coeffs
 
     def solve(self):
-        if self.result is None:
-            self.result = forward_transform(
-                self.coeffs, self.basis, self.weights
+        if self._result is None:
+            self._result = forward_transform(
+                self.coeffs, self._basis, self._weights, self._guess
             )
-        return self.result
+        return self._result
 
 
 class MFPTMemory(StatisticMemory):
@@ -194,6 +215,9 @@ class MFPTMemory(StatisticMemory):
         Whether each frame is in the domain or not
     guess : array-like of ndarray of float (n_frames,)
         Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
     test : optional, array-like of ndarray (n_frames, n_basis)
         Test basis
     """
@@ -202,40 +226,42 @@ class MFPTMemory(StatisticMemory):
         self, basis, weights, in_domain, guess, lag, mem=0, test=None
     ):
         super().__init__(lag, memlag=mem)
-        self.basis = basis
-        self.weights = weights
-        self.in_domain = in_domain
-        self.guess = guess
-        self.test = test
-
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._guess = guess
+        self._test = test
+ 
+    @property
     def mats(self):
-        if self.mats is None:
+        if self._mats is None:
             mats = []
-            for t in _memlags(self.lag, self.mem):
+            for t in _memlags(self._lag, self._memlag):
                 mats.append(
                     forward_mfpt_matrix(
-                        self.basis,
-                        self.weights,
-                        self.in_domain,
-                        self.guess,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._guess,
                         t,
-                        test=self.test,
+                        test=self._test,
                     )
                 )
-            self.mats = mats
-        return self.mats
+            self._mats = mats
+        return self._mats
 
+    @property
     def coeffs(self):
-        if self.coeffs is None:
-            self.coeffs = forward_solve(self.gen)
-        return self.coeffs
+        if self._coeffs is None:
+            self._coeffs = forward_solve(self.gen)
+        return self._coeffs
 
     def solve(self):
-        if self.result is None:
-            self.result = forward_transform(
-                self.coeffs, self.basis, self.weights
+        if self._result is None:
+            self._result = forward_transform(
+                self.coeffs, self._basis, self._weights, self._guess
             )
-        return self.result
+        return self._result
 
 
 class BackwardCommittorMemory(StatisticMemory):
@@ -254,6 +280,9 @@ class BackwardCommittorMemory(StatisticMemory):
         Whether each frame is in the domain or not
     guess : array-like of ndarray of float (n_frames,)
         Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
     test : optional, array-like of ndarray (n_frames, n_basis)
         Test basis
     """
@@ -262,42 +291,44 @@ class BackwardCommittorMemory(StatisticMemory):
         self, w_basis, basis, weights, in_domain, guess, lag, mem=0, test=None
     ):
         super().__init__(lag, memlag=mem)
-        self.w_basis = w_basis
-        self.basis = basis
-        self.weights = weights
-        self.in_domain = in_domain
-        self.guess = guess
-        self.test = test
+        self._w_basis = w_basis
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._guess = guess
+        self._test = test
 
+    @property
     def mats(self):
-        if self.mats is None:
+        if self._mats is None:
             mats = []
-            for t in _memlags(self.lag, self.mem):
+            for t in _memlags(self._lag, self._memlag):
                 mats.append(
                     backward_committor_matrix(
-                        self.w_basis,
-                        self.basis,
-                        self.weights,
-                        self.in_domain,
-                        self.guess,
+                        self._w_basis,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._guess,
                         t,
-                        test=self.test,
+                        test=self._test,
                     )
                 )
-            self.mats = mats
-        return self.mats
+            self._mats = mats
+        return self._mats
 
+    @property
     def coeffs(self):
-        if self.coeffs is None:
-            self.coeffs = backward_solve(self.gen)
-        return self.coeffs
+        if self._coeffs is None:
+            self._coeffs = backward_solve(self.gen)
+        return self._coeffs
 
     def solve(self):
-        if self.result is None:
-            self.result = backward_transform(
-                self.coeffs, self.w_basis, self.basis, self.weights
+        if self._result is None:
+            self._result = backward_transform(
+                self.coeffs, self._w_basis, self._basis, self._weights, self._guess
             )
-        return self.result
+        return self._result
 
 
 class MLPTMemory(StatisticMemory):
@@ -314,6 +345,9 @@ class MLPTMemory(StatisticMemory):
         Whether each frame is in the domain or not
     guess : array-like of ndarray of float (n_frames,)
         Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
     test : optional, array-like of ndarray (n_frames, n_basis)
         Test basis
     """
@@ -322,42 +356,44 @@ class MLPTMemory(StatisticMemory):
         self, w_basis, basis, weights, in_domain, guess, lag, mem=0, test=None
     ):
         super().__init__(lag, memlag=mem)
-        self.w_basis = w_basis
-        self.basis = basis
-        self.weights = weights
-        self.in_domain = in_domain
-        self.guess = guess
-        self.test = test
+        self._w_basis = w_basis
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._guess = guess
+        self._test = test
 
+    @property
     def mats(self):
-        if self.mats is None:
+        if self._mats is None:
             mats = []
-            for t in _memlags(self.lag, self.mem):
+            for t in _memlags(self._lag, self._memlag):
                 mats.append(
                     backward_mfpt_matrix(
-                        self.w_basis,
-                        self.basis,
-                        self.weights,
-                        self.in_domain,
-                        self.guess,
+                        self._w_basis,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._guess,
                         t,
-                        test=self.test,
+                        test=self._test,
                     )
                 )
-            self.mats = mats
-        return self.mats
+            self._mats = mats
+        return self._mats
 
+    @property
     def coeffs(self):
-        if self.coeffs is None:
-            self.coeffs = backward_solve(self.gen)
-        return self.coeffs
+        if self._coeffs is None:
+            self._coeffs = backward_solve(self.gen)
+        return self._coeffs
 
     def solve(self):
-        if self.result is None:
-            self.result = backward_transform(
-                self.coeffs, self.w_basis, self.basis, self.weights
+        if self._result is None:
+            self._result = backward_transform(
+                self.coeffs, self._w_basis, self._basis, self._weights, self._guess
             )
-        return self.result
+        return self._result
 
 
 def reweight(basis, weights, lag, mem=0, test=None):
