@@ -800,6 +800,23 @@ def reweight_transform(coeffs, basis, weights):
 
 
 def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
+    """Compute correlation matrix for forward committors.
+
+    Parameters
+    ----------
+    basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
+        Basis functions; must satisfy boundary conditions
+    weights, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
+        Weight, guess for committor at each frame in trajectories
+    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
+        Whether each frame is in the domain (A U B)^c
+    test : optional
+        Test basis functions; if not specified, will use the same as the right basis
+
+    Returns
+    -------
+    ndarray (n_basis + 1, n_basis + 1) of float
+    """
     if test is None:
         test = basis
     mat = None
@@ -809,6 +826,8 @@ def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
 
 
 def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
+    """Compute correlation matrix for (forward) mean first passage time."""
+
     if test is None:
         test = basis
     mat = None
@@ -820,6 +839,24 @@ def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
 def forward_feynman_kac_matrix(
     basis, weights, in_domain, function, guess, lag, test=None
 ):
+    """Compute correlation matrix for forward Feynman-Kac problem.
+
+    Parameters
+    ----------
+    basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
+        Basis functions; must satisfy boundary conditions
+    weights, function, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
+        Weight, function to integrate, guess for committor at each frame in trajectories
+    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
+        Whether each frame is in the domain (A U B)^c
+    test : optional
+        Test basis functions; if not specified, will use the same as the right basis
+
+    Returns
+    -------
+    ndarray (2 * n_basis + 1, 2 * n_basis + 1) of float
+    """
+
     if test is None:
         test = basis
     mat = None
@@ -844,6 +881,26 @@ def forward_transform(coeffs, basis, in_domain, guess):
 def backward_committor_matrix(
     w_basis, basis, weights, in_domain, guess, lag, w_test=None, test=None
 ):
+    """Compute correlation matrix for backward committors.
+
+    Parameters
+    ----------
+    w_basis, basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
+        Basis functions to estimate reweighting factor, without boundary
+        conditions; basis functions to estimate committor, must satisfy
+        boundary conditions
+    weights, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
+        Weight, guess for committor at each frame in trajectories
+    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
+        Whether each frame is in the domain (A U B)^c
+    test : optional
+        Test basis functions; if not specified, will use the same as the right basis
+
+    Returns
+    -------
+    ndarray (2 * n_basis + 1, 2 * n_basis + 1) of float
+    """
+
     if w_test is None:
         w_test = w_basis
     if test is None:
@@ -859,6 +916,7 @@ def backward_committor_matrix(
 def backward_mfpt_matrix(
     w_basis, basis, weights, in_domain, guess, lag, w_test=None, test=None
 ):
+    """Compute correlation matrix for (backward) mean last passage time."""
     if w_test is None:
         w_test = w_basis
     if test is None:
@@ -882,6 +940,23 @@ def backward_feynman_kac_matrix(
     w_test=None,
     test=None,
 ):
+    """Parameters
+    ----------
+    w_basis, basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
+        Basis functions to estimate reweighting factor, without boundary
+        conditions; basis functions to estimate committor, must satisfy
+        boundary conditions
+    weights, function, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
+        Weight, function to integrate, guess for committor at each frame in trajectories
+    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
+        Whether each frame is in the domain (A U B)^c
+    test : optional
+        Test basis functions; if not specified, will use the same as the right basis
+
+    Returns
+    -------
+    ndarray (2 * n_basis + 1, 2 * n_basis + 1) of float
+    """
     if w_test is None:
         w_test = w_basis
     if test is None:
@@ -1232,6 +1307,18 @@ def integral_solve(gen, eye):
 
 
 def _reweight_matrix(x_w, y_w, w, lag, mat):
+    """Compute the correlation matrix for reweighting.
+
+    Parameters
+    ----------
+    x_w, y_w : ndarray (n_frames, n_basis) of float
+        Left and right basis functions.
+    w : ndarray (n_frames,) of float
+        Initial weights for each frame
+    lag : int
+    mat : ndarray (2, 2) or None
+        Matrix in which to store result
+    """
     m = reweight_kernel(w, lag)
     if mat is None:
         mat = np.full((2, 2), None)
@@ -1249,6 +1336,22 @@ def _reweight_transform(coeffs, x_w, w):
 
 
 def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag, mat):
+    """Compute the correlation matrix for forward-in-time statistics.
+
+    Parameters
+    ----------
+    x_f, y_f : ndarray (n_frames, n_basis) of float
+        Left and right basis functions
+    w : ndarray (n_frames,) of float
+        Initial weights for each frame
+    d_f : ndarray (n_frames,) of bool
+        Whether each frame is in the domain
+    f_f, g_f : ndarray (n_frames,) of float
+        Function to integrate until entrance into domain, guess for statistic.
+    lag : int
+    mat : ndarray (2, 2) or None
+        Matrix in which to store result
+    """
     f_f = np.broadcast_to(f_f, len(w) - 1)
     m = forward_kernel(w, d_f, f_f, g_f, lag)
     if mat is None:
@@ -1266,6 +1369,27 @@ def _forward_transform(coeffs, y_f, d_f, g_f):
 
 
 def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag, mat):
+    """Compute the correlation matrix for backward-in-time statistics.
+
+    Parameters
+    ----------
+    x_w, y_w : ndarray (n_frames, n_basis) of float
+        Left and right basis functions for weights (do not satisfy boundary
+        conditions)
+    x_b, y_b : ndarray (n_frames, n_basis) of float
+        Left and right basis functions for statistic (must satisfy boundary
+        conditions)
+    w : ndarray (n_frames,) of float
+        Initial weights for each frame
+    d_b : ndarray (n_frames,) of bool
+        Whether each frame is in the domain
+    f_b, g_b : ndarray (n_frames,) of float
+        Function to integrate until entrance into domain, guess for statistic.
+    lag : int
+    mat : ndarray (3, 3) or None
+        Matrix in which to store result
+    """
+
     f_b = np.broadcast_to(f_b, len(w) - 1)
     m = backward_kernel(w, d_b, f_b, g_b, lag)
     if mat is None:
@@ -1392,14 +1516,52 @@ def _integral_matrix(
 
 
 def _solve_forward(gen):
+    """Solve problem for forward-in-time statistic.
+
+    Parameters
+    ----------
+    gen : ndarray of float
+        Magic generator operator + memory
+
+    Returns
+    -------
+    ndarray
+        Coefficients
+    """
     return np.concatenate([linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]])
 
 
 def _solve_backward(gen):
+    """Solve problem for backward-in-time statistic.
+
+    Parameters
+    ----------
+    gen : ndarray of float
+        Magic generator operator + memory
+
+    Returns
+    -------
+    ndarray
+        Coefficients
+    """
     return np.concatenate([[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])])
 
 
 def _solve_integral(gen, eye):
+    """Solve problem for integral average statistic.
+
+    Parameters
+    ----------
+    gen : ndarray of float
+        Magic generator operator + memory
+    eye : ndarray of float
+
+    Returns
+    -------
+    ndarray
+        Integral result
+    """
+
     mat = linalg.solve(eye, gen)
     forward_coeffs = _solve_forward(mat[1:, 1:])
     backward_coeffs = _solve_backward(mat[:-1, :-1])
@@ -1407,6 +1569,17 @@ def _solve_integral(gen, eye):
 
 
 def _bmat(blocks):
+    """Instantiate blocks into a full matrix.
+
+    Parameters
+    ----------
+    blocks : array-like of 2-D ndarray
+
+    Returns
+    -------
+    mat : 2-D ndarray
+        Full matrix
+    """
     s0, s1 = _bshape(blocks)
     si = np.cumsum(np.concatenate([[0], s0]))
     sj = np.cumsum(np.concatenate([[0], s1]))
@@ -1419,6 +1592,15 @@ def _bmat(blocks):
 
 
 def _bshape(blocks):
+    """Obtain shapes of block matrix
+
+    Returns
+    -------
+    (tuple of int, tuple of int)
+        Dimensions of blocks, where ith index of first tuple and the
+        jth index of the second tuple correspond to the row and column
+        dimension of the (i, j)th block
+    """
     br, bc = blocks.shape
     rows = [None] * br
     cols = [None] * bc
@@ -1439,5 +1621,22 @@ def _bshape(blocks):
 
 
 def _memlags(lag, mem):
+    """Stride memory lags
+
+    Parameters
+    ----------
+    lag : int
+        Maximum memory lag time.
+    mem : int
+        Number of evaluations of the memory kernel. Must be one less
+        than a memory lag which evenly divides the maximum lag. For example,
+        a lag of 32 and number of memory kernels of 3 or 7 is fine (since
+        7 + 1 and 3 + 1 evenly divide 32)
+
+    Returns
+    -------
+    iterable of int
+        Lag times at which to evaluate memory kernels.
+    """
     assert lag % (mem + 1) == 0
     return np.arange(0, lag + 1, lag // (mem + 1))
