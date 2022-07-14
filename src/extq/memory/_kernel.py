@@ -9,6 +9,18 @@ from ..moving_semigroup import moving_semigroup
 
 @nb.njit
 def reweight_kernel(w, lag):
+    """Correlation matrix kernel for computing reweighting.
+
+    Parameters
+    ----------
+    w : ndarray (n_frames,) of float
+        Weight of each frame
+    lag : int
+
+    Returns
+    -------
+    m : ndarray (1, 1, n_frames - lag) of float
+    """
     _check_lag(w, lag)
     m = np.zeros((1, 1, len(w) - lag))
     for t in range(len(w) - lag):
@@ -18,6 +30,23 @@ def reweight_kernel(w, lag):
 
 @nb.njit
 def forward_kernel(w, d_f, f_f, g_f, lag):
+    """Correlation matrix kernel for computing forward-in-time
+    predictions.
+
+    Parameters
+    ----------
+    w, f_f, g_f : ndarray (n_frames,) of float
+        Weights, function to integrate, and guess function at each
+        frame of the trajectory.
+    d_f : ndarray (n_frames,) of bool
+        Whether the frame is in the domain.
+    lag : int
+
+    Returns
+    -------
+    m : ndarray (3, 3, n_frames - lag)
+    """
+
     _check_lag(w, lag)
     assert d_f.ndim == 1 and len(d_f) == len(w)
     assert f_f.ndim == 1 and len(f_f) == len(w) - 1
@@ -51,6 +80,23 @@ def forward_kernel(w, d_f, f_f, g_f, lag):
 
 @nb.njit
 def backward_kernel(w, d_b, f_b, g_b, lag):
+    """Correlation matrix kernel for computing backward-in-time
+    predictions.
+
+    Parameters
+    ----------
+    w, f_b, g_b : ndarray (n_frames,) of float
+        Weights, function to integrate, and guess function at each
+        frame of the trajectory.
+    d_b : ndarray (n_frames,) of bool
+        Whether the frame is in the domain.
+    lag : int
+
+    Returns
+    -------
+    m : ndarray (3, 3, n_frames - lag)
+    """
+
     _check_lag(w, lag)
     assert d_b.ndim == 1 and len(d_b) == len(w)
     assert f_b.ndim == 1 and len(f_b) == len(w) - 1
@@ -84,6 +130,21 @@ def backward_kernel(w, d_b, f_b, g_b, lag):
 
 @nb.njit
 def reweight_integral_kernel(w, v, lag):
+    """Correlation matrix kernel for computing reweight integral averages.
+
+    Parameters
+    ----------
+    w: ndarray (n_frames,) of float
+        Weight of each frame.
+    v : ndarray (n_frames - 1,) of float
+        Value of function to average up to last frame.
+    lag : int
+
+    Returns
+    -------
+    m : ndarray (2, 2, n_frames - lag) of float
+    """
+
     _check_lag(w, lag)
     assert v.ndim == 1 and len(v) == len(w) - 1
     if lag == 0:
@@ -114,6 +175,25 @@ def reweight_integral_kernel(w, v, lag):
 
 @nb.njit
 def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
+    """Correlation matrix kernel for computing integral averages against
+    forward-in-time quantities.
+
+    Parameters
+    ----------
+    w, f_f, g_f : ndarray (n_frames,) of float
+        Weights, function to integrate, and guess function at each
+        frame of the trajectory.
+    v : ndarray (n_frames - 1,) of float
+        Value of function to average up to last frame.
+    d_f : ndarray (n_frames,) of bool
+        Whether the frame is in the domain.
+    lag : int
+
+    Returns
+    -------
+    m : ndarray (3, 3, n_frames - lag)
+
+    """
     _check_lag(w, lag)
     assert d_f.ndim == 1 and len(d_f) == len(w)
     assert v.ndim == 1 and len(v) == len(w) - 1
@@ -165,6 +245,26 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
 
 @nb.njit
 def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
+    """Correlation matrix kernel for computing integral averages against
+    backward-in-time quantities.
+
+    Parameters
+    ----------
+    w, f_b, g_b : ndarray (n_frames,) of float
+        Weights, function to integrate, and guess function at each
+        frame of the trajectory.
+    v : ndarray (n_frames - 1,) of float
+        Value of function to average up to last frame.
+    d_b : ndarray (n_frames,) of bool
+        Whether the frame is in the domain.
+    lag : int
+
+    Returns
+    -------
+    m : ndarray (3, 3, n_frames - lag)
+
+    """
+
     _check_lag(w, lag)
     assert d_b.ndim == 1 and len(d_b) == len(w)
     assert v.ndim == 1 and len(v) == len(w) - 1
