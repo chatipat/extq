@@ -1,10 +1,15 @@
 from . import fdm
 from ._dga import (
     ReweightMemory,
+    ReweightIntegralMemory,
     ForwardCommittorMemory,
+    ForwardCommittorIntegralMemory,
     MFPTMemory,
+    MFPTIntegralMemory,
     BackwardCommittorMemory,
+    BackwardCommittorIntegralMemory,
     MLPTMemory,
+    MLPTIntegralMemory
 )
 from ._dga import backward_committor
 from ._dga import backward_committor_integral

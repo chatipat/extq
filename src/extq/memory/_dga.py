@@ -68,26 +68,6 @@ class StatisticMemory(ABC):
         return self._result
 
 
-class IntegralMemory(StatisticMemory):
-    """Class for integral memory statistics. Each subclass
-    must implement the mats method which computes the appropriate
-    memory matrices, as well as the coeffs method which calls
-    the appropriate solve function.
-    """
-
-    def __init__(self, lag, memlag=0):
-        super().__init__(lag, memlag=memlag)
-
-    def coeffs(self):
-        raise NotImplementedError("Coefficients not available!")
-
-    def solve(self):
-        if self._result is None:
-            eye = identity(self.mats, self.mem)
-            self._result = integral_solve(self.gen, eye) / (self._lag // (self._memlag + 1))
-        return self._result
-
-
 class ReweightMemory(StatisticMemory):
     """Computes change of measure with memory.
 
@@ -146,6 +126,7 @@ class ForwardCommittorMemory(StatisticMemory):
     Attributes
     ----------
     basis : array-like of ndarray of float (n_frames, n_basis)
+        basis for forward committor, must be 0 outside domain
     weights : array-like ndarray of float (n_frames,)
         Weights for basis
     in_domain : array-like of ndarray of bool (n_frames,)
@@ -209,6 +190,7 @@ class MFPTMemory(StatisticMemory):
     Attributes
     ----------
     basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for MFPT, must be zero outside domain
     weights : array-like ndarray of float (n_frames,)
         Weights for basis
     in_domain : array-like of ndarray of bool (n_frames,)
@@ -231,7 +213,7 @@ class MFPTMemory(StatisticMemory):
         self._in_domain = in_domain
         self._guess = guess
         self._test = test
- 
+
     @property
     def mats(self):
         if self._mats is None:
@@ -271,9 +253,8 @@ class BackwardCommittorMemory(StatisticMemory):
 
     Attributes
     ----------
-    w_basis : array-like of ndarray of float (n_frames, n_basis)
-        Basis for change-of-measure
-    basis : array-like of ndarray of float (n_frames, n_basis)
+    w_basis, basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for change-of-measure, and basis for backward committor (must be 0 outside domain)
     weights : array-like ndarray of float (n_frames,)
         Weights for basis
     in_domain : array-like of ndarray of bool (n_frames,)
@@ -326,7 +307,11 @@ class BackwardCommittorMemory(StatisticMemory):
     def solve(self):
         if self._result is None:
             self._result = backward_transform(
-                self.coeffs, self._w_basis, self._basis, self._weights, self._guess
+                self.coeffs,
+                self._w_basis,
+                self._basis,
+                self._weights,
+                self._guess,
             )
         return self._result
 
@@ -338,7 +323,8 @@ class MLPTMemory(StatisticMemory):
 
     Attributes
     ----------
-    w_basis : array-like of ndarray of float (n_frames, n_basis) Basis for change-of-measure basis : array-like of ndarray of float (n_frames, n_basis)
+    w_basis, basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for change-of-measure, and basis for MLPT (must be 0 outside domain)
     weights : array-like ndarray of float (n_frames,)
         Weights for basis
     in_domain : array-like of ndarray of bool (n_frames,)
@@ -391,9 +377,300 @@ class MLPTMemory(StatisticMemory):
     def solve(self):
         if self._result is None:
             self._result = backward_transform(
-                self.coeffs, self._w_basis, self._basis, self._weights, self._guess
+                self.coeffs,
+                self._w_basis,
+                self._basis,
+                self._weights,
+                self._guess,
             )
         return self._result
+
+
+class IntegralMemory(StatisticMemory):
+    """Class for integral memory statistics. Each subclass
+    must implement the mats method which computes the appropriate
+    memory matrices.
+    """
+
+    def __init__(self, lag, memlag=0):
+        super().__init__(lag, memlag=memlag)
+
+    @property
+    def coeffs(self):
+        raise NotImplementedError("Coefficients not available!")
+
+    def solve(self):
+        if self._result is None:
+            eye = identity(self.mats, self.mem)
+            self._result = integral_solve(self.gen, eye) / (
+                self._lag // (self._memlag + 1)
+            )
+        return self._result
+
+
+class ReweightIntegralMemory(IntegralMemory):
+    """Computes ergodic average of a function with memory.
+
+    ...
+
+    Attributes
+    ----------
+    basis : array-like of ndarray (n_frames, n_basis)
+    weights, values : array-like ndarray (n_frames,)
+        Weights for basis, values of function to compute ergodic averages for
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
+    test : optional, array-like of ndarray (n_frames, n_basis)
+        Test basis
+    """
+
+    def __init__(self, basis, weights, values, lag, mem=0, test=None):
+        super().__init__(lag, memlag=mem)
+        self._basis = basis
+        self._weights = weights
+        self._values = values
+        self._test = test
+
+    @property
+    def mats(self):
+        if self._mats is None:
+            mats = []
+            for t in _memlags(self._lag, self._memlag):
+                mats.append(
+                    reweight_integral_matrix(
+                        self._basis,
+                        self._weights,
+                        self._values,
+                        t,
+                        test=self._test,
+                    )
+                )
+            self._mats = mats
+        return self._mats
+
+
+class ForwardCommittorIntegralMemory(IntegralMemory):
+    """Computes ergodic average of a function with respect to the forward
+    committor with memory.
+
+    ...
+
+    Attributes
+    ----------
+    w_basis, basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for change-of-measure, basis for forward committor (must be 0 outside domain)
+    weights, values : array-like ndarray of float (n_frames,)
+        Weights for basis, values of function to compute ergodic average for
+    in_domain : array-like of ndarray of bool (n_frames,)
+        Whether each frame is in the domain or not
+    guess : array-like of ndarray of float (n_frames,)
+        Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
+    w_test, test : optional, array-like of ndarray (n_frames, n_basis)
+        Test basis for weights, forward committor
+    """
+
+    def __init__(self, w_basis, basis, weights, in_domain, values, guess, lag, mem=0, w_test=None, test=None):
+        super().__init__(lag, memlag=mem)
+        self._w_basis = w_basis
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._values = values
+        self._guess = guess
+        self._w_test = w_test
+        self._test = test
+
+    @property
+    def mats(self):
+        if self._mats is None:
+            mats = []
+            for t in _memlags(self._lag, self._memlag):
+                mats.append(
+                    forward_committor_integral_matrix(
+                        self._w_basis,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._values,
+                        self._guess,
+                        t,
+                        w_test=self._w_test,
+                        test=self._test,
+                    )
+                )
+            self._mats = mats
+        return self._mats
+
+class MFPTIntegralMemory(IntegralMemory):
+    """Computes ergodic average of a function with respect to the (forward) 
+    MFPT with memory.
+
+    ...
+
+    Attributes
+    ----------
+    w_basis, basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for change-of-measure, basis for MFPT (must be 0 outside domain)
+    weights, values : array-like ndarray of float (n_frames,)
+        Weights for basis, values of function to compute ergodic average for
+    in_domain : array-like of ndarray of bool (n_frames,)
+        Whether each frame is in the domain or not
+    guess : array-like of ndarray of float (n_frames,)
+        Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
+    w_test, test : optional, array-like of ndarray (n_frames, n_basis)
+        Test basis for weights, forward committor
+    """
+
+    def __init__(self, w_basis, basis, weights, in_domain, values, guess, lag, mem=0, w_test=None, test=None):
+        super().__init__(lag, memlag=mem)
+        self._w_basis = w_basis
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._values = values
+        self._guess = guess
+        self._w_test = w_test
+        self._test = test
+
+    @property
+    def mats(self):
+        if self._mats is None:
+            mats = []
+            for t in _memlags(self._lag, self._memlag):
+                mats.append(
+                    forward_mfpt_integral_matrix(
+                        self._w_basis,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._values,
+                        self._guess,
+                        t,
+                        w_test=self._w_test,
+                        test=self._test,
+                    )
+                )
+            self._mats = mats
+        return self._mats
+
+
+class BackwardCommittorIntegralMemory(IntegralMemory):
+    """Computes ergodic average of a function with respect to the backward
+    committor with memory.
+
+    ...
+
+    Attributes
+    ----------
+    w_basis, basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for change-of-measure, basis for backward committor (must be 0 outside domain)
+    weights, values : array-like ndarray of float (n_frames,)
+        Weights for basis, values of function to compute ergodic average for
+    in_domain : array-like of ndarray of bool (n_frames,)
+        Whether each frame is in the domain or not
+    guess : array-like of ndarray of float (n_frames,)
+        Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
+    w_test, test : optional, array-like of ndarray (n_frames, n_basis)
+        Test basis for weights, forward committor
+    """
+
+    def __init__(self, w_basis, basis, weights, in_domain, values, guess, lag, mem=0, w_test=None, test=None):
+        super().__init__(lag, memlag=mem)
+        self._w_basis = w_basis
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._values = values
+        self._guess = guess
+        self._w_test = w_test
+        self._test = test
+
+    @property
+    def mats(self):
+        if self._mats is None:
+            mats = []
+            for t in _memlags(self._lag, self._memlag):
+                mats.append(
+                    backward_committor_integral_matrix(
+                        self._w_basis,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._values,
+                        self._guess,
+                        t,
+                        w_test=self._w_test,
+                        test=self._test,
+                    )
+                )
+            self._mats = mats
+        return self._mats
+
+
+class MLPTIntegralMemory(IntegralMemory):
+    """Computes ergodic average of a function with respect to the (backward) 
+    MLPT with memory.
+
+    ...
+
+    Attributes
+    ----------
+    w_basis, basis : array-like of ndarray of float (n_frames, n_basis)
+        Basis for change-of-measure, basis for MLPT (must be 0 outside domain)
+    weights, values : array-like ndarray of float (n_frames,)
+        Weights for basis, values of function to compute ergodic average for
+    in_domain : array-like of ndarray of bool (n_frames,)
+        Whether each frame is in the domain or not
+    guess : array-like of ndarray of float (n_frames,)
+        Guess function
+    lag : int
+    mem : int, optional
+        Number of memory matrices to use. (mem + 1) must evenly divide lag.
+    w_test, test : optional, array-like of ndarray (n_frames, n_basis)
+        Test basis for weights, forward committor
+    """
+
+    def __init__(self, w_basis, basis, weights, in_domain, values, guess, lag, mem=0, w_test=None, test=None):
+        super().__init__(lag, memlag=mem)
+        self._w_basis = w_basis
+        self._basis = basis
+        self._weights = weights
+        self._in_domain = in_domain
+        self._values = values
+        self._guess = guess
+        self._w_test = w_test
+        self._test = test
+
+    @property
+    def mats(self):
+        if self._mats is None:
+            mats = []
+            for t in _memlags(self._lag, self._memlag):
+                mats.append(
+                    backward_mfpt_integral_matrix(
+                        self._w_basis,
+                        self._basis,
+                        self._weights,
+                        self._in_domain,
+                        self._values,
+                        self._guess,
+                        t,
+                        w_test=self._w_test,
+                        test=self._test,
+                    )
+                )
+            self._mats = mats
+        return self._mats
 
 
 def reweight(basis, weights, lag, mem=0, test=None):
