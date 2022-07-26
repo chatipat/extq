@@ -1140,57 +1140,29 @@ def _integral(mats, lag, mem):
 
 
 def reweight_solve(gen):
-    return _solve_backward(gen)
+    """Solve problem for change of measure.
+
+    Parameters
+    ----------
+    gen : ndarray of float
+        Magic generator operator + memory
+
+    Returns
+    -------
+    ndarray
+        Coefficients
+    """
+    return np.concatenate([[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])])
 
 
 def reweight_transform(coeffs, basis, weights):
     result = []
     for x_w, w in zip(basis, weights):
-        result.append(_reweight_transform(coeffs, x_w, w))
+        result.append(w * (coeffs[0] + x_w @ coeffs[1:]))
     return result
 
 
 def forward_solve(gen):
-    return _solve_forward(gen)
-
-
-def forward_transform(coeffs, basis, in_domain, guess):
-    result = []
-    for y_f, in_d, g in zip(basis, in_domain, guess):
-        result.append(_forward_transform(coeffs, y_f, in_d, g))
-    return result
-
-
-def backward_solve(gen):
-    return _solve_backward(gen)
-
-
-def backward_transform(coeffs, w_basis, basis, in_domain, guess):
-    result = []
-    for x_w, x_b, in_d, g in zip(w_basis, basis, in_domain, guess):
-        result.append(_backward_transform(coeffs, x_w, x_b, in_d, g))
-    return result
-
-
-def integral_solve(gen, eye):
-    return _solve_integral(gen, eye)
-
-
-def _reweight_transform(coeffs, x_w, w):
-    return w * (coeffs[0] + x_w @ coeffs[1:])
-
-
-def _forward_transform(coeffs, y_f, d_f, g_f):
-    return g_f + np.where(d_f, y_f @ coeffs[:-1], 0.0) / coeffs[-1]
-
-
-def _backward_transform(coeffs, x_w, x_b, d_b, g_b):
-    n = x_w.shape[1] + 1
-    com = coeffs[0] + x_w @ coeffs[1:n]
-    return g_b + np.where(d_b, x_b @ coeffs[n:], 0.0) / com
-
-
-def _solve_forward(gen):
     """Solve problem for forward-in-time statistic.
 
     Parameters
@@ -1206,7 +1178,14 @@ def _solve_forward(gen):
     return np.concatenate([linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]])
 
 
-def _solve_backward(gen):
+def forward_transform(coeffs, basis, in_domain, guess):
+    result = []
+    for y_f, d_f, g_f in zip(basis, in_domain, guess):
+        result.append(g_f + np.where(d_f, y_f @ coeffs[:-1], 0.0) / coeffs[-1])
+    return result
+
+
+def backward_solve(gen):
     """Solve problem for backward-in-time statistic.
 
     Parameters
@@ -1222,7 +1201,16 @@ def _solve_backward(gen):
     return np.concatenate([[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])])
 
 
-def _solve_integral(gen, eye):
+def backward_transform(coeffs, w_basis, basis, in_domain, guess):
+    result = []
+    for x_w, x_b, d_b, g_b in zip(w_basis, basis, in_domain, guess):
+        n = x_w.shape[1] + 1
+        com = coeffs[0] + x_w @ coeffs[1:n]
+        result.append(g_b + np.where(d_b, x_b @ coeffs[n:], 0.0) / com)
+    return result
+
+
+def integral_solve(gen, eye):
     """Solve problem for integral average statistic.
 
     Parameters
@@ -1238,8 +1226,8 @@ def _solve_integral(gen, eye):
     """
 
     mat = linalg.solve(eye, gen)
-    forward_coeffs = _solve_forward(mat[1:, 1:])
-    backward_coeffs = _solve_backward(mat[:-1, :-1])
+    forward_coeffs = forward_solve(mat[1:, 1:])
+    backward_coeffs = backward_solve(mat[:-1, :-1])
     return backward_coeffs @ mat[:-1, 1:] @ forward_coeffs
 
 
