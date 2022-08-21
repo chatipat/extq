@@ -2,6 +2,40 @@ import numpy as np
 import scipy.sparse
 
 
+def generator_reversible_1d(potential, kT, x):
+    """Compute the generator matrix for a reversible 1D potential.
+
+    Parameters
+    ----------
+    potential : (nx,) ndarray of float
+        Potential energy for a 1D system.
+    kT : float
+        Temperature of the system, in units of energy.
+    x : (nx,) ndarray of float
+        X coordinates. Must be evenly spaced.
+
+    Returns
+    -------
+    sparse matrix
+        Generator matrix.
+
+    """
+
+    xsep = (x[-1] - x[0]) / (len(x) - 1)
+    assert np.allclose(x[1:] - x[:-1], xsep)
+
+    shape = (len(x),)
+    ind = np.arange(len(x))
+
+    # possible transitions per step
+    transitions = [
+        (np.s_[:-1], np.s_[1:], xsep),
+        (np.s_[1:], np.s_[:-1], xsep),
+    ]
+
+    return _generator_reversible_helper(transitions, potential, kT, ind, shape)
+
+
 def generator_reversible_2d(potential, kT, x, y):
     """Compute the generator matrix for a reversible 2D potential.
 
@@ -96,7 +130,7 @@ def _generator_reversible_helper(transitions, u, kT, ind, shape):
 
     # transitioning to adjacent cell
     for row, col, sep in transitions:
-        p = (2.0 * kT / sep ** 2) / (1.0 + np.exp((u[col] - u[row]) / kT))
+        p = (2.0 * kT / sep**2) / (1.0 + np.exp((u[col] - u[row]) / kT))
         p0[row] -= p
         data.append(p.ravel())
         row_ind.append(ind[row].ravel())
@@ -113,6 +147,40 @@ def _generator_reversible_helper(transitions, u, kT, ind, shape):
     return scipy.sparse.csr_matrix(
         (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
     )
+
+
+def generator_irreversible_1d(drift, diffusion, x):
+    """Compute the generator matrix for an irreversible 1D potential.
+
+    Parameters
+    ----------
+    drift : (nx,) ndarray of float
+        Drift for a 1D system.
+    diffusion : (nx,) ndarray of float
+        Diffusion for a 1D system.
+    x : (nx,) ndarray of float
+        X coordinates. Must be evenly spaced.
+
+    Returns
+    -------
+    sparse matrix
+        Generator matrix.
+
+    """
+
+    xsep = (x[-1] - x[0]) / (len(x) - 1)
+    assert np.allclose(x[1:] - x[:-1], xsep)
+
+    shape = (len(x),)
+    ind = np.arange(len(x))
+
+    # possible transitions per step
+    transitions = [
+        (np.s_[:-1, :], np.s_[1:, :], drift, diffusion, xsep),
+        (np.s_[1:, :], np.s_[:-1, :], drift, diffusion, -xsep),
+    ]
+
+    return _generator_irreversible_helper(transitions, ind, shape)
 
 
 def generator_irreversible_2d(
@@ -213,7 +281,7 @@ def _generator_irreversible_helper(transitions, ind, shape):
 
     # transitioning to adjacent cell
     for row, col, drift, diffusion, sep in transitions:
-        p = 0.5 * drift[row] / sep + diffusion[row] / sep ** 2
+        p = 0.5 * drift[row] / sep + diffusion[row] / sep**2
         p0[row] -= p
         data.append(p.ravel())
         row_ind.append(ind[row].ravel())

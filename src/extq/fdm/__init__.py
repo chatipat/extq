@@ -1,5 +1,7 @@
+from .gen import generator_irreversible_1d
 from .gen import generator_irreversible_2d
 from .gen import generator_irreversible_3d
+from .gen import generator_reversible_1d
 from .gen import generator_reversible_2d
 from .gen import generator_reversible_3d
 from .tpt import backward_committor

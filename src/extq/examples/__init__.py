@@ -4,4 +4,6 @@ from . import doublewell
 from . import euler
 from . import gillespie
 from . import mullerbrown
+from . import symmetricdoublewell
 from . import threehole
+from . import triplewell
