@@ -78,7 +78,7 @@ def kmeans3d_domain_basis(
 
 
 def _num(labels):
-    return max(np.max(indices) for indices in labels) + 1
+    return max(np.max(indices) for indices in labels if len(indices) > 0) + 1
 
 
 def _stack(*cvs):
