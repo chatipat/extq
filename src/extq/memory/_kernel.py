@@ -1,9 +1,9 @@
 import numba as nb
 import numpy as np
 
-from ..moving_matmul import _mm2
-from ..moving_matmul import _mm3
-from ..moving_matmul import _mm4
+from ..moving_semigroup import mm2
+from ..moving_semigroup import mm3
+from ..moving_semigroup import mm4
 from ..moving_semigroup import moving_semigroup
 
 
@@ -69,7 +69,7 @@ def forward_kernel(w, d_f, f_f, g_f, lag):
                 else:
                     k[t, 0, 1] = g_f[t + 1] + f_f[t]
             k[t, 1, 1] = 1.0
-        k = moving_semigroup(k, lag, _mm2)
+        k = moving_semigroup(k, lag, mm2)
         m = np.zeros((2, 2, len(w) - lag))
         for t in range(len(w) - lag):
             m[0, 0, t] = w[t] * k[t, 0, 0]
@@ -119,7 +119,7 @@ def backward_kernel(w, d_b, f_b, g_b, lag):
                     k[t, 1, 1] = 1.0
                 else:
                     k[t, 0, 1] = g_b[t] + f_b[t]
-        k = moving_semigroup(k, lag, _mm2)
+        k = moving_semigroup(k, lag, mm2)
         m = np.zeros((2, 2, len(w) - lag))
         for t in range(len(w) - lag):
             m[0, 0, t] = w[t]
@@ -164,7 +164,7 @@ def reweight_integral_kernel(w, v, lag):
             k[t, 0, 1] = v[t]
             # lower right block
             k[t, 1, 1] = 1.0
-        k = moving_semigroup(k, lag, _mm2)
+        k = moving_semigroup(k, lag, mm2)
         m = np.zeros((2, 2, len(w) - lag))
         for t in range(len(w) - lag):
             m[0, 0, t] = w[t]
@@ -228,7 +228,7 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
                 else:
                     k[t, 1, 2] = g_f[t + 1] + f_f[t]
             k[t, 2, 2] = 1.0
-        k = moving_semigroup(k, lag, _mm3)
+        k = moving_semigroup(k, lag, mm3)
         m = np.zeros((3, 3, len(w) - lag))
         for t in range(len(w) - lag):
             # upper left block
@@ -299,7 +299,7 @@ def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
                 k[t, 0, 2] = g_b[t] * v[t]
             # lower right block
             k[t, 2, 2] = 1.0
-        k = moving_semigroup(k, lag, _mm3)
+        k = moving_semigroup(k, lag, mm3)
         m = np.zeros((3, 3, len(w) - lag))
         for t in range(len(w) - lag):
             # upper left block
@@ -368,7 +368,7 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
                 else:
                     k[t, 2, 3] = g_f[t + 1] + f_f[t]
             k[t, 3, 3] = 1.0
-        k = moving_semigroup(k, lag, _mm4)
+        k = moving_semigroup(k, lag, mm4)
         m = np.zeros((4, 4, len(w) - lag))
         for t in range(len(w) - lag):
             # upper left block
