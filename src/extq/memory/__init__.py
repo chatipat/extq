@@ -32,6 +32,15 @@ from ._dga import reweight_integral
 from ._dga import reweight_solve
 from ._dga import reweight_transform
 from ._dga import tpt_integral
+from ._integral import backward_committor_integral_coeffs
+from ._integral import backward_feynman_kac_integral_coeffs
+from ._integral import backward_mfpt_integral_coeffs
+from ._integral import forward_committor_integral_coeffs
+from ._integral import forward_feynman_kac_integral_coeffs
+from ._integral import forward_mfpt_integral_coeffs
+from ._integral import integral_coeffs
+from ._integral import reweight_integral_coeffs
+from ._integral import tpt_integral_coeffs
 from ._matrix import backward_committor_integral_matrix
 from ._matrix import backward_committor_matrix
 from ._matrix import backward_feynman_kac_integral_matrix
