@@ -495,9 +495,9 @@ def _combine(left, right, lag, mem=0):
             l = np.arange(u_f.shape[-1])
             mask = (k[:, None] + l[None, :] <= mem - n).astype(float)
             c = np.einsum("kl,tik,tjl->tij", mask, u_b[:-s], u_f[s:])
-            a = _integral_coeffs(c, k_b, k_f, s)
-            u += (n + 1) * np.einsum("tij,ti,tj->t", a, m_b[:-1], m_f[1:])
-        out.append(u)
+            a = _integral_coeffs(c, k_b, k_f, 1, s)
+            u += np.einsum("tij,ti,tj->t", a, m_b[:-1], m_f[1:])
+        out.append(u / dlag)
     return out
 
 
