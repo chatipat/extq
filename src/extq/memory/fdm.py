@@ -81,9 +81,7 @@ def _forward_matrix(gen, x_f, y_f, w, d_f, f_f, g_f, lag):
 
     a = np.full((2, 2), None)
     a[0, 0] = gen[d_f, :][:, d_f]
-    a[0, 1] = (
-        gen[d_f, :] @ scipy.sparse.diags(b_f) + scipy.sparse.diags(f_f)[d_f, :]
-    )
+    a[0, 1] = (gen @ scipy.sparse.diags(b_f) + scipy.sparse.diags(f_f))[d_f, :]
     a[1, 1] = gen
 
     x = np.full((2, 2), None)
@@ -192,9 +190,7 @@ def _backward_matrix(gen, x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag):
 
     a = np.full((2, 2), None)
     a[0, 0] = gen
-    a[0, 1] = (
-        scipy.sparse.diags(b_b) @ gen[:, d_b] + scipy.sparse.diags(f_b)[:, d_b]
-    )
+    a[0, 1] = (scipy.sparse.diags(b_b) @ gen + scipy.sparse.diags(f_b))[:, d_b]
     a[1, 1] = gen[d_b, :][:, d_b]
 
     x = np.full((2, 3), None)
@@ -358,9 +354,7 @@ def _forward_integral_matrix(
     a[0, 2] = v @ scipy.sparse.diags(b_f)
     # lower right block
     a[1, 1] = gen[d_f, :][:, d_f]
-    a[1, 2] = (
-        gen[d_f, :] @ scipy.sparse.diags(b_f) + scipy.sparse.diags(f_f)[d_f, :]
-    )
+    a[1, 2] = (gen @ scipy.sparse.diags(b_f) + scipy.sparse.diags(f_f))[d_f, :]
     a[2, 2] = gen
 
     x = np.full((3, 4), None)
@@ -478,9 +472,7 @@ def _backward_integral_matrix(
     a = np.full((3, 3), None)
     # upper left block
     a[0, 0] = gen
-    a[0, 1] = (
-        scipy.sparse.diags(b_b) @ gen[:, d_b] + scipy.sparse.diags(f_b)[:, d_b]
-    )
+    a[0, 1] = (scipy.sparse.diags(b_b) @ gen + scipy.sparse.diags(f_b))[:, d_b]
     a[1, 1] = gen[d_b, :][:, d_b]
     # upper right block
     a[0, 2] = scipy.sparse.diags(b_b) @ v
@@ -601,9 +593,7 @@ def _integral_matrix(
     a = np.full((4, 4), None)
     # upper left block
     a[0, 0] = gen
-    a[0, 1] = (
-        scipy.sparse.diags(b_b) @ gen[:, d_b] + scipy.sparse.diags(f_b)[:, d_b]
-    )
+    a[0, 1] = (scipy.sparse.diags(b_b) @ gen + scipy.sparse.diags(f_b))[:, d_b]
     a[1, 1] = gen[d_b, :][:, d_b]
     # upper right block
     a[0, 2] = scipy.sparse.diags(b_b) @ v[:, d_f]
@@ -612,9 +602,7 @@ def _integral_matrix(
     a[1, 3] = v[d_b, :] @ scipy.sparse.diags(b_f)
     # lower right block
     a[2, 2] = gen[d_f, :][:, d_f]
-    a[2, 3] = (
-        gen[d_f, :] @ scipy.sparse.diags(b_f) + scipy.sparse.diags(f_f)[d_f, :]
-    )
+    a[2, 3] = (gen @ scipy.sparse.diags(b_f) + scipy.sparse.diags(f_f))[d_f, :]
     a[3, 3] = gen
 
     x = np.full((4, 5), None)
