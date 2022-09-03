@@ -1,45 +1,85 @@
+"""Functions for computing memory and related matrices."""
+
 from .. import linalg
 
 
 def identity(mats, mems=[]):
+    r"""
+    Compute the memory-corrected zero-lag-time correlation matrix.
+
+    The memory-corrected zero-lag-time correlation matrix is defined as
+
+    ..math :: C_0 + \sum_{k=0}^{K-1} (k+1) M_k
+
+    where :math:`C_0` is the zero-lag-time correlation matrix
+    ``mats[0]`` and :math:`M_k` are memory matrices ``mems[k]``.
+
+    Parameters
+    ----------
+    mats : sequence of (n_basis, n_basis) ndarray of float
+        Sequence of correlation matrices at equally-spaced lag times,
+        starting at a lag time of zero. Note that only ``mats[0]`` is
+        used.
+    mems : sequence of (n_basis, n_basis) ndarray of float, optional
+        Sequence of memory matrices at equally-spaced lag times (with
+        the same spacing as `mats`), starting at a lag time of zero.
+
+    Returns
+    -------
+    (n_basis, n_basis) ndarray of float
+        Memory-corrected zero-lag-time correlation matrix.
+
+    """
     return mats[0] + sum((s + 1) * mems[s] for s in range(len(mems)))
 
 
 def generator(mats, mems=[]):
-    """Compute the `magic' generator + memory operator
-    from a series of correlation matrices.
-    The operator is defined as
-    .. math:: A + \sum_{k=0}^KM_k
-    where :math:`A` is the generator and :math:`M_k` are the
-    memory matrices.
+    r"""
+    Compute the memory-corrected generator matrix.
+
+    The memory-corrected generator is defined as
+
+    ..math :: A + \sum_{k=0}^{K-1} M_k
+
+    where :math:`A` is the generator matrix ``mats[1]-mats[0]`` and
+    :math:`M_k` are memory matrices ``mems[k]``.
 
     Parameters
     ----------
-    mats : array-like of ndarray (n_basis, n_basis) of float
-        Correlation matrices
-    mems : array-like of ndarray (n_basis, n_basis) of float, optional
-        Memory matrices
+    mats : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float
+        Sequence of correlation matrices at equally-spaced lag times,
+        starting at a lag time of zero. Note that only ``mats[0]`` and
+        ``mats[1]`` are used.
+    mems : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float, optional
+        Sequence of memory matrices at equally-spaced lag times (with
+        the same spacing as `mats`), starting at a lag time of zero.
 
     Returns
     -------
-    ndarray (n_basis, n_basis) of float
-        Generator operator + memory
+    (n_basis, n_basis) ndarray of float
+        Memory-corrected generator matrix.
+
     """
     return mats[1] - mats[0] + sum(mems[s] for s in range(len(mems)))
 
 
 def memory(mats):
-    """Compute the memory matrices from correlation matrices.
+    """
+    Compute memory matrices from correlation matrices.
 
     Parameters
     ---------
-    mats : array-like (n_mats,) of ndarray (n_basis, n_basis) of float
-        Correlation matrices
+    mats : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float
+        Sequence of correlation matrices at equally-spaced lag times,
+        starting at a lag time of zero. Note that ``len(mats) >= 2``.
 
     Returns
     -------
-    mems : array-like (n_mats - 2,) of ndarray (n_basis, n_basis) of float
-        Memory matrices
+    mems : list of (n_basis, n_basis) {ndarray, sparse matrix} of float
+        List of memory matrices at equally-spaced lag times (with the
+        same spacing as `mats`), starting at a lag time of zero.
+        Note that ``len(mems) = len(mats) - 2``.
+
     """
     inv = linalg.inv(mats[0])
     tmat = inv @ mats[1]
@@ -56,21 +96,28 @@ def memory(mats):
 
 
 def extrapolate(mats, mems, lag):
-    """Extrapolate correlation matrices to longer lag time
-    using memory matrices.
+    """
+    Extrapolate correlation matrices to longer lag times.
 
     Parameters
     ----------
-    mats : array-like of ndarray (n_basis, n_basis) of float
-        Correlation matrices
-    mems : array-like of ndarray (n_basis, n_basis) of float
-        Memory matrices
+    mats : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float
+        Sequence of correlation matrices at equally-spaced lag times,
+        starting at a lag time of zero.
+    mems : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float, optional
+        Sequence of memory matrices at equally-spaced lag times (with
+        the same spacing as `mats`), starting at a lag time of zero.
     lag : int
+        Maximum lag time up to which to extrapolate.
 
     Returns
     -------
-    xmats : list (lag + 1,) of ndarray (n_basis, n_basis) of float
-        Extrapolated correlation matrices
+    xmats : list of (n_basis, n_basis) {ndarray, sparse matrix} of float
+        Length ``lag+1`` list of extrapolated correlation matrices. The
+        first ``len(mats)`` matrices of `xmats` is taken from `mats`
+        and the subsequent matrices are extrapolated from `mats` using
+        `mems`.
+
     """
     inv = linalg.inv(mats[0])
     tmat = inv @ mats[1]
