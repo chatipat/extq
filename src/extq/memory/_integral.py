@@ -1,8 +1,8 @@
-import numba as nb
 import numpy as np
 
 from .. import linalg
 from ..integral import integral_coeffs as _integral_coeffs
+from . import _kernel
 from . import _matrix
 from . import _memory
 
@@ -291,7 +291,7 @@ def _forward(mats, basis, domain, function, guess):
     v = _right_coeffs(mats)
     for y_f, d_f, f_f, g_f in zip(basis, domain, function, guess):
 
-        k = _forward_transitions(d_f, f_f, g_f)
+        k = _kernel.forward_transitions(d_f, f_f, g_f)
 
         u = np.empty((len(d_f), 2, v.shape[-1]))
         u[:, 1] = v[-1]
@@ -304,24 +304,6 @@ def _forward(mats, basis, domain, function, guess):
         m[:, 0] = np.where(d_f, 1.0, 0.0)
 
         yield k, u, m
-
-
-@nb.njit
-def _forward_transitions(d_f, f_f, g_f):
-    n = len(d_f)
-    assert d_f.shape == (n,)
-    assert f_f.shape == (n - 1,)
-    assert g_f.shape == (n,)
-    out = np.zeros((n - 1, 2, 2))
-    for t in range(n - 1):
-        if d_f[t]:
-            if d_f[t + 1]:
-                out[t, 0, 0] = 1.0
-                out[t, 0, 1] = f_f[t]
-            else:
-                out[t, 0, 1] = g_f[t + 1] + f_f[t]
-        out[t, 1, 1] = 1.0
-    return out
 
 
 def _backward_committor(
@@ -415,7 +397,7 @@ def _backward(mats, w_basis, basis, weights, domain, function, guess):
         w_basis, basis, weights, domain, function, guess
     ):
 
-        k = _backward_transitions(d_b, f_b, g_b)
+        k = _kernel.backward_transitions(d_b, f_b, g_b)
 
         n = x_w.shape[1] + 1
         u = np.empty((len(d_b), 2, v.shape[-1]))
@@ -431,24 +413,6 @@ def _backward(mats, w_basis, basis, weights, domain, function, guess):
         m[:, 1] = np.where(d_b, 1.0, 0.0)
 
         yield k, u, m
-
-
-@nb.njit
-def _backward_transitions(d_b, f_b, g_b):
-    n = len(d_b)
-    assert d_b.shape == (n,)
-    assert f_b.shape == (n - 1,)
-    assert g_b.shape == (n,)
-    out = np.zeros((n - 1, 2, 2))
-    for t in range(n - 1):
-        out[t, 0, 0] = 1.0
-        if d_b[t + 1]:
-            if d_b[t]:
-                out[t, 0, 1] = f_b[t]
-                out[t, 1, 1] = 1.0
-            else:
-                out[t, 0, 1] = g_b[t] + f_b[t]
-    return out
 
 
 def _left_coeffs(mats):
