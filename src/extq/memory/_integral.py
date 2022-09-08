@@ -7,10 +7,10 @@ from . import _matrix
 from . import _memory
 
 
-def reweight_integral_coeffs(basis, weights, lag, mem=0, test=None):
+def reweight_integral_coeffs(basis, weights, obslag, lag, mem=0, test=None):
     left = _reweight(basis, weights, lag, mem=mem, test=test)
     right = _constant(weights)
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def forward_committor_integral_coeffs(
@@ -19,6 +19,7 @@ def forward_committor_integral_coeffs(
     weights,
     domain,
     guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -28,7 +29,7 @@ def forward_committor_integral_coeffs(
     right = _forward_committor(
         basis, weights, domain, guess, lag, mem=mem, test=test
     )
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def forward_mfpt_integral_coeffs(
@@ -37,6 +38,7 @@ def forward_mfpt_integral_coeffs(
     weights,
     domain,
     guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -46,7 +48,7 @@ def forward_mfpt_integral_coeffs(
     right = _forward_mfpt(
         basis, weights, domain, guess, lag, mem=mem, test=test
     )
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def forward_feynman_kac_integral_coeffs(
@@ -56,6 +58,7 @@ def forward_feynman_kac_integral_coeffs(
     domain,
     function,
     guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -65,7 +68,7 @@ def forward_feynman_kac_integral_coeffs(
     right = _forward_feynman_kac(
         basis, weights, domain, function, guess, lag, mem=mem, test=test
     )
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def backward_committor_integral_coeffs(
@@ -74,6 +77,7 @@ def backward_committor_integral_coeffs(
     weights,
     domain,
     guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -91,7 +95,7 @@ def backward_committor_integral_coeffs(
         test=test,
     )
     right = _constant(weights)
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def backward_mfpt_integral_coeffs(
@@ -100,6 +104,7 @@ def backward_mfpt_integral_coeffs(
     weights,
     domain,
     guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -117,7 +122,7 @@ def backward_mfpt_integral_coeffs(
         test=test,
     )
     right = _constant(weights)
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def backward_feynman_kac_integral_coeffs(
@@ -127,6 +132,7 @@ def backward_feynman_kac_integral_coeffs(
     domain,
     function,
     guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -145,7 +151,7 @@ def backward_feynman_kac_integral_coeffs(
         test=test,
     )
     right = _constant(weights)
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def tpt_integral_coeffs(
@@ -156,6 +162,7 @@ def tpt_integral_coeffs(
     domain,
     b_guess,
     f_guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -176,7 +183,7 @@ def tpt_integral_coeffs(
     right = _forward_committor(
         f_basis, weights, domain, f_guess, lag, mem=mem, test=f_test
     )
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def integral_coeffs(
@@ -190,6 +197,7 @@ def integral_coeffs(
     f_function,
     b_guess,
     f_guess,
+    obslag,
     lag,
     mem=0,
     w_test=None,
@@ -218,7 +226,7 @@ def integral_coeffs(
         mem=mem,
         test=f_test,
     )
-    return _combine(left, right, lag, mem=mem)
+    return _combine(left, right, lag, obslag, mem=mem)
 
 
 def _constant(weights):
@@ -448,20 +456,33 @@ def _right_coeffs(mats):
     return v
 
 
-def _combine(left, right, lag, mem=0):
+def _combine(left, right, obslag, lag, mem=0):
+    assert obslag in [0, 1]
     dlag = lag // (mem + 1)
     out = []
     for (k_b, u_b, m_b), (k_f, u_f, m_f) in zip(left, right):
-        u = 0.0
-        for n in range(mem + 1):
-            s = (n + 1) * dlag
-            k = np.arange(u_b.shape[-1])
-            l = np.arange(u_f.shape[-1])
-            mask = (k[:, None] + l[None, :] <= mem - n).astype(float)
-            c = np.einsum("kl,tik,tjl->tij", mask, u_b[:-s], u_f[s:])
-            a = _integral_coeffs(c, k_b, k_f, 1, s)
-            u += np.einsum("tij,ti,tj->t", a, m_b[:-1], m_f[1:])
-        out.append(u / dlag)
+        a = _integral_memory_coeffs(k_b, k_f, u_b, u_f, lag, mem=mem)
+        if obslag == 0:
+            c = np.zeros(len(a) + 1)
+            c[:-1] += np.einsum("tik,ti,tj,tjk->t", a, m_b[:-1], m_f[:-1], k_f)
+            c[1:] += np.einsum("tik,tij,tj,tk->t", a, k_b, m_b[1:], m_f[1:])
+            c /= 2.0 * dlag
+        else:
+            c = np.einsum("tij,ti,tj->t", a, m_b[:-1], m_f[1:]) / dlag
+        out.append(c)
+    return out
+
+
+def _integral_memory_coeffs(k_b, k_f, u_b, u_f, lag, mem=0):
+    dlag = lag // (mem + 1)
+    out = 0.0
+    for n in range(mem + 1):
+        s = (n + 1) * dlag
+        k = np.arange(u_b.shape[-1])
+        l = np.arange(u_f.shape[-1])
+        mask = (k[:, None] + l[None, :] <= mem - n).astype(float)
+        c = np.einsum("kl,tik,tjl->tij", mask, u_b[:-s], u_f[s:])
+        out += _integral_coeffs(c, k_b, k_f, 1, s)
     return out
 
 
