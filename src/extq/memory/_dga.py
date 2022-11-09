@@ -424,8 +424,7 @@ def integral(
 def _integral(mats, lag, mem):
     mems = _memory.memory(mats)
     gen = _memory.generator(mats, mems)
-    eye = _memory.identity(mats, mems)
-    return integral_solve(gen, eye) / (lag // (mem + 1))
+    return integral_solve(gen, mats[0]) / (lag // (mem + 1))
 
 
 def reweight_solve(gen):

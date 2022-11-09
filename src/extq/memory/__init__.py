@@ -59,5 +59,4 @@ from ._matrix import reweight_matrix
 from ._matrix import tpt_integral_matrix
 from ._memory import extrapolate
 from ._memory import generator
-from ._memory import identity
 from ._memory import memory

@@ -81,12 +81,6 @@ class StatisticMemory(ABC):
         return self._gen
 
     @property
-    def eye(self):
-        if self._eye is None:
-            self._eye = _memory.identity(self.cor_mats, mems=self.mem_mats)
-        return self._eye
-
-    @property
     def coeffs(self):
         if self._coeffs is None:
             self._coeffs = self._compute_coeffs()
@@ -409,7 +403,7 @@ class IntegralMemory(StatisticMemory):
         super().__init__(lag, mem=mem)
 
     def _compute_coeffs(self):
-        return integral_solve(self.gen, self.eye)
+        return integral_solve(self.gen, self.cor_mats[0])
 
     def _compute_result(self):
         return self._coeffs

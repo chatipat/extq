@@ -425,13 +425,12 @@ def _backward(mats, w_basis, basis, weights, domain, function, guess):
 
 def _left_coeffs(mats):
     mems = _memory.memory(mats)
-    eye = _memory.identity(mats, mems)
     gen = _memory.generator(mats, mems)
-    gen = linalg.solve(eye, gen)
+    gen = linalg.solve(mats[0], gen)
     coeffs = np.concatenate(
         [[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])]
     )
-    coeffs = linalg.solve(eye.T, coeffs)
+    coeffs = linalg.solve(mats[0].T, coeffs)
     neginv = -linalg.inv(mats[0])
     v = np.empty((len(coeffs), len(mems) + 2))
     v[:, 0] = coeffs

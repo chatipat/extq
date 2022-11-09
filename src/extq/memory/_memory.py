@@ -3,36 +3,6 @@
 from .. import linalg
 
 
-def identity(mats, mems=[]):
-    r"""
-    Compute the memory-corrected zero-lag-time correlation matrix.
-
-    The memory-corrected zero-lag-time correlation matrix is defined as
-
-    ..math :: C_0 + \sum_{k=0}^{K-1} (k+1) M_k
-
-    where :math:`C_0` is the zero-lag-time correlation matrix
-    ``mats[0]`` and :math:`M_k` are memory matrices ``mems[k]``.
-
-    Parameters
-    ----------
-    mats : sequence of (n_basis, n_basis) ndarray of float
-        Sequence of correlation matrices at equally-spaced lag times,
-        starting at a lag time of zero. Note that only ``mats[0]`` is
-        used.
-    mems : sequence of (n_basis, n_basis) ndarray of float, optional
-        Sequence of memory matrices at equally-spaced lag times (with
-        the same spacing as `mats`), starting at a lag time of zero.
-
-    Returns
-    -------
-    (n_basis, n_basis) ndarray of float
-        Memory-corrected zero-lag-time correlation matrix.
-
-    """
-    return mats[0] + sum((s + 1) * mems[s] for s in range(len(mems)))
-
-
 def generator(mats, mems=[]):
     r"""
     Compute the memory-corrected generator matrix.
