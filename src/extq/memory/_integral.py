@@ -10,7 +10,7 @@ from . import _memory
 def reweight_integral_coeffs(basis, weights, obslag, lag, mem=0, test=None):
     left = _reweight(basis, weights, lag, mem=mem, test=test)
     right = _constant(weights)
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def forward_committor_integral_coeffs(
@@ -29,7 +29,7 @@ def forward_committor_integral_coeffs(
     right = _forward_committor(
         basis, weights, domain, guess, lag, mem=mem, test=test
     )
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def forward_mfpt_integral_coeffs(
@@ -48,7 +48,7 @@ def forward_mfpt_integral_coeffs(
     right = _forward_mfpt(
         basis, weights, domain, guess, lag, mem=mem, test=test
     )
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def forward_feynman_kac_integral_coeffs(
@@ -68,7 +68,7 @@ def forward_feynman_kac_integral_coeffs(
     right = _forward_feynman_kac(
         basis, weights, domain, function, guess, lag, mem=mem, test=test
     )
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def backward_committor_integral_coeffs(
@@ -95,7 +95,7 @@ def backward_committor_integral_coeffs(
         test=test,
     )
     right = _constant(weights)
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def backward_mfpt_integral_coeffs(
@@ -122,7 +122,7 @@ def backward_mfpt_integral_coeffs(
         test=test,
     )
     right = _constant(weights)
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def backward_feynman_kac_integral_coeffs(
@@ -151,7 +151,7 @@ def backward_feynman_kac_integral_coeffs(
         test=test,
     )
     right = _constant(weights)
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def tpt_integral_coeffs(
@@ -183,7 +183,7 @@ def tpt_integral_coeffs(
     right = _forward_committor(
         f_basis, weights, domain, f_guess, lag, mem=mem, test=f_test
     )
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def integral_coeffs(
@@ -226,7 +226,7 @@ def integral_coeffs(
         mem=mem,
         test=f_test,
     )
-    return _combine(left, right, lag, obslag, mem=mem)
+    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def _constant(weights):
