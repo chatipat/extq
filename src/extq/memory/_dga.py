@@ -417,11 +417,16 @@ def backward_feynman_kac(
 
 
 def reweight_integral(basis, weights, values, lag, mem=0, test=None):
-    mats = [
-        _matrix.reweight_integral_matrix(basis, weights, values, t, test=test)
+    b_mats = [
+        _matrix.reweight_matrix(basis, weights, t, test=test)
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    f_mats = [_matrix.constant_matrix(weights, t) for t in _memlags(lag, mem)]
+    v_mats = [
+        _matrix.reweight_integral_matrix(basis, weights, values, t)
+        for t in _memlags(lag, mem)
+    ]
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def forward_committor_integral(
@@ -436,21 +441,23 @@ def forward_committor_integral(
     w_test=None,
     test=None,
 ):
-    mats = [
-        _matrix.forward_committor_integral_matrix(
-            w_basis,
-            basis,
-            weights,
-            in_domain,
-            values,
-            guess,
-            t,
-            w_test=w_test,
-            test=test,
+    b_mats = [
+        _matrix.reweight_matrix(w_basis, weights, t, test=w_test)
+        for t in _memlags(lag, mem)
+    ]
+    f_mats = [
+        _matrix.forward_committor_matrix(
+            basis, weights, in_domain, guess, t, test=test
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    v_mats = [
+        _matrix.forward_committor_integral_matrix(
+            w_basis, basis, weights, in_domain, values, guess, t
+        )
+        for t in _memlags(lag, mem)
+    ]
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def forward_mfpt_integral(
@@ -465,21 +472,23 @@ def forward_mfpt_integral(
     w_test=None,
     test=None,
 ):
-    mats = [
-        _matrix.forward_mfpt_integral_matrix(
-            w_basis,
-            basis,
-            weights,
-            in_domain,
-            values,
-            guess,
-            t,
-            w_test=w_test,
-            test=test,
+    b_mats = [
+        _matrix.reweight_matrix(w_basis, weights, t, test=w_test)
+        for t in _memlags(lag, mem)
+    ]
+    f_mats = [
+        _matrix.forward_mfpt_matrix(
+            basis, weights, in_domain, guess, t, test=test
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    v_mats = [
+        _matrix.forward_mfpt_integral_matrix(
+            w_basis, basis, weights, in_domain, values, guess, t
+        )
+        for t in _memlags(lag, mem)
+    ]
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def forward_feynman_kac_integral(
@@ -495,7 +504,17 @@ def forward_feynman_kac_integral(
     w_test=None,
     test=None,
 ):
-    mats = [
+    b_mats = [
+        _matrix.reweight_matrix(w_basis, weights, t, test=w_test)
+        for t in _memlags(lag, mem)
+    ]
+    f_mats = [
+        _matrix.forward_feynman_kac_matrix(
+            basis, weights, in_domain, function, guess, t, test=test
+        )
+        for t in _memlags(lag, mem)
+    ]
+    v_mats = [
         _matrix.forward_feynman_kac_integral_matrix(
             w_basis,
             basis,
@@ -505,12 +524,10 @@ def forward_feynman_kac_integral(
             function,
             guess,
             t,
-            w_test=w_test,
-            test=test,
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def backward_committor_integral(
@@ -525,13 +542,12 @@ def backward_committor_integral(
     w_test=None,
     test=None,
 ):
-    mats = [
-        _matrix.backward_committor_integral_matrix(
+    b_mats = [
+        _matrix.backward_committor_matrix(
             w_basis,
             basis,
             weights,
             in_domain,
-            values,
             guess,
             t,
             w_test=w_test,
@@ -539,7 +555,14 @@ def backward_committor_integral(
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    f_mats = [_matrix.constant_matrix(weights, t) for t in _memlags(lag, mem)]
+    v_mats = [
+        _matrix.backward_committor_integral_matrix(
+            w_basis, basis, weights, in_domain, values, guess, t
+        )
+        for t in _memlags(lag, mem)
+    ]
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def backward_mfpt_integral(
@@ -554,13 +577,12 @@ def backward_mfpt_integral(
     w_test=None,
     test=None,
 ):
-    mats = [
-        _matrix.backward_mfpt_integral_matrix(
+    b_mats = [
+        _matrix.backward_mfpt_matrix(
             w_basis,
             basis,
             weights,
             in_domain,
-            values,
             guess,
             t,
             w_test=w_test,
@@ -568,7 +590,14 @@ def backward_mfpt_integral(
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    f_mats = [_matrix.constant_matrix(weights, t) for t in _memlags(lag, mem)]
+    v_mats = [
+        _matrix.backward_mfpt_integral_matrix(
+            w_basis, basis, weights, in_domain, values, guess, t
+        )
+        for t in _memlags(lag, mem)
+    ]
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def backward_feynman_kac_integral(
@@ -584,7 +613,22 @@ def backward_feynman_kac_integral(
     w_test=None,
     test=None,
 ):
-    mats = [
+    b_mats = [
+        _matrix.backward_feynman_kac_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            function,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
+        )
+        for t in _memlags(lag, mem)
+    ]
+    f_mats = [_matrix.constant_matrix(weights, t) for t in _memlags(lag, mem)]
+    v_mats = [
         _matrix.backward_feynman_kac_integral_matrix(
             w_basis,
             basis,
@@ -594,12 +638,10 @@ def backward_feynman_kac_integral(
             function,
             guess,
             t,
-            w_test=w_test,
-            test=test,
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def tpt_integral(
@@ -617,7 +659,26 @@ def tpt_integral(
     b_test=None,
     f_test=None,
 ):
-    mats = [
+    b_mats = [
+        _matrix.backward_committor_matrix(
+            w_basis,
+            b_basis,
+            weights,
+            in_domain,
+            b_guess,
+            t,
+            w_test=w_test,
+            test=b_test,
+        )
+        for t in _memlags(lag, mem)
+    ]
+    f_mats = [
+        _matrix.forward_committor_matrix(
+            f_basis, weights, in_domain, f_guess, t, test=f_test
+        )
+        for t in _memlags(lag, mem)
+    ]
+    v_mats = [
         _matrix.tpt_integral_matrix(
             w_basis,
             b_basis,
@@ -628,13 +689,10 @@ def tpt_integral(
             b_guess,
             f_guess,
             t,
-            w_test=w_test,
-            b_test=b_test,
-            f_test=f_test,
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def integral(
@@ -655,7 +713,27 @@ def integral(
     b_test=None,
     f_test=None,
 ):
-    mats = [
+    b_mats = [
+        _matrix.backward_feynman_kac_matrix(
+            w_basis,
+            b_basis,
+            weights,
+            b_domain,
+            b_function,
+            b_guess,
+            t,
+            w_test=w_test,
+            test=b_test,
+        )
+        for t in _memlags(lag, mem)
+    ]
+    f_mats = [
+        _matrix.forward_feynman_kac_matrix(
+            f_basis, weights, f_domain, f_function, f_guess, t, test=f_test
+        )
+        for t in _memlags(lag, mem)
+    ]
+    v_mats = [
         _matrix.integral_matrix(
             w_basis,
             b_basis,
@@ -669,13 +747,10 @@ def integral(
             b_guess,
             f_guess,
             t,
-            w_test=w_test,
-            b_test=b_test,
-            f_test=f_test,
         )
         for t in _memlags(lag, mem)
     ]
-    return integral_solve(mats, lag, mem)
+    return integral_solve(b_mats, f_mats, v_mats, lag, mem)
 
 
 def reweight_solve(mats, basis, weights):
@@ -853,14 +928,20 @@ def aftcast_transform(coeffs, w_basis, basis, in_domain, guess):
     return result
 
 
-def integral_solve(mats, lag, mem):
+def integral_solve(b_mats, f_mats, v_mats, lag, mem):
     """
     Compute an ergodic average from correlation matrices.
 
     Parameters
     ----------
-    mats : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float
-        Sequence of correlation matrices at lag times
+    b_mats : sequence of (n_b_basis, n_b_basis) {ndarray, sparse matrix} of float
+        Sequence of correlation matrices for the backward-in-time
+        statistic at lag times `numpy.linspace(0, lag, mem+2)`.
+    f_mats : sequence of (n_f_basis, n_f_basis) {ndarray, sparse matrix} of float
+        Sequence of correlation matrices for the forward-in-time
+        statistic at lag times `numpy.linspace(0, lag, mem+2)`.
+    v_mats : sequence of (n_b_basis, n_f_basis) {ndarray, sparse matrix} of float
+        Sequence of correlation matrices for the integral at lag times
         `numpy.linspace(0, lag, mem+2)`.
     lag : int
         Maximum lag time in units of frames.
@@ -877,21 +958,32 @@ def integral_solve(mats, lag, mem):
         Ergodic average.
 
     """
-    assert len(mats) == mem + 2
     assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)  # time between correlation matrices
+    assert len(b_mats) == mem + 2
+    assert len(f_mats) == mem + 2
+    assert len(v_mats) == mem + 2
+    n_b, n_f = v_mats[0].shape
+
+    mats = []
+    for b_mat, f_mat, v_mat in zip(b_mats, f_mats, v_mats):
+        mat = np.zeros((n_b + n_f, n_b + n_f))
+        mat[:n_b, :n_b] = b_mat
+        mat[n_b:, n_b:] = f_mat
+        mat[:n_b, n_b:] = v_mat
+        mats.append(mat)
+
     mems = _memory.memory(mats)
-    gen = linalg.solve(mats[0], mats[1] - mats[0] + sum(mems))
-    forward_coeffs = np.concatenate(
-        [linalg.solve(gen[1:-1, 1:-1], -gen[1:-1, -1]), [1.0]]
-    )
-    backward_coeffs = np.concatenate(
-        [[1.0], linalg.solve(gen.T[1:-1, 1:-1], -gen.T[1:-1, 0])]
-    )
-    return (backward_coeffs @ gen[:-1, 1:] @ forward_coeffs) / dlag
+    b_mems = [m[:n_b, :n_b] for m in mems]
+    f_mems = [m[n_b:, n_b:] for m in mems]
+    v_mems = [m[:n_b, n_b:] for m in mems]
+
+    b_coeffs = backward_coeffs(b_mats, b_mems)
+    f_coeffs = forward_coeffs(f_mats, f_mems)
+    gen = v_mats[1] - v_mats[0] + sum(v_mems)
+    return (b_coeffs @ gen @ f_coeffs) / (lag // (mem + 1))
 
 
-def forward_coeffs(mats):
+def forward_coeffs(mats, mems=None):
     """
     Solve a forward-in-time problem for projection coefficients.
 
@@ -900,6 +992,11 @@ def forward_coeffs(mats):
     mats : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float
         Sequence of correlation matrices at equally-spaced lag times,
         starting at a lag time of zero.
+    mems : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float, optional
+        Sequence of memory matrices at equally-spaced lag times (with
+        the same spacing as `mats`), starting at a lag time of zero.
+        Must satisfy ``len(mems) = len(mats) - 2``. If `None`, compute
+        `mems` from `mats`.
 
     Returns
     -------
@@ -907,12 +1004,14 @@ def forward_coeffs(mats):
         Projection coefficients.
 
     """
-    mems = _memory.memory(mats)
+    if mems is None:
+        mems = _memory.memory(mats)
+    assert len(mats) == len(mems) + 2
     gen = mats[1] - mats[0] + sum(mems)
     return np.concatenate([linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]])
 
 
-def backward_coeffs(mats):
+def backward_coeffs(mats, mems=None):
     """
     Solve a backward-in-time problem for projection coefficients.
 
@@ -921,6 +1020,11 @@ def backward_coeffs(mats):
     mats : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float
         Sequence of correlation matrices at equally-spaced lag times,
         starting at a lag time of zero.
+    mems : sequence of (n_basis, n_basis) {ndarray, sparse matrix} of float, optional
+        Sequence of memory matrices at equally-spaced lag times (with
+        the same spacing as `mats`), starting at a lag time of zero.
+        Must satisfy ``len(mems) = len(mats) - 2``. If `None`, compute
+        `mems` from `mats`.
 
     Returns
     -------
@@ -928,7 +1032,9 @@ def backward_coeffs(mats):
         Projection coefficients.
 
     """
-    mems = _memory.memory(mats)
+    if mems is None:
+        mems = _memory.memory(mats)
+    assert len(mats) == len(mems) + 2
     gen = linalg.solve(mats[0], mats[1] - mats[0] + sum(mems))
     return linalg.solve(
         mats[0].T,

@@ -73,7 +73,7 @@ def forward_kernel(w, d_f, f_f, g_f, lag):
 @nb.njit
 def backward_kernel(w, d_b, f_b, g_b, lag):
     """
-    Correlation matrix kernel for backcasting.
+    Correlation matrix kernel for aftcasting.
 
     Parameters
     ----------
@@ -93,7 +93,7 @@ def backward_kernel(w, d_b, f_b, g_b, lag):
     Returns
     -------
     (2, 2, n_frames-lag) ndarray of float
-        Correlation matrix kernel for computing backcast correlation
+        Correlation matrix kernel for computing aftcast correlation
         matrices.
 
     """
@@ -130,21 +130,19 @@ def reweight_integral_kernel(w, v, lag):
 
     Returns
     -------
-    (2, 2, n_frames-lag) ndarray of float
+    (1, 1, n_frames-lag) ndarray of float
         Correlation matrix for computing ``reweight_integral_matrix``.
 
     """
     _check_lag(w, lag)
     if lag == 0:
-        k = np.zeros((len(w), 2, 2))
-        k[:, 0, 0] = 1.0
-        k[:, 1, 1] = 1.0
+        k = np.zeros((len(w), 1, 1))
     else:
         k = np.zeros((len(w) - 1, 2, 2))
         k[:, 0, 0] = 1.0
         k[:, 0, 1] = v
         k[:, 1, 1] = 1.0
-        k = moving_semigroup(k, lag, mm2)
+        k = moving_semigroup(k, lag, mm2)[:1, 1:]
     return _kernel(k, w, lag)
 
 
@@ -178,24 +176,22 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
 
     Returns
     -------
-    (3, 3, n_frames-lag) ndarray of float
+    (1, 2, n_frames-lag) ndarray of float
         Correlation matrix for computing correlation matrices for
         ergodic averages involving forecasts.
 
     """
     _check_lag(w, lag)
     if lag == 0:
-        k = np.zeros((len(w), 3, 3))
-        k[:, 0, 0] = 1.0
-        forward_identity(d_f, out=k[:, 1:, 1:])
+        k = np.zeros((len(w), 1, 2))
     else:
         k = np.zeros((len(w) - 1, 3, 3))
         k[:, 0, 0] = 1.0
         observable(k[:, :1, 1:], v)
         forward_boundary(k[:, :1, 1:], d_f, g_f)
         forward_transitions(d_f, f_f, g_f, out=k[:, 1:, 1:])
-        k = moving_semigroup(k, lag, mm3)
-    forward_guess(k[:, :, 1:], g_f, lag)
+        k = moving_semigroup(k, lag, mm3)[:1, 1:]
+        forward_guess(k, g_f, lag)
     return _kernel(k, w, lag)
 
 
@@ -203,9 +199,9 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
 def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
     r"""
     Correlation matrix kernel for computing ergodic averages involving
-    backcasts.
+    aftcasts.
 
-    For the backcast :math:`u_-`, the average computed is
+    For the aftcast :math:`u_-`, the average computed is
     :math:`\langle u_-(X_t) v(X_t,X_{t+1}) \rangle`.
 
     Parameters
@@ -223,30 +219,28 @@ def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
         Function to integrate. Note that this is defined at each *step*,
         not at each frame.
     g_b : (n_frames,) ndarray of float
-        Guess of the backcast, with the correct boundary conditions.
+        Guess of the aftcast, with the correct boundary conditions.
     lag : int
         Lag time, in units of frames.
 
     Returns
     -------
-    (3, 3, n_frames-lag) ndarray of float
+    (2, 1, n_frames-lag) ndarray of float
         Correlation matrix for computing correlation matrices for
-        ergodic averages involving backcasts.
+        ergodic averages involving aftcasts.
 
     """
     _check_lag(w, lag)
     if lag == 0:
-        k = np.zeros((len(w), 3, 3))
-        backward_identity(d_b, out=k[:, :2, :2])
-        k[:, 2, 2] = 1.0
+        k = np.zeros((len(w), 2, 1))
     else:
         k = np.zeros((len(w) - 1, 3, 3))
         backward_transitions(d_b, f_b, g_b, out=k[:, :2, :2])
         observable(k[:, :2, 2:], v)
         backward_boundary(k[:, :2, 2:], d_b, g_b)
         k[:, 2, 2] = 1.0
-        k = moving_semigroup(k, lag, mm3)
-    backward_guess(k[:, :2, :], g_b, lag)
+        k = moving_semigroup(k, lag, mm3)[:2, 2:]
+        backward_guess(k, g_b, lag)
     return _kernel(k, w, lag)
 
 
@@ -254,9 +248,9 @@ def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
 def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
     r"""
     Correlation matrix kernel for computing ergodic averages involving
-    both forecasts and backcasts.
+    both forecasts and aftcasts.
 
-    For the forecast :math:`u_+` and the backcast :math:`u_-`, the
+    For the forecast :math:`u_+` and the aftcast :math:`u_-`, the
     average computed is :math:`\langle u_-(X_t) v(X_t,X_{t+1}) \rangle`.
 
     Parameters
@@ -265,7 +259,7 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
         Weight of each frame. Note that the last `lag` frames must have
         zero weight.
     d_b : (n_frames,) ndarray of bool
-        For the backcast, whether each frame is in the domain.
+        For the aftcast, whether each frame is in the domain.
     d_f : (n_frames,) ndarray of bool
         For the forecast, whether each frame is in the domain.
     v : (n_frames-1,) ndarray of float
@@ -273,13 +267,13 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
         this is defined at each *step*, not at each frame, so ``v[t]``
         is a function of frames ``t`` and ``t+1``.
     f_b : (n_frames-1,) ndarray of float
-        Function to integrate for the backcast. Note that this is
+        Function to integrate for the aftcast. Note that this is
         defined at each *step*, not at each frame.
     f_f : (n_frames-1,) ndarray of float
         Function to integrate for the forecast. Note that this is
         defined at each *step*, not at each frame.
     g_b : (n_frames,) ndarray of float
-        Guess of the backcast, with the correct boundary conditions.
+        Guess of the aftcast, with the correct boundary conditions.
     g_f : (n_frames,) ndarray of float
         Guess of the forecast, with the correct boundary conditions.
     lag : int
@@ -287,16 +281,14 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
 
     Returns
     -------
-    (4, 4, n_frames-lag) ndarray of float
+    (2, 2, n_frames-lag) ndarray of float
         Correlation matrix for computing correlation matrices for
-        ergodic averages involving forecasts and backcasts.
+        ergodic averages involving forecasts and aftcasts.
 
     """
     _check_lag(w, lag)
     if lag == 0:
-        k = np.zeros((len(w), 4, 4))
-        backward_identity(d_b, out=k[:, :2, :2])
-        forward_identity(d_f, out=k[:, 2:, 2:])
+        k = np.zeros((len(w), 2, 2))
     else:
         k = np.zeros((len(w) - 1, 4, 4))
         backward_transitions(d_b, f_b, g_b, out=k[:, :2, :2])
@@ -304,9 +296,9 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
         backward_boundary(k[:, :2, 2:], d_b, g_b)
         forward_boundary(k[:, :2, 2:], d_f, g_f)
         forward_transitions(d_f, f_f, g_f, out=k[:, 2:, 2:])
-        k = moving_semigroup(k, lag, mm4)
-    backward_guess(k[:, :2, :], g_b, lag)
-    forward_guess(k[:, :, 2:], g_f, lag)
+        k = moving_semigroup(k, lag, mm4)[:2, 2:]
+        backward_guess(k, g_b, lag)
+        forward_guess(k, g_f, lag)
     return _kernel(k, w, lag)
 
 
@@ -394,7 +386,7 @@ def forward_transitions(d_f, f_f, g_f, out=None):
 @nb.njit
 def backward_identity(d_b, out=None):
     r"""
-    Identity element of the backcast kernel semigroup.
+    Identity element of the aftcast kernel semigroup.
 
     For frame `t`, this is ::
 
@@ -414,7 +406,7 @@ def backward_identity(d_b, out=None):
     Returns
     -------
     (n_frames, 2, 2) ndarray of float
-        Identity element of the backcast kernel semigroup at each frame.
+        Identity element of the aftcast kernel semigroup at each frame.
 
     """
     n = len(d_b)
@@ -430,7 +422,7 @@ def backward_identity(d_b, out=None):
 @nb.njit
 def backward_transitions(d_b, f_b, g_b, out=None):
     r"""
-    Single-step transition, from the backcast kernel semigroup.
+    Single-step transition, from the aftcast kernel semigroup.
 
     For step `t`, this is ::
 
@@ -528,7 +520,7 @@ def forward_boundary(k, d_f, g_f):
 @nb.njit
 def backward_boundary(k, d_b, g_b):
     """
-    Apply the backcast boundary condition to an observable in-place.
+    Apply the aftcast boundary condition to an observable in-place.
 
     This is equivalent to ``k[t] = m[t] @ k[t]``, where ::
 
@@ -587,7 +579,7 @@ def forward_guess(k, g_f, lag):
 @nb.njit
 def backward_guess(k, g_b, lag):
     """
-    Apply the guess function to a backcast kernel in-place.
+    Apply the guess function to a aftcast kernel in-place.
 
     This is equivalent to ``k[t] = m[t] @ k[t]``, where ::
 
