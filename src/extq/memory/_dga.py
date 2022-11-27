@@ -37,9 +37,10 @@ def reweight(basis, weights, lag, mem=0, test=None):
         Estimate of the invariant distribution.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(_matrix.reweight_matrix(basis, weights, t, test=test))
+    mats = [
+        _matrix.reweight_matrix(basis, weights, t, test=test)
+        for t in _memlags(lag, mem)
+    ]
     return _reweight(mats, basis, weights)
 
 
@@ -105,13 +106,12 @@ def forward_committor(basis, weights, in_domain, guess, lag, mem=0, test=None):
         Estimate of the committor.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.forward_committor_matrix(
-                basis, weights, in_domain, guess, t, test=test
-            )
+    mats = [
+        _matrix.forward_committor_matrix(
+            basis, weights, in_domain, guess, t, test=test
         )
+        for t in _memlags(lag, mem)
+    ]
     return _forward(mats, basis, in_domain, guess)
 
 
@@ -150,13 +150,12 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, mem=0, test=None):
         Estimate of the MFPT.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.forward_mfpt_matrix(
-                basis, weights, in_domain, guess, t, test=test
-            )
+    mats = [
+        _matrix.forward_mfpt_matrix(
+            basis, weights, in_domain, guess, t, test=test
         )
+        for t in _memlags(lag, mem)
+    ]
     return _forward(mats, basis, in_domain, guess)
 
 
@@ -200,13 +199,12 @@ def forward_feynman_kac(
         Estimate of the solution.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.forward_feynman_kac_matrix(
-                basis, weights, in_domain, function, guess, t, test=test
-            )
+    mats = [
+        _matrix.forward_feynman_kac_matrix(
+            basis, weights, in_domain, function, guess, t, test=test
         )
+        for t in _memlags(lag, mem)
+    ]
     return _forward(mats, basis, in_domain, guess)
 
 
@@ -291,20 +289,19 @@ def backward_committor(
         Estimate of the committor.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.backward_committor_matrix(
-                w_basis,
-                basis,
-                weights,
-                in_domain,
-                guess,
-                t,
-                w_test=w_test,
-                test=test,
-            )
+    mats = [
+        _matrix.backward_committor_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _backward(mats, w_basis, basis, in_domain, guess)
 
 
@@ -360,20 +357,19 @@ def backward_mfpt(
         Estimate of the MFPT.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.backward_mfpt_matrix(
-                w_basis,
-                basis,
-                weights,
-                in_domain,
-                guess,
-                t,
-                w_test=w_test,
-                test=test,
-            )
+    mats = [
+        _matrix.backward_mfpt_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _backward(mats, w_basis, basis, in_domain, guess)
 
 
@@ -433,21 +429,20 @@ def backward_feynman_kac(
         Estimate of the solution.
 
     """
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.backward_feynman_kac_matrix(
-                w_basis,
-                basis,
-                weights,
-                in_domain,
-                function,
-                guess,
-                t,
-                w_test=w_test,
-                test=test,
-            )
+    mats = [
+        _matrix.backward_feynman_kac_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            function,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _backward(mats, w_basis, basis, in_domain, guess)
 
 
@@ -485,13 +480,10 @@ def _backward(mats, w_basis, basis, in_domain, guess):
 
 
 def reweight_integral(basis, weights, values, lag, mem=0, test=None):
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.reweight_integral_matrix(
-                basis, weights, values, t, test=test
-            )
-        )
+    mats = [
+        _matrix.reweight_integral_matrix(basis, weights, values, t, test=test)
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -507,21 +499,20 @@ def forward_committor_integral(
     w_test=None,
     test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.forward_committor_integral_matrix(
-                w_basis,
-                basis,
-                weights,
-                in_domain,
-                values,
-                guess,
-                t,
-                w_test=w_test,
-                test=test,
-            )
+    mats = [
+        _matrix.forward_committor_integral_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            values,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -537,21 +528,20 @@ def forward_mfpt_integral(
     w_test=None,
     test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.forward_mfpt_integral_matrix(
-                w_basis,
-                basis,
-                weights,
-                in_domain,
-                values,
-                guess,
-                t,
-                w_test=w_test,
-                test=test,
-            )
+    mats = [
+        _matrix.forward_mfpt_integral_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            values,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -568,22 +558,21 @@ def forward_feynman_kac_integral(
     w_test=None,
     test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.forward_feynman_kac_integral_matrix(
-                w_basis,
-                basis,
-                weights,
-                in_domain,
-                values,
-                function,
-                guess,
-                t,
-                w_test=w_test,
-                test=test,
-            )
+    mats = [
+        _matrix.forward_feynman_kac_integral_matrix(
+            w_basis,
+            basis,
+            weights,
+            in_domain,
+            values,
+            function,
+            guess,
+            t,
+            w_test=w_test,
+            test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -599,8 +588,7 @@ def backward_committor_integral(
     w_test=None,
     test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
+    mats = [
         _matrix.backward_committor_integral_matrix(
             w_basis,
             basis,
@@ -612,6 +600,8 @@ def backward_committor_integral(
             w_test=w_test,
             test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -627,8 +617,7 @@ def backward_mfpt_integral(
     w_test=None,
     test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
+    mats = [
         _matrix.backward_mfpt_integral_matrix(
             w_basis,
             basis,
@@ -640,6 +629,8 @@ def backward_mfpt_integral(
             w_test=w_test,
             test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -656,8 +647,7 @@ def backward_feynman_kac_integral(
     w_test=None,
     test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
+    mats = [
         _matrix.backward_feynman_kac_integral_matrix(
             w_basis,
             basis,
@@ -670,6 +660,8 @@ def backward_feynman_kac_integral(
             w_test=w_test,
             test=test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -688,24 +680,23 @@ def tpt_integral(
     b_test=None,
     f_test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.tpt_integral_matrix(
-                w_basis,
-                b_basis,
-                f_basis,
-                weights,
-                in_domain,
-                values,
-                b_guess,
-                f_guess,
-                t,
-                w_test=w_test,
-                b_test=b_test,
-                f_test=f_test,
-            )
+    mats = [
+        _matrix.tpt_integral_matrix(
+            w_basis,
+            b_basis,
+            f_basis,
+            weights,
+            in_domain,
+            values,
+            b_guess,
+            f_guess,
+            t,
+            w_test=w_test,
+            b_test=b_test,
+            f_test=f_test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
@@ -727,27 +718,26 @@ def integral(
     b_test=None,
     f_test=None,
 ):
-    mats = []
-    for t in _memlags(lag, mem):
-        mats.append(
-            _matrix.integral_matrix(
-                w_basis,
-                b_basis,
-                f_basis,
-                weights,
-                b_domain,
-                f_domain,
-                values,
-                b_function,
-                f_function,
-                b_guess,
-                f_guess,
-                t,
-                w_test=w_test,
-                b_test=b_test,
-                f_test=f_test,
-            )
+    mats = [
+        _matrix.integral_matrix(
+            w_basis,
+            b_basis,
+            f_basis,
+            weights,
+            b_domain,
+            f_domain,
+            values,
+            b_function,
+            f_function,
+            b_guess,
+            f_guess,
+            t,
+            w_test=w_test,
+            b_test=b_test,
+            f_test=f_test,
         )
+        for t in _memlags(lag, mem)
+    ]
     return _integral(mats, lag, mem)
 
 
