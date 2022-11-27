@@ -62,11 +62,11 @@ def forward_kernel(w, d_f, f_f, g_f, lag):
     """
     _check_lag(w, lag)
     if lag == 0:
-        k = forward_identity(d_f)
+        k = forward_identity(d_f, g_f)
     else:
         k = forward_transitions(d_f, f_f, g_f)
         k = moving_semigroup(k, lag, mm2)
-    forward_guess(k, g_f, lag)
+    forward_guess(k, d_f, g_f, lag)
     return _kernel(k, w, lag)
 
 
@@ -99,11 +99,11 @@ def backward_kernel(w, d_b, f_b, g_b, lag):
     """
     _check_lag(w, lag)
     if lag == 0:
-        k = backward_identity(d_b)
+        k = backward_identity(d_b, g_b)
     else:
         k = backward_transitions(d_b, f_b, g_b)
         k = moving_semigroup(k, lag, mm2)
-    backward_guess(k, g_b, lag)
+    backward_guess(k, d_b, g_b, lag)
     return _kernel(k, w, lag)
 
 
@@ -188,10 +188,9 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
         k = np.zeros((len(w) - 1, 3, 3))
         k[:, 0, 0] = 1.0
         observable(k[:, :1, 1:], v)
-        forward_boundary(k[:, :1, 1:], d_f, g_f)
         forward_transitions(d_f, f_f, g_f, out=k[:, 1:, 1:])
         k = moving_semigroup(k, lag, mm3)[:1, 1:]
-        forward_guess(k, g_f, lag)
+        forward_guess(k, d_f, g_f, lag)
     return _kernel(k, w, lag)
 
 
@@ -237,10 +236,9 @@ def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
         k = np.zeros((len(w) - 1, 3, 3))
         backward_transitions(d_b, f_b, g_b, out=k[:, :2, :2])
         observable(k[:, :2, 2:], v)
-        backward_boundary(k[:, :2, 2:], d_b, g_b)
         k[:, 2, 2] = 1.0
         k = moving_semigroup(k, lag, mm3)[:2, 2:]
-        backward_guess(k, g_b, lag)
+        backward_guess(k, d_b, g_b, lag)
     return _kernel(k, w, lag)
 
 
@@ -293,32 +291,34 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
         k = np.zeros((len(w) - 1, 4, 4))
         backward_transitions(d_b, f_b, g_b, out=k[:, :2, :2])
         observable(k[:, :2, 2:], v)
-        backward_boundary(k[:, :2, 2:], d_b, g_b)
-        forward_boundary(k[:, :2, 2:], d_f, g_f)
         forward_transitions(d_f, f_f, g_f, out=k[:, 2:, 2:])
         k = moving_semigroup(k, lag, mm4)[:2, 2:]
-        backward_guess(k, g_b, lag)
-        forward_guess(k, g_f, lag)
+        backward_guess(k, d_b, g_b, lag)
+        forward_guess(k, d_f, g_f, lag)
     return _kernel(k, w, lag)
 
 
 @nb.njit
-def forward_identity(d_f, out=None):
+def forward_identity(d_f, g_f, out=None):
     r"""
     Identity element of the forecast kernel semigroup.
 
     For frame `t`, this is ::
 
-        k[t] = [[ d_f[t], 0 ],
-                [      0, 1 ]]
+        k[t] = [[ d_f[t], b_f[t] ],
+                [      0,      1 ]]
 
-    Note that this is a projection matrix because the domain is
-    restricted to :math:`D \times \Omega`.
+    where ``b_f = ~d_f * g_f``.
+
+    Note that this is a projection matrix because the forecast is
+    restricted to an affine subspace.
 
     Parameters
     ----------
     d_f : (n_frames,) ndarray of bool
         Whether each frame is in the domain.
+    g_f : (n_frames,) ndarray of float
+        Guess of the solution, with the correct boundary conditions.
     out : (n_frames, 2, 2) ndarray of float, optional
         Array to which the output is written.
 
@@ -334,6 +334,8 @@ def forward_identity(d_f, out=None):
     for t in range(n):
         if d_f[t]:
             out[t, 0, 0] = 1.0
+        else:
+            out[t, 0, 1] = g_f[t]
         out[t, 1, 1] = 1.0
     return out
 
@@ -345,8 +347,10 @@ def forward_transitions(d_f, f_f, g_f, out=None):
 
     For step `t`, this is ::
 
-        k[t] = [[ d_f[t]*d_f[t+1], d_f[t]*(~d_f[t+1]*g_f[t+1]+f_f[t]) ],
-                [               0,                                  1 ]]
+        k[t] = [[ d_f[t]*d_f[t+1], b_f[t] + d_f[t]*(b_f[t+1]+f_f[t]) ],
+                [               0,                                 1 ]]
+
+    where ``b_f = ~d_f * g_f``.
 
     Parameters
     ----------
@@ -379,27 +383,33 @@ def forward_transitions(d_f, f_f, g_f, out=None):
                 out[t, 0, 1] = f_f[t]
             else:
                 out[t, 0, 1] = g_f[t + 1] + f_f[t]
+        else:
+            out[t, 0, 1] = g_f[t]
         out[t, 1, 1] = 1.0
     return out
 
 
 @nb.njit
-def backward_identity(d_b, out=None):
+def backward_identity(d_b, g_b, out=None):
     r"""
     Identity element of the aftcast kernel semigroup.
 
     For frame `t`, this is ::
 
-        k[t] = [[ 1,      0 ],
+        k[t] = [[ 1, b_b[t] ],
                 [ 0, d_b[t] ]]
 
-    Note that this is a projection matrix because the domain is
-    restricted to :math:`\Omega \times D`.
+    where ``b_b = ~d_b * g_b``.
+
+    Note that this is a projection matrix because the aftcast is
+    restricted to an affine subspace.
 
     Parameters
     ----------
     d_b : (n_frames,) ndarray of bool
         Whether each frame is in the domain.
+    g_b : (n_frames,) ndarray of float
+        Guess of the solution, with the correct boundary conditions.
     out : (n_frames, 2, 2) ndarray of float, optional
         Array to which the output is written.
 
@@ -416,6 +426,8 @@ def backward_identity(d_b, out=None):
         out[t, 0, 0] = 1.0
         if d_b[t]:
             out[t, 1, 1] = 1.0
+        else:
+            out[t, 0, 1] = g_b[t]
     return out
 
 
@@ -426,8 +438,10 @@ def backward_transitions(d_b, f_b, g_b, out=None):
 
     For step `t`, this is ::
 
-        k[t] = [[ 1, (~d_b[t]*g_b[t]+f_b[t+1])*d_b[t+1] ],
-                [ 0,                    d_b[t]*d_b[t+1] ]]
+        k[t] = [[ 1, (b_b[t]+f_b[t+1])*d_b[t+1] + b_b[t+1] ],
+                [ 0,                       d_b[t]*d_b[t+1] ]]
+
+    where ``b_b = ~d_b * g_b``.
 
     Parameters
     ----------
@@ -461,6 +475,8 @@ def backward_transitions(d_b, f_b, g_b, out=None):
                 out[t, 1, 1] = 1.0
             else:
                 out[t, 0, 1] = g_b[t] + f_b[t]
+        else:
+            out[t, 0, 1] = g_b[t + 1]
     return out
 
 
@@ -486,85 +502,25 @@ def observable(k, v):
 
 
 @nb.njit
-def forward_boundary(k, d_f, g_f):
-    """
-    Apply the forecast boundary condition to an observable in-place.
-
-    This is equivalent to ``k[t] = k[t] @ m[t]``, where ::
-
-        m[t] = [[ d_f[t+1], ~d_f[t+1] * g_f[t+1] ],
-                [        0,                    1 ]]
-
-    Parameters
-    ----------
-    k : (n_frames-1, n_indices, 2) ndarray of float
-        Input kernel.
-    d_f : (n_frames,) ndarray of bool
-        Whether each frame is in the domain.
-    g_f : (n_frames,) ndarray of float
-        Guess function.
-
-    """
-    n = len(d_f)
-    ni = k.shape[1]
-    assert k.shape == (n - 1, ni, 2)
-    assert d_f.shape == (n,)
-    assert g_f.shape == (n,)
-    for t in range(n - 1):
-        if not d_f[t + 1]:
-            for i in range(ni):
-                k[t, i, 1] += k[t, i, 0] * g_f[t + 1]
-                k[t, i, 0] = 0.0
-
-
-@nb.njit
-def backward_boundary(k, d_b, g_b):
-    """
-    Apply the aftcast boundary condition to an observable in-place.
-
-    This is equivalent to ``k[t] = m[t] @ k[t]``, where ::
-
-        m[t] = [[ 1, ~d_b[t] * g_b[t] ],
-                [ 0,           d_b[t] ]]
-
-    Parameters
-    ----------
-    k : (n_frames-1, 2, n_indices) ndarray of float
-        Input kernel.
-    d_b : (n_frames,) ndarray of bool
-        Whether each frame is in the domain.
-    g_b : (n_frames,) ndarray of float
-        Guess function.
-
-    """
-    n = len(d_b)
-    nj = k.shape[2]
-    assert k.shape == (n - 1, 2, nj)
-    assert d_b.shape == (n,)
-    assert g_b.shape == (n,)
-    for t in range(n - 1):
-        if not d_b[t]:
-            for j in range(nj):
-                k[t, 0, j] += g_b[t] * k[t, 1, j]
-                k[t, 1, j] = 0.0
-
-
-@nb.njit
-def forward_guess(k, g_f, lag):
+def forward_guess(k, d_f, g_f, lag):
     """
     Apply the guess function to a forecast kernel in-place.
 
     This is equivalent to ``k[t] = k[t] @ m[t]``, where ::
 
-        m[t] = [[ 1, g_f[t+lag] ],
-                [ 0,          1 ]]
+        m[t] = [[ d_f[t+lag], g_f[t+lag] ],
+                [ 0,                   1 ]]
+
+    Note that this also applies the boundary conditions.
 
     Parameters
     ----------
     k : (n_frames-lag, n_indices, 2) ndarray of float
         Input kernel.
+    d_f : (n_frames,) ndarray of bool
+        Whether each frame is in the domain.
     g_f : (n_frames,) ndarray of float
-        Guess function.
+        Guess of the solution, with the correct boundary conditions.
 
     """
     n = len(g_f)
@@ -574,24 +530,29 @@ def forward_guess(k, g_f, lag):
     for t in range(n - lag):
         for i in range(ni):
             k[t, i, 1] += k[t, i, 0] * g_f[t + lag]
+        if not d_f[t + lag]:
+            for i in range(ni):
+                k[t, i, 0] = 0.0
 
 
 @nb.njit
-def backward_guess(k, g_b, lag):
+def backward_guess(k, d_b, g_b, lag):
     """
     Apply the guess function to a aftcast kernel in-place.
 
     This is equivalent to ``k[t] = m[t] @ k[t]``, where ::
 
         m[t] = [[ 1, g_b[t] ],
-                [ 0,      1 ]]
+                [ 0, d_b[t] ]]
 
     Parameters
     ----------
     k : (n_frames-lag, 2, n_indices) ndarray of float
         Input kernel.
+    d_b : (n_frames,) ndarray of bool
+        Whether each frame is in the domain.
     g_b : (n_frames,) ndarray of float
-        Guess function.
+        Guess of the solution, with the correct boundary conditions.
 
     """
     n = len(g_b)
@@ -601,6 +562,9 @@ def backward_guess(k, g_b, lag):
     for t in range(n - lag):
         for j in range(nj):
             k[t, 0, j] += g_b[t] * k[t, 1, j]
+        if not d_b[t]:
+            for j in range(nj):
+                k[t, 1, j] = 0.0
 
 
 @nb.njit

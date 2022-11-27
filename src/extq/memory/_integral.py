@@ -2,6 +2,7 @@ import numpy as np
 
 from .. import linalg
 from ..integral import integral_coeffs as _integral_coeffs
+from . import _dga
 from . import _kernel
 from . import _matrix
 from . import _memory
@@ -250,9 +251,7 @@ def _constant(weights):
         u[:, 0, 0] = 1.0
         u[:, 0, 1] = -1.0
 
-        m = np.ones((len(w), 1))
-
-        yield k, u, m
+        yield k, u
 
 
 def _reweight(basis, weights, lag, mem=0, test=None):
@@ -268,9 +267,7 @@ def _reweight(basis, weights, lag, mem=0, test=None):
         u = np.empty((len(w), 1, mem + 2))
         u[:, 0] = w[:, None] * (v[0] + x_w @ v[1:])
 
-        m = np.ones((len(w), 1))
-
-        yield k, u, m
+        yield k, u
 
 
 def _forward_committor(basis, weights, domain, guess, lag, mem=0, test=None):
@@ -315,15 +312,9 @@ def _forward(mats, basis, domain, function, guess):
 
         u = np.empty((len(d_f), 2, v.shape[-1]))
         u[:, 1] = v[-1]
-        u[:, 0] = np.where(
-            d_f[:, None], g_f[:, None] * u[:, 1] + y_f @ v[:-1], 0.0
-        )
+        u[:, 0] = g_f[:, None] * u[:, 1] + d_f[:, None] * (y_f @ v[:-1])
 
-        m = np.empty((len(d_f), 2))
-        m[:, 1] = np.where(d_f, 0.0, g_f)
-        m[:, 0] = np.where(d_f, 1.0, 0.0)
-
-        yield k, u, m
+        yield k, u
 
 
 def _backward_committor(
@@ -422,26 +413,14 @@ def _backward(mats, w_basis, basis, weights, domain, function, guess):
         n = x_w.shape[1] + 1
         u = np.empty((len(d_b), 2, v.shape[-1]))
         u[:, 0] = w[:, None] * (v[0] + x_w @ v[1:n])
-        u[:, 1] = np.where(
-            d_b[:, None],
-            g_b[:, None] * u[:, 0] + w[:, None] * (x_b @ v[n:]),
-            0.0,
-        )
+        u[:, 1] = g_b[:, None] * u[:, 0] + (d_b * w)[:, None] * (x_b @ v[n:])
 
-        m = np.empty((len(d_b), 2))
-        m[:, 0] = np.where(d_b, 0.0, g_b)
-        m[:, 1] = np.where(d_b, 1.0, 0.0)
-
-        yield k, u, m
+        yield k, u
 
 
 def _left_coeffs(mats):
     mems = _memory.memory(mats)
-    gen = linalg.solve(mats[0], mats[1] - mats[0] + sum(mems))
-    coeffs = np.concatenate(
-        [[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])]
-    )
-    coeffs = linalg.solve(mats[0].T, coeffs)
+    coeffs = _dga.backward_coeffs(mats, mems)
     neginv = -linalg.inv(mats[0])
     v = np.empty((len(coeffs), len(mems) + 2))
     v[:, 0] = coeffs
@@ -453,10 +432,7 @@ def _left_coeffs(mats):
 
 def _right_coeffs(mats):
     mems = _memory.memory(mats)
-    gen = mats[1] - mats[0] + sum(mems)
-    coeffs = np.concatenate(
-        [linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]]
-    )
+    coeffs = _dga.forward_coeffs(mats, mems)
     neginv = -linalg.inv(mats[0])
     v = np.empty((len(coeffs), len(mems) + 2))
     v[:, 0] = coeffs
@@ -470,15 +446,15 @@ def _combine(left, right, obslag, lag, mem=0):
     assert obslag in [0, 1]
     dlag = lag // (mem + 1)
     out = []
-    for (k_b, u_b, m_b), (k_f, u_f, m_f) in zip(left, right):
+    for (k_b, u_b), (k_f, u_f) in zip(left, right):
         a = _integral_memory_coeffs(k_b, k_f, u_b, u_f, lag, mem=mem)
         if obslag == 0:
             c = np.zeros(len(a) + 1)
-            c[:-1] += np.einsum("tik,ti,tj,tjk->t", a, m_b[:-1], m_f[:-1], k_f)
-            c[1:] += np.einsum("tik,tij,tj,tk->t", a, k_b, m_b[1:], m_f[1:])
+            c[:-1] += np.einsum("tik,tjk->tij", a, k_f)[:, -1, 0]
+            c[1:] += np.einsum("tkj,tki->tij", a, k_b)[:, -1, 0]
             c /= 2.0 * dlag
         else:
-            c = np.einsum("tij,ti,tj->t", a, m_b[:-1], m_f[1:]) / dlag
+            c = a[:, -1, 0] / dlag
         out.append(c)
     return out
 
