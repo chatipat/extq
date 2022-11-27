@@ -1,3 +1,5 @@
+"""Correlation matrices for DGA."""
+
 import numpy as np
 
 from . import _kernel
@@ -5,6 +7,29 @@ from ._tlcc import wtlcc_dense as _build
 
 
 def reweight_matrix(basis, weights, lag, test=None):
+    """
+    Compute the correlation matrix for the invariant distribution.
+
+    Parameters
+    ----------
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the invariant distribution. The span of
+        `basis` must *not* contain the constant function.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    lag : int
+        Lag time in units of frames.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error. Must have the
+        same dimension as `basis`. If `None`, use `basis`.
+
+    Returns
+    -------
+    (1 + n_basis, 1 + n_basis) ndarray of float
+        Correlation matrix.
+
+    """
     if test is None:
         test = basis
     mat = None
@@ -14,22 +39,32 @@ def reweight_matrix(basis, weights, lag, test=None):
 
 
 def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
-    """Compute correlation matrix for forward committors.
+    """
+    Compute the correlation matrix for the forward committor.
 
     Parameters
     ----------
-    basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
-        Basis functions; must satisfy boundary conditions
-    weights, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
-        Weight, guess for committor at each frame in trajectories
-    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
-        Whether each frame is in the domain (A U B)^c
-    test : optional
-        Test basis functions; if not specified, will use the same as the right basis
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the committor. Must be zero outside of the
+        domain.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    in_domain : sequence of (n_frames[i],) ndarray of bool
+        Whether each frame is in the domain.
+    guess : sequence of (n_frames[i],) ndarray of float
+        Guess for the committor. Must satisfy boundary conditions.
+    lag : int
+        Lag time in units of frames.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error. Must have the
+        same dimension as `basis`. If `None`, use `basis`.
 
     Returns
     -------
-    ndarray (n_basis + 1, n_basis + 1) of float
+    (n_basis + 1, n_basis + 1) ndarray of float
+        Correlation matrix.
+
     """
     if test is None:
         test = basis
@@ -40,8 +75,34 @@ def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
 
 
 def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
-    """Compute correlation matrix for (forward) mean first passage time."""
+    """
+    Compute the correlation matrix for the forward mean first passage
+    time (MFPT).
 
+    Parameters
+    ----------
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the MFPT. Must be zero outside of the
+        domain.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    in_domain : sequence of (n_frames[i],) ndarray of bool
+        Whether each frame is in the domain.
+    guess : sequence of (n_frames[i],) ndarray of float
+        Guess for the MFPT. Must satisfy boundary conditions.
+    lag : int
+        Lag time in units of frames.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error. Must have the
+        same dimension as `basis`. If `None`, use `basis`.
+
+    Returns
+    -------
+    (n_basis + 1, n_basis + 1) ndarray of float
+        Correlation matrix.
+
+    """
     if test is None:
         test = basis
     mat = None
@@ -53,24 +114,36 @@ def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
 def forward_feynman_kac_matrix(
     basis, weights, in_domain, function, guess, lag, test=None
 ):
-    """Compute correlation matrix for forward Feynman-Kac problem.
+    """
+    Compute the correlation matrix for the forward Feynman-Kac problem.
 
     Parameters
     ----------
-    basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
-        Basis functions; must satisfy boundary conditions
-    weights, function, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
-        Weight, function to integrate, guess for committor at each frame in trajectories
-    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
-        Whether each frame is in the domain (A U B)^c
-    test : optional
-        Test basis functions; if not specified, will use the same as the right basis
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the solution. Must be zero outside of the
+        domain.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    in_domain : sequence of (n_frames[i],) ndarray of bool
+        Whether each frame is in the domain.
+    function : sequence of (n_frames[i] - 1,) ndarray of float
+        Function to integrate. This is defined over *transitions*, not
+        frames.
+    guess : sequence of (n_frames[i],) ndarray of float
+        Guess for the solution. Must satisfy boundary conditions.
+    lag : int
+        Lag time in units of frames.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error. Must have the
+        same dimension as `basis`. If `None`, use `basis`.
 
     Returns
     -------
-    ndarray (2 * n_basis + 1, 2 * n_basis + 1) of float
-    """
+    (n_basis + 1, n_basis + 1) ndarray of float
+        Correlation matrix.
 
+    """
     if test is None:
         test = basis
     mat = None
@@ -84,26 +157,40 @@ def forward_feynman_kac_matrix(
 def backward_committor_matrix(
     w_basis, basis, weights, in_domain, guess, lag, w_test=None, test=None
 ):
-    """Compute correlation matrix for backward committors.
+    """
+    Compute the correlation matrix for the backward committor.
 
     Parameters
     ----------
-    w_basis, basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
-        Basis functions to estimate reweighting factor, without boundary
-        conditions; basis functions to estimate committor, must satisfy
-        boundary conditions
-    weights, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
-        Weight, guess for committor at each frame in trajectories
-    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
-        Whether each frame is in the domain (A U B)^c
-    test : optional
-        Test basis functions; if not specified, will use the same as the right basis
+    w_basis : sequence of (n_frames[i], n_w_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the invariant distribution. The span of
+        `w_basis` must *not* contain the constant function.
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the committor. Must be zero outside of the
+        domain.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    in_domain : sequence of (n_frames[i],) ndarray of bool
+        Whether each frame is in the domain.
+    guess : sequence of (n_frames[i],) ndarray of float
+        Guess for the committor. Must satisfy boundary conditions.
+    lag : int
+        Lag time in units of frames.
+    w_test : sequence of (n_frames[i], n_w_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the invariant
+        distribution. Must have the same dimension as `w_basis`. If
+        `None`, use `w_basis`.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the committor.
+        Must have the same dimension as `basis`. If `None`, use `basis`.
 
     Returns
     -------
-    ndarray (2 * n_basis + 1, 2 * n_basis + 1) of float
-    """
+    (1 + n_w_basis + n_basis, 1 + n_w_basis + n_basis) ndarray of float
+        Correlation matrix.
 
+    """
     if w_test is None:
         w_test = w_basis
     if test is None:
@@ -119,7 +206,41 @@ def backward_committor_matrix(
 def backward_mfpt_matrix(
     w_basis, basis, weights, in_domain, guess, lag, w_test=None, test=None
 ):
-    """Compute correlation matrix for (backward) mean last passage time."""
+    """
+    Compute the correlation matrix for the backward mean first passage
+    time (MFPT).
+
+    Parameters
+    ----------
+    w_basis : sequence of (n_frames[i], n_w_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the invariant distribution. The span of
+        `w_basis` must *not* contain the constant function.
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the MFPT. Must be zero outside of the
+        domain.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    in_domain : sequence of (n_frames[i],) ndarray of bool
+        Whether each frame is in the domain.
+    guess : sequence of (n_frames[i],) ndarray of float
+        Guess for the MFPT. Must satisfy boundary conditions.
+    lag : int
+        Lag time in units of frames.
+    w_test : sequence of (n_frames[i], n_w_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the invariant
+        distribution. Must have the same dimension as `w_basis`. If
+        `None`, use `w_basis`.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the MFPT. Must
+        have the same dimension as `basis`. If `None`, use `basis`.
+
+    Returns
+    -------
+    (1 + n_w_basis + n_basis, 1 + n_w_basis + n_basis) ndarray of float
+        Correlation matrix.
+
+    """
     if w_test is None:
         w_test = w_basis
     if test is None:
@@ -143,22 +264,42 @@ def backward_feynman_kac_matrix(
     w_test=None,
     test=None,
 ):
-    """Parameters
+    """
+    Compute the correlation matrix for the backward Feynman-Kac problem.
+
+    Parameters
     ----------
-    w_basis, basis : array-like (n_trajs,) of ndarray (n_frames, n_basis) of float
-        Basis functions to estimate reweighting factor, without boundary
-        conditions; basis functions to estimate committor, must satisfy
-        boundary conditions
-    weights, function, guess : array-like (n_trajs,) of ndarray (n_frames,) of float
-        Weight, function to integrate, guess for committor at each frame in trajectories
-    in_domain : array-like (n_trajs,) of ndarray (n_frames,) of bool
-        Whether each frame is in the domain (A U B)^c
-    test : optional
-        Test basis functions; if not specified, will use the same as the right basis
+    w_basis : sequence of (n_frames[i], n_w_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the invariant distribution. The span of
+        `w_basis` must *not* contain the constant function.
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the solution. Must be zero outside of the
+        domain.
+    weights : sequence of (n_frames[i],) ndarray of float
+        Weight of each frame. The last `lag` frames of each trajectory
+        must be zero.
+    in_domain : sequence of (n_frames[i],) ndarray of bool
+        Whether each frame is in the domain.
+    function : sequence of (n_frames[i] - 1,) ndarray of float
+        Function to integrate. This is defined over *transitions*, not
+        frames.
+    guess : sequence of (n_frames[i],) ndarray of float
+        Guess for the solution. Must satisfy boundary conditions.
+    lag : int
+        Lag time in units of frames.
+    w_test : sequence of (n_frames[i], n_w_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the invariant
+        distribution. Must have the same dimension as `w_basis`. If
+        `None`, use `w_basis`.
+    test : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the solution.
+        Must have the same dimension as `basis`. If `None`, use `basis`.
 
     Returns
     -------
-    ndarray (2 * n_basis + 1, 2 * n_basis + 1) of float
+    (1 + n_w_basis + n_basis, 1 + n_w_basis + n_basis) ndarray of float
+        Correlation matrix.
+
     """
     if w_test is None:
         w_test = w_basis
@@ -495,17 +636,30 @@ def integral_matrix(
 
 
 def _reweight_matrix(x_w, y_w, w, lag, mat):
-    """Compute the correlation matrix for reweighting.
+    """
+    Compute the correlation matrix for the invariant distribution from a
+    single trajectory
 
     Parameters
     ----------
-    x_w, y_w : ndarray (n_frames, n_basis) of float
-        Left and right basis functions.
-    w : ndarray (n_frames,) of float
-        Initial weights for each frame
+    x_w : (n_frames, n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the invariant distribution. The span of
+        `basis` must *not* contain the constant function.
+    y_w : (n_frames, n_basis) {ndarray, sparse matrix} of float
+        Test basis against which to minimize the error.
+    w : (n_frames,) ndarray of float
+        Weight of each frame. The last `lag` frames must be zero.
     lag : int
-    mat : ndarray (2, 2) or None
-        Matrix in which to store result
+        Lag time in units of frames.
+    mat : (2, 2) ndarray of object or None
+        Matrix in which to store the result. If `None`, create a new
+        matrix.
+
+    Returns
+    -------
+    (2, 2) ndarray of object
+        Correlation matrix.
+
     """
     m = _kernel.reweight_kernel(w, lag)
     if mat is None:
@@ -520,21 +674,36 @@ def _reweight_matrix(x_w, y_w, w, lag, mat):
 
 
 def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag, mat):
-    """Compute the correlation matrix for forward-in-time statistics.
+    """
+    Compute the correlation matrix for forecasts.
 
     Parameters
     ----------
-    x_f, y_f : ndarray (n_frames, n_basis) of float
-        Left and right basis functions
-    w : ndarray (n_frames,) of float
-        Initial weights for each frame
-    d_f : ndarray (n_frames,) of bool
-        Whether each frame is in the domain
-    f_f, g_f : ndarray (n_frames,) of float
-        Function to integrate until entrance into domain, guess for statistic.
+    x_f : (n_frames, n_basis) {ndarray, sparse matrix} of float
+        Test basis against which to minimize the error.
+    y_f : (n_frames, n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the solution. Must be zero outside of the
+        domain.
+    w : (n_frames,) ndarray of float
+        Weight of each frame. The last `lag` frames must be zero.
+    d_f : (n_frames,) ndarray of bool
+        Whether each frame is in the domain.
+    f_f : (n_frames - 1,) ndarray of float
+        Function to integrate. This is defined over *transitions*, not
+        frames.
+    g_f : (n_frames,) ndarray of float
+        Guess for the solution. Must satisfy boundary conditions.
     lag : int
-    mat : ndarray (2, 2) or None
-        Matrix in which to store result
+        Lag time in units of frames.
+    mat : (2, 2) ndarray of object or None
+        Matrix in which to store the result. If `None`, create a new
+        matrix.
+
+    Returns
+    -------
+    (2, 2) ndarray of object
+        Correlation matrix.
+
     """
     f_f = np.broadcast_to(f_f, len(w) - 1)
     m = _kernel.forward_kernel(w, d_f, f_f, g_f, lag)
@@ -549,27 +718,43 @@ def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag, mat):
 
 
 def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag, mat):
-    """Compute the correlation matrix for backward-in-time statistics.
+    """
+    Compute the correlation matrix for aftcasts.
 
     Parameters
     ----------
-    x_w, y_w : ndarray (n_frames, n_basis) of float
-        Left and right basis functions for weights (do not satisfy boundary
-        conditions)
-    x_b, y_b : ndarray (n_frames, n_basis) of float
-        Left and right basis functions for statistic (must satisfy boundary
-        conditions)
-    w : ndarray (n_frames,) of float
-        Initial weights for each frame
-    d_b : ndarray (n_frames,) of bool
-        Whether each frame is in the domain
-    f_b, g_b : ndarray (n_frames,) of float
-        Function to integrate until entrance into domain, guess for statistic.
+    x_w : (n_frames, n_w_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the invariant distribution. The span of
+        `basis` must *not* contain the constant function.
+    y_w : (n_frames, n_w_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the invariant
+        distribution.
+    x_b : (n_frames, n_basis) {ndarray, sparse matrix} of float
+        Basis for estimating the solution. Must be zero outside of the
+        domain.
+    y_b : (n_frames, n_basis) {ndarray, sparse matrix} of float, optional
+        Test basis against which to minimize the error of the solution.
+    w : (n_frames,) ndarray of float
+        Weight of each frame. The last `lag` frames must be zero.
+    d_b : (n_frames,) ndarray of bool
+        Whether each frame is in the domain.
+    f_b : (n_frames - 1,) ndarray of float
+        Function to integrate. This is defined over *transitions*, not
+        frames.
+    g_b : (n_frames,) ndarray of float
+        Guess for the solution. Must satisfy boundary conditions.
     lag : int
-    mat : ndarray (3, 3) or None
-        Matrix in which to store result
-    """
+        Lag time in units of frames.
+    mat : (3, 3) ndarray of object or None
+        Matrix in which to store the result. If `None`, create a new
+        matrix.
 
+    Returns
+    -------
+    (3, 3) ndarray of object
+        Correlation matrix.
+
+    """
     f_b = np.broadcast_to(f_b, len(w) - 1)
     m = _kernel.backward_kernel(w, d_b, f_b, g_b, lag)
     if mat is None:
@@ -690,16 +875,20 @@ def _integral_matrix(
 
 
 def _bmat(blocks):
-    """Instantiate blocks into a full matrix.
+    """
+    Build a matrix from blocks.
 
     Parameters
     ----------
-    blocks : array-like of 2-D ndarray
+    blocks : 2D ndarray of {(n_rows[i], n_cols[j]) ndarray, None}
+        Array of blocks, which must have conformable dimensions. An
+        entry `None` is interpreted as a matrix of zeros.
 
     Returns
     -------
-    mat : 2-D ndarray
-        Full matrix
+    (sum(n_rows), sum(n_cols)) ndarray of float
+        Matrix built from the blocks.
+
     """
     s0, s1 = _bshape(blocks)
     si = np.cumsum(np.concatenate([[0], s0]))
@@ -713,14 +902,24 @@ def _bmat(blocks):
 
 
 def _bshape(blocks):
-    """Obtain shapes of block matrix
+    """
+    Obtain the dimensions of the blocks in an array of blocks.
+
+    Parameters
+    ----------
+    blocks : 2D ndarray of {(n_rows[i], n_cols[j]) ndarray, None}
+        Array of blocks, which must have conformable dimensions. An
+        entry `None` is interpreted as a matrix of zeros.
 
     Returns
     -------
-    (tuple of int, tuple of int)
-        Dimensions of blocks, where ith index of first tuple and the
-        jth index of the second tuple correspond to the row and column
-        dimension of the (i, j)th block
+    n_rows : tuple of int
+        Row dimensions of the blocks. `blocks[i, j]` has `n_rows[i]`
+        rows.
+    n_cols : tuple of int
+        Column dimensions of the blocks. `blocks[i, j]` has n_cols[j]`
+        columns.
+
     """
     br, bc = blocks.shape
     rows = [None] * br
