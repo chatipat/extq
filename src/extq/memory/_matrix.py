@@ -5,6 +5,25 @@ import numpy as np
 from . import _kernel
 from ._tlcc import wtlcc_dense as _build
 
+__all__ = [
+    "reweight_matrix",
+    "forward_committor_matrix",
+    "forward_mfpt_matrix",
+    "forward_feynman_kac_matrix",
+    "backward_committor_matrix",
+    "backward_mfpt_matrix",
+    "backward_feynman_kac_matrix",
+    "reweight_integral_matrix",
+    "forward_committor_integral_matrix",
+    "forward_mfpt_integral_matrix",
+    "forward_feynman_kac_integral_matrix",
+    "backward_committor_integral_matrix",
+    "backward_mfpt_integral_matrix",
+    "backward_feynman_kac_integral_matrix",
+    "tpt_integral_matrix",
+    "integral_matrix",
+]
+
 
 def reweight_matrix(basis, weights, lag, test=None):
     """

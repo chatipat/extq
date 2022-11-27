@@ -6,6 +6,18 @@ from . import _kernel
 from . import _matrix
 from . import _memory
 
+__all__ = [
+    "reweight_integral_coeffs",
+    "forward_committor_integral_coeffs",
+    "forward_mfpt_integral_coeffs",
+    "forward_feynman_kac_integral_coeffs",
+    "backward_committor_integral_coeffs",
+    "backward_mfpt_integral_coeffs",
+    "backward_feynman_kac_integral_coeffs",
+    "tpt_integral_coeffs",
+    "integral_coeffs",
+]
+
 
 def reweight_integral_coeffs(basis, weights, obslag, lag, mem=0, test=None):
     left = _reweight(basis, weights, lag, mem=mem, test=test)
@@ -425,8 +437,7 @@ def _backward(mats, w_basis, basis, weights, domain, function, guess):
 
 def _left_coeffs(mats):
     mems = _memory.memory(mats)
-    gen = _memory.generator(mats, mems)
-    gen = linalg.solve(mats[0], gen)
+    gen = linalg.solve(mats[0], mats[1] - mats[0] + sum(mems))
     coeffs = np.concatenate(
         [[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])]
     )
@@ -442,7 +453,7 @@ def _left_coeffs(mats):
 
 def _right_coeffs(mats):
     mems = _memory.memory(mats)
-    gen = _memory.generator(mats, mems)
+    gen = mats[1] - mats[0] + sum(mems)
     coeffs = np.concatenate(
         [linalg.solve(gen[:-1, :-1], -gen[:-1, -1]), [1.0]]
     )
