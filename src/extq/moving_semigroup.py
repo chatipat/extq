@@ -4,28 +4,29 @@ import numpy as np
 
 @nb.njit
 def moving_semigroup(a, k, f, *args):
-    """Calculate a moving window of an associative binary operation.
+    """
+    Calculate a moving window of an associative binary operation.
 
     Note that this function modifies the input array in-place.
 
     Parameters
     ----------
     a : (m, ...) ndarray
-        Input time series of square matrices. This array is also used
-        for the output, and must be C-contiguous.
+        Input time series. This must be at least 2D. This array is also
+        used for the output, and must be C-contiguous.
     k : int
         Size of the moving window.
     f : callable
         Associative binary operation taking two input arguments and
         one output argument. This must be Numba-compiled.
     *args
-        Additional arguments to f, if needed.
+        Additional arguments to `f`, if needed.
 
     Returns
     -------
     (m - k + 1, ...) ndarray
         Output time series. Each output point is the result of
-        k sequential input points reduced using the operation.
+        `k` sequential input points reduced using the operation.
 
     """
     assert k >= 1
@@ -63,6 +64,47 @@ def moving_semigroup(a, k, f, *args):
             f(acc[j], acc[j - 1], a[n], *args)
 
     return a[:out_len]
+
+
+@nb.njit
+def moving_matmul(a, k):
+    """
+    Calculate a moving matrix product.
+
+    Note that this function modifies the input array in-place.
+
+    Parameters
+    ----------
+    a : (m, n, n) ndarray
+        Input time series of square matrices. This array is also used
+        for the output, and must be C-contiguous.
+    k : int
+        Size of the moving window.
+
+    Returns
+    -------
+    (m - k + 1, n, n) ndarray
+        Output time series. Each output point is matrix product of `k`
+        sequential input points.
+
+    """
+    assert a.ndim == 3 and a.shape[1] == a.shape[2]
+    return moving_semigroup(a, k, _choose_mm(a.shape[1]))
+
+
+@nb.njit
+def _choose_mm(n):
+    assert n > 0
+    if n == 1:
+        return mm1
+    elif n == 2:
+        return mm2
+    elif n == 3:
+        return mm3
+    elif n == 4:
+        return mm4
+    else:
+        return np.dot
 
 
 @nb.njit(fastmath=True)
