@@ -36,6 +36,7 @@ def moving_semigroup(a, k, f, *args):
         return a
 
     out_len = a.shape[0] - k + 1
+    assert out_len >= 0
 
     # temporary arrays
     acc = np.empty((k,) + a.shape[1:], dtype=a.dtype)
