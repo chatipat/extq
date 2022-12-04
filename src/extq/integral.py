@@ -50,3 +50,51 @@ def integral_coeffs(u, kl, kr, obslag, lag, normalize=False):
     if normalize:
         out /= nint
     return out
+
+
+def integral_windows(kl, kr, obs, obslag, lag, normalize=False):
+    """
+    Compute integral-type statistics over each window.
+
+    Parameters
+    ----------
+    kl : (n_frames - 1, n_left_indices, n_left_indices) ndarray of float
+        Transition kernel for left statistic.
+    kr : (n_frames - 1, n_right_indices, n_right_indices) ndarray of float
+        Transition kernel for right statistic.
+    obs : (n_frames - obslag, n_left_indices, n_right_indices) ndarray of float
+        Transition kernel for the observable.
+    obslag : int
+        Lag time of the observable.
+    lag : int
+        Total lag time.
+    normalize : bool, optional
+        If False (default), return the integral of the observable.
+        If True, return the mean of the observable. This is the integral
+        divided by `lag - obslag + 1`.
+
+    Returns
+    -------
+    (n_frames - lag, n_left_indices, n_right_indices) ndarray of float
+        Integral (or mean) of the observable over each window.
+
+    """
+    nobs, nl, nr = obs.shape  # nobs = number of obs (n_frames - obslag)
+    nf = nobs + obslag  # number of frames (n_frames)
+    nt = nf - 1  # number of steps (n_frames - 1)
+    nint = lag - obslag + 1  # number of times over which to integrate
+    assert 0 <= obslag <= lag < nf
+    assert kl.shape == (nt, nl, nl)
+    assert kr.shape == (nt, nr, nr)
+    if lag == obslag:
+        return obs
+    m = np.zeros((nobs, nl + nr, nl + nr))
+    m[:-1, :nl, :nl] = kl[: nt - obslag]
+    m[:, :nl, nl:] = obs
+    m[1:, nl:, nl:] = kr[obslag:]
+    m = moving_matmul(m, nint)
+    assert m.shape == (nf - lag, nl + nr, nl + nr)
+    out = m[:, :nl, nl:]
+    if normalize:
+        out /= nint
+    return out
