@@ -110,12 +110,15 @@ def forward_committor_matrix(basis, weights, in_domain, guess, lag, test=None):
         Correlation matrix.
 
     """
-    if test is None:
-        test = basis
-    mat = None
-    for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess):
-        mat = _forward_matrix(x_f, y_f, w, in_d, 0.0, g, lag, mat)
-    return _bmat(mat)
+    return forward_feynman_kac_matrix(
+        basis,
+        weights,
+        in_domain,
+        np.zeros(len(weights)),
+        guess,
+        lag,
+        test=test,
+    )
 
 
 def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
@@ -147,12 +150,15 @@ def forward_mfpt_matrix(basis, weights, in_domain, guess, lag, test=None):
         Correlation matrix.
 
     """
-    if test is None:
-        test = basis
-    mat = None
-    for x_f, y_f, w, in_d, g in zip(test, basis, weights, in_domain, guess):
-        mat = _forward_matrix(x_f, y_f, w, in_d, 1.0, g, lag, mat)
-    return _bmat(mat)
+    return forward_feynman_kac_matrix(
+        basis,
+        weights,
+        in_domain,
+        np.ones(len(weights)),
+        guess,
+        lag,
+        test=test,
+    )
 
 
 def forward_feynman_kac_matrix(
@@ -235,16 +241,17 @@ def backward_committor_matrix(
         Correlation matrix.
 
     """
-    if w_test is None:
-        w_test = w_basis
-    if test is None:
-        test = basis
-    mat = None
-    for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
-        w_basis, w_test, basis, test, weights, in_domain, guess
-    ):
-        mat = _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 0.0, g_b, lag, mat)
-    return _bmat(mat)
+    return backward_feynman_kac_matrix(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        np.zeros(len(weights)),
+        guess,
+        lag,
+        w_test=w_test,
+        test=test,
+    )
 
 
 def backward_mfpt_matrix(
@@ -285,16 +292,17 @@ def backward_mfpt_matrix(
         Correlation matrix.
 
     """
-    if w_test is None:
-        w_test = w_basis
-    if test is None:
-        test = basis
-    mat = None
-    for x_w, y_w, x_b, y_b, w, in_d, g_b in zip(
-        w_basis, w_test, basis, test, weights, in_domain, guess
-    ):
-        mat = _backward_matrix(x_w, y_w, x_b, y_b, w, in_d, 1.0, g_b, lag, mat)
-    return _bmat(mat)
+    return backward_feynman_kac_matrix(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        np.ones(len(weights)),
+        guess,
+        lag,
+        w_test=w_test,
+        test=test,
+    )
 
 
 def backward_feynman_kac_matrix(
@@ -367,23 +375,31 @@ def reweight_integral_matrix(basis, weights, values, lag):
 def forward_committor_integral_matrix(
     w_basis, basis, weights, in_domain, values, guess, lag
 ):
-    mat = None
-    for x_w, y_f, w, in_d, v, g in zip(
-        w_basis, basis, weights, in_domain, values, guess
-    ):
-        mat = _forward_integral_matrix(x_w, y_f, w, in_d, v, 0.0, g, lag, mat)
-    return _bmat(mat)
+    return forward_feynman_kac_integral_matrix(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        values,
+        np.zeros(len(weights)),
+        guess,
+        lag,
+    )
 
 
 def forward_mfpt_integral_matrix(
     w_basis, basis, weights, in_domain, values, guess, lag
 ):
-    mat = None
-    for x_w, y_f, w, in_d, v, g in zip(
-        w_basis, basis, weights, in_domain, values, guess
-    ):
-        mat = _forward_integral_matrix(x_w, y_f, w, in_d, v, 1.0, g, lag, mat)
-    return _bmat(mat)
+    return forward_feynman_kac_integral_matrix(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        values,
+        np.ones(len(weights)),
+        guess,
+        lag,
+    )
 
 
 def forward_feynman_kac_integral_matrix(
@@ -400,23 +416,31 @@ def forward_feynman_kac_integral_matrix(
 def backward_committor_integral_matrix(
     w_basis, basis, weights, in_domain, values, guess, lag
 ):
-    mat = None
-    for x_w, x_b, w, in_d, v, g in zip(
-        w_basis, basis, weights, in_domain, values, guess
-    ):
-        mat = _backward_integral_matrix(x_w, x_b, w, in_d, v, 0.0, g, lag, mat)
-    return _bmat(mat)
+    return backward_feynman_kac_integral_matrix(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        values,
+        np.zeros(len(weights)),
+        guess,
+        lag,
+    )
 
 
 def backward_mfpt_integral_matrix(
     w_basis, basis, weights, in_domain, values, guess, lag
 ):
-    mat = None
-    for x_w, x_b, w, in_d, v, g in zip(
-        w_basis, basis, weights, in_domain, values, guess
-    ):
-        mat = _backward_integral_matrix(x_w, x_b, w, in_d, v, 1.0, g, lag, mat)
-    return _bmat(mat)
+    return backward_feynman_kac_integral_matrix(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        values,
+        np.ones(len(weights)),
+        guess,
+        lag,
+    )
 
 
 def backward_feynman_kac_integral_matrix(
@@ -441,14 +465,20 @@ def tpt_integral_matrix(
     f_guess,
     lag,
 ):
-    mat = None
-    for x_w, x_b, y_f, w, in_d, v, g_b, g_f in zip(
-        w_basis, b_basis, f_basis, weights, in_domain, values, b_guess, f_guess
-    ):
-        mat = _integral_matrix(
-            x_w, x_b, y_f, w, in_d, in_d, v, 0.0, 0.0, g_b, g_f, lag, mat
-        )
-    return _bmat(mat)
+    return integral_matrix(
+        w_basis,
+        b_basis,
+        f_basis,
+        weights,
+        in_domain,
+        in_domain,
+        values,
+        np.zeros(len(weights)),
+        np.zeros(len(weights)),
+        b_guess,
+        f_guess,
+        lag,
+    )
 
 
 def integral_matrix(

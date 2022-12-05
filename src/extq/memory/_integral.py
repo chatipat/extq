@@ -30,7 +30,7 @@ def forward_committor_integral_coeffs(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     guess,
     obslag,
     lag,
@@ -38,18 +38,26 @@ def forward_committor_integral_coeffs(
     w_test=None,
     test=None,
 ):
-    left = _reweight(w_basis, weights, lag, mem=mem, test=w_test)
-    right = _forward_committor(
-        basis, weights, domain, guess, lag, mem=mem, test=test
+    return forward_feynman_kac_integral_coeffs(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        np.zeros(len(weights)),
+        guess,
+        obslag,
+        lag,
+        mem=mem,
+        w_test=w_test,
+        test=test,
     )
-    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def forward_mfpt_integral_coeffs(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     guess,
     obslag,
     lag,
@@ -57,18 +65,26 @@ def forward_mfpt_integral_coeffs(
     w_test=None,
     test=None,
 ):
-    left = _reweight(w_basis, weights, lag, mem=mem, test=w_test)
-    right = _forward_mfpt(
-        basis, weights, domain, guess, lag, mem=mem, test=test
+    return forward_feynman_kac_integral_coeffs(
+        w_basis,
+        basis,
+        weights,
+        in_domain,
+        np.ones(len(weights)),
+        guess,
+        obslag,
+        lag,
+        mem=mem,
+        w_test=w_test,
+        test=test,
     )
-    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def forward_feynman_kac_integral_coeffs(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     function,
     guess,
     obslag,
@@ -79,7 +95,7 @@ def forward_feynman_kac_integral_coeffs(
 ):
     left = _reweight(w_basis, weights, lag, mem=mem, test=w_test)
     right = _forward_feynman_kac(
-        basis, weights, domain, function, guess, lag, mem=mem, test=test
+        basis, weights, in_domain, function, guess, lag, mem=mem, test=test
     )
     return _combine(left, right, obslag, lag, mem=mem)
 
@@ -88,7 +104,7 @@ def backward_committor_integral_coeffs(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     guess,
     obslag,
     lag,
@@ -96,26 +112,26 @@ def backward_committor_integral_coeffs(
     w_test=None,
     test=None,
 ):
-    left = _backward_committor(
+    return backward_feynman_kac_integral_coeffs(
         w_basis,
         basis,
         weights,
-        domain,
+        in_domain,
+        np.zeros(len(weights)),
         guess,
+        obslag,
         lag,
         mem=mem,
         w_test=w_test,
         test=test,
     )
-    right = _constant(weights)
-    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def backward_mfpt_integral_coeffs(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     guess,
     obslag,
     lag,
@@ -123,26 +139,26 @@ def backward_mfpt_integral_coeffs(
     w_test=None,
     test=None,
 ):
-    left = _backward_mfpt(
+    return backward_feynman_kac_integral_coeffs(
         w_basis,
         basis,
         weights,
-        domain,
+        in_domain,
+        np.ones(len(weights)),
         guess,
+        obslag,
         lag,
         mem=mem,
         w_test=w_test,
         test=test,
     )
-    right = _constant(weights)
-    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def backward_feynman_kac_integral_coeffs(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     function,
     guess,
     obslag,
@@ -155,7 +171,7 @@ def backward_feynman_kac_integral_coeffs(
         w_basis,
         basis,
         weights,
-        domain,
+        in_domain,
         function,
         guess,
         lag,
@@ -172,7 +188,7 @@ def tpt_integral_coeffs(
     b_basis,
     f_basis,
     weights,
-    domain,
+    in_domain,
     b_guess,
     f_guess,
     obslag,
@@ -182,21 +198,24 @@ def tpt_integral_coeffs(
     b_test=None,
     f_test=None,
 ):
-    left = _backward_committor(
+    return integral_coeffs(
         w_basis,
         b_basis,
+        f_basis,
         weights,
-        domain,
+        in_domain,
+        in_domain,
+        np.zeros(len(weights)),
+        np.zeros(len(weights)),
         b_guess,
+        f_guess,
+        obslag,
         lag,
         mem=mem,
         w_test=w_test,
-        test=b_test,
+        b_test=b_test,
+        f_test=f_test,
     )
-    right = _forward_committor(
-        f_basis, weights, domain, f_guess, lag, mem=mem, test=f_test
-    )
-    return _combine(left, right, obslag, lag, mem=mem)
 
 
 def integral_coeffs(
@@ -270,43 +289,22 @@ def _reweight(basis, weights, lag, mem=0, test=None):
         yield k, u
 
 
-def _forward_committor(basis, weights, domain, guess, lag, mem=0, test=None):
-    mats = [
-        _matrix.forward_committor_matrix(
-            basis, weights, domain, guess, t, test=test
-        )
-        for t in _memlags(lag, mem)
-    ]
-    function = [np.zeros(len(w) - 1) for w in weights]
-    return _forward(mats, basis, domain, function, guess)
-
-
-def _forward_mfpt(basis, weights, domain, guess, lag, mem=0, test=None):
-    mats = [
-        _matrix.forward_committor_matrix(
-            basis, weights, domain, guess, t, test=test
-        )
-        for t in _memlags(lag, mem)
-    ]
-    function = [np.ones(len(w) - 1) for w in weights]
-    return _forward(mats, basis, domain, function, guess)
-
-
 def _forward_feynman_kac(
-    basis, weights, domain, function, guess, lag, mem=0, test=None
+    basis, weights, in_domain, function, guess, lag, mem=0, test=None
 ):
     mats = [
         _matrix.forward_feynman_kac_matrix(
-            basis, weights, domain, function, guess, t, test=test
+            basis, weights, in_domain, function, guess, t, test=test
         )
         for t in _memlags(lag, mem)
     ]
-    return _forward(mats, basis, domain, function, guess)
+    return _forward(mats, basis, in_domain, function, guess)
 
 
-def _forward(mats, basis, domain, function, guess):
+def _forward(mats, basis, in_domain, function, guess):
     v = _right_coeffs(mats)
-    for y_f, d_f, f_f, g_f in zip(basis, domain, function, guess):
+    for y_f, d_f, f_f, g_f in zip(basis, in_domain, function, guess):
+        f_f = np.broadcast_to(f_f, len(d_f) - 1)
 
         k = _kernel.forward_transitions(d_f, f_f, g_f)
 
@@ -317,67 +315,11 @@ def _forward(mats, basis, domain, function, guess):
         yield k, u
 
 
-def _backward_committor(
-    w_basis,
-    basis,
-    weights,
-    domain,
-    guess,
-    lag,
-    mem=0,
-    w_test=None,
-    test=None,
-):
-    mats = [
-        _matrix.backward_committor_matrix(
-            w_basis,
-            basis,
-            weights,
-            domain,
-            guess,
-            t,
-            w_test=w_test,
-            test=test,
-        )
-        for t in _memlags(lag, mem)
-    ]
-    function = [np.zeros(len(w) - 1) for w in weights]
-    return _backward(mats, w_basis, basis, weights, domain, function, guess)
-
-
-def _backward_mfpt(
-    w_basis,
-    basis,
-    weights,
-    domain,
-    guess,
-    lag,
-    mem=0,
-    w_test=None,
-    test=None,
-):
-    mats = [
-        _matrix.backward_mfpt_matrix(
-            w_basis,
-            basis,
-            weights,
-            domain,
-            guess,
-            t,
-            w_test=w_test,
-            test=test,
-        )
-        for t in _memlags(lag, mem)
-    ]
-    function = [np.ones(len(w) - 1) for w in weights]
-    return _backward(mats, w_basis, basis, weights, domain, function, guess)
-
-
 def _backward_feynman_kac(
     w_basis,
     basis,
     weights,
-    domain,
+    in_domain,
     function,
     guess,
     lag,
@@ -390,7 +332,7 @@ def _backward_feynman_kac(
             w_basis,
             basis,
             weights,
-            domain,
+            in_domain,
             function,
             guess,
             t,
@@ -399,14 +341,15 @@ def _backward_feynman_kac(
         )
         for t in _memlags(lag, mem)
     ]
-    return _backward(mats, w_basis, basis, weights, domain, function, guess)
+    return _backward(mats, w_basis, basis, weights, in_domain, function, guess)
 
 
-def _backward(mats, w_basis, basis, weights, domain, function, guess):
+def _backward(mats, w_basis, basis, weights, in_domain, function, guess):
     v = _left_coeffs(mats)
     for x_w, x_b, w, d_b, f_b, g_b in zip(
-        w_basis, basis, weights, domain, function, guess
+        w_basis, basis, weights, in_domain, function, guess
     ):
+        f_b = np.broadcast_to(f_b, len(d_b) - 1)
 
         k = _kernel.backward_transitions(d_b, f_b, g_b)
 
