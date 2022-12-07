@@ -1,9 +1,7 @@
 import numpy as np
 
 from .. import linalg
-from ..stop import backward_integrate
 from ..stop import backward_stop
-from ..stop import forward_integrate
 from ..stop import forward_stop
 from ._utils import transform
 
@@ -231,8 +229,8 @@ def forward_feynman_kac(
         assert np.all(w[-lag:] == 0.0)
         iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
         assert np.all(iy < len(d))
-        intf = forward_integrate(d, f)
-        integral = intf[:-lag] - intf[iy]
+        intf = np.concatenate([np.zeros(1), np.cumsum(f)])
+        integral = intf[iy] - intf[:-lag]
         wx = linalg.scale_rows(w[:-lag], x[:-lag])
         a += wx.T @ (y[iy] - y[:-lag])
         b -= wx.T @ (g[iy] - g[:-lag] + integral)
@@ -283,7 +281,7 @@ def backward_feynman_kac(
         assert np.all(w[-lag:] == 0.0)
         iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
         assert np.all(iy >= 0)
-        intf = backward_integrate(d, f)
+        intf = np.concatenate([np.zeros(1), np.cumsum(f)])
         integral = intf[lag:] - intf[iy]
         wx = linalg.scale_rows(w[:-lag], x[lag:])
         a += wx.T @ (y[iy] - y[lag:])
