@@ -306,7 +306,7 @@ def _forward(mats, basis, in_domain, function, guess):
     for y_f, d_f, f_f, g_f in zip(basis, in_domain, function, guess):
         f_f = np.broadcast_to(f_f, len(d_f) - 1)
 
-        k = _kernel.forward_transitions(d_f, f_f, g_f)
+        k = _kernel.forward_transitions(d_f, f_f, g_f, 1)
 
         u = np.empty((len(d_f), 2, v.shape[-1]))
         u[:, 1] = v[-1]
@@ -351,7 +351,7 @@ def _backward(mats, w_basis, basis, weights, in_domain, function, guess):
     ):
         f_b = np.broadcast_to(f_b, len(d_b) - 1)
 
-        k = _kernel.backward_transitions(d_b, f_b, g_b)
+        k = _kernel.backward_transitions(d_b, f_b, g_b, 1)
 
         n = x_w.shape[1] + 1
         u = np.empty((len(d_b), 2, v.shape[-1]))

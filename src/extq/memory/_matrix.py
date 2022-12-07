@@ -615,7 +615,6 @@ def _forward_matrix(x_f, y_f, w, d_f, f_f, g_f, lag, mat):
         Correlation matrix.
 
     """
-    f_f = np.broadcast_to(f_f, len(w) - 1)
     m = _kernel.forward_kernel(w, d_f, f_f, g_f, lag)
     if mat is None:
         mat = np.full((2, 2), None)
@@ -665,7 +664,6 @@ def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag, mat):
         Correlation matrix.
 
     """
-    f_b = np.broadcast_to(f_b, len(w) - 1)
     m = _kernel.backward_kernel(w, d_b, f_b, g_b, lag)
     if mat is None:
         mat = np.full((3, 3), None)
@@ -693,7 +691,6 @@ def _reweight_integral_matrix(x_w, w, v, lag, mat):
 
 
 def _forward_integral_matrix(x_w, y_f, w, d_f, v, f_f, g_f, lag, mat):
-    f_f = np.broadcast_to(f_f, len(w) - 1)
     m = _kernel.forward_integral_kernel(w, d_f, v, f_f, g_f, lag)
     if mat is None:
         mat = np.full((2, 2), None)
@@ -707,7 +704,6 @@ def _forward_integral_matrix(x_w, y_f, w, d_f, v, f_f, g_f, lag, mat):
 
 
 def _backward_integral_matrix(x_w, x_b, w, d_b, v, f_b, g_b, lag, mat):
-    f_b = np.broadcast_to(f_b, len(w) - 1)
     m = _kernel.backward_integral_kernel(w, d_b, v, f_b, g_b, lag)
     if mat is None:
         mat = np.full((3, 1), None)
@@ -722,8 +718,6 @@ def _backward_integral_matrix(x_w, x_b, w, d_b, v, f_b, g_b, lag, mat):
 def _integral_matrix(
     x_w, x_b, y_f, w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag, mat
 ):
-    f_b = np.broadcast_to(f_b, len(w) - 1)
-    f_f = np.broadcast_to(f_f, len(w) - 1)
     m = _kernel.integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag)
     if mat is None:
         mat = np.full((3, 2), None)
