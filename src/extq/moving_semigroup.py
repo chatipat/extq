@@ -67,7 +67,6 @@ def moving_semigroup(a, k, f, *args):
     return a[:out_len]
 
 
-@nb.njit
 def moving_matmul(a, k):
     """
     Calculate a moving matrix product.
@@ -93,7 +92,6 @@ def moving_matmul(a, k):
     return moving_semigroup(a, k, _choose_mm(a.shape[1]))
 
 
-@nb.njit
 def _choose_mm(n):
     assert n > 0
     if n == 1:
@@ -105,7 +103,12 @@ def _choose_mm(n):
     elif n == 4:
         return mm4
     else:
-        return np.dot
+        return mm
+
+
+@nb.njit(fastmath=True)
+def mm(a, b, c):
+    np.dot(a, b, c)
 
 
 @nb.njit(fastmath=True)
