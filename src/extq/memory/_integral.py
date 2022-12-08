@@ -262,15 +262,14 @@ def integral_coeffs(
 
 
 def _constant(weights):
+    out = []
     for w in weights:
-
-        k = np.ones((len(w) - 1, 1, 1))
-
+        k = _kernel.constant_transitions(len(w), 1)
         u = np.empty((len(w), 1, 2))
         u[:, 0, 0] = 1.0
         u[:, 0, 1] = -1.0
-
-        yield k, u
+        out.append((k, u))
+    return out
 
 
 def _reweight(basis, weights, lag, mem=0, test=None):
@@ -279,14 +278,13 @@ def _reweight(basis, weights, lag, mem=0, test=None):
         for t in _memlags(lag, mem)
     ]
     v = _left_coeffs(mats)
+    out = []
     for x_w, w in zip(basis, weights):
-
-        k = np.ones((len(w) - 1, 1, 1))
-
+        k = _kernel.constant_transitions(len(w), 1)
         u = np.empty((len(w), 1, mem + 2))
         u[:, 0] = w[:, None] * (v[-1] + x_w @ v[:-1])
-
-        yield k, u
+        out.append((k, u))
+    return out
 
 
 def _forward_feynman_kac(
@@ -303,16 +301,14 @@ def _forward_feynman_kac(
 
 def _forward(mats, basis, in_domain, function, guess):
     v = _right_coeffs(mats)
+    out = []
     for y_f, d_f, f_f, g_f in zip(basis, in_domain, function, guess):
-        f_f = np.broadcast_to(f_f, len(d_f) - 1)
-
         k = _kernel.forward_transitions(d_f, f_f, g_f, 1)
-
         u = np.empty((len(d_f), 2, v.shape[-1]))
         u[:, 1] = v[-1]
         u[:, 0] = g_f[:, None] * u[:, 1] + d_f[:, None] * (y_f @ v[:-1])
-
-        yield k, u
+        out.append((k, u))
+    return out
 
 
 def _backward_feynman_kac(
@@ -346,19 +342,17 @@ def _backward_feynman_kac(
 
 def _backward(mats, w_basis, basis, weights, in_domain, function, guess):
     v = _left_coeffs(mats)
+    out = []
     for x_w, x_b, w, d_b, f_b, g_b in zip(
         w_basis, basis, weights, in_domain, function, guess
     ):
-        f_b = np.broadcast_to(f_b, len(d_b) - 1)
-
         k = _kernel.backward_transitions(d_b, f_b, g_b, 1)
-
         n = x_b.shape[1]
         u = np.empty((len(d_b), 2, v.shape[-1]))
         u[:, 0] = w[:, None] * (v[-1] + x_w @ v[n:-1])
         u[:, 1] = g_b[:, None] * u[:, 0] + (d_b * w)[:, None] * (x_b @ v[:n])
-
-        yield k, u
+        out.append((k, u))
+    return out
 
 
 def _left_coeffs(mats):
@@ -387,31 +381,39 @@ def _right_coeffs(mats):
 
 def _combine(left, right, obslag, lag, mem=0):
     assert obslag in [0, 1]
+    assert lag > 0
+    assert mem >= 0
+    assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
     out = []
     for (k_b, u_b), (k_f, u_f) in zip(left, right):
-        a = _integral_memory_coeffs(k_b, k_f, u_b, u_f, lag, mem=mem)
+        nf, ni, nk = u_b.shape
+        _, nj, nl = u_f.shape
+        assert u_b.shape == (nf, ni, nk)
+        assert u_f.shape == (nf, nj, nl)
+        assert k_b.shape == (nf - 1, ni, ni)
+        assert k_f.shape == (nf - 1, nj, nj)
+        assert nf > lag
+        end = nf - lag
+        a = np.zeros((nf - 1, ni, nj))
+        u_f_sum = np.cumsum(u_f, axis=-1)
+        for n in range(mem + 1):
+            s = (n + 1) * dlag
+            kend = end + s - 1
+            # u[t,i,j] = sum_{k+l <= mem-n} u_b[t,i,k] * u_f[t+s,j,l]
+            u = np.zeros((end, ni, nj))
+            for k in range(min(mem - n, nk - 1) + 1):
+                u += (
+                    u_b[:end, :, None, k]
+                    * u_f_sum[s : end + s, None, :, min(mem - n - k, nl - 1)]
+                )
+            a[:kend] += _integral_coeffs(u, k_b[:kend], k_f[:kend], 1, s)
         if obslag == 0:
-            c = np.zeros(len(a) + 1)
-            c[:-1] += np.einsum("tik,tjk->tij", a, k_f)[:, 0, 0]
-            c[1:] += np.einsum("tkj,tki->tij", a, k_b)[:, 0, 0]
-            c /= 2.0 * dlag
-        else:
-            c = a[:, 0, 0] / dlag
-        out.append(c)
-    return out
-
-
-def _integral_memory_coeffs(k_b, k_f, u_b, u_f, lag, mem=0):
-    dlag = lag // (mem + 1)
-    out = 0.0
-    for n in range(mem + 1):
-        s = (n + 1) * dlag
-        k = np.arange(u_b.shape[-1])
-        l = np.arange(u_f.shape[-1])
-        mask = (k[:, None] + l[None, :] <= mem - n).astype(float)
-        c = np.einsum("kl,tik,tjl->tij", mask, u_b[:-s], u_f[s:])
-        out += _integral_coeffs(c, k_b, k_f, 1, s)
+            c = np.zeros((nf, ni, nj))
+            c[:-1] += a @ np.swapaxes(k_f, 1, 2)
+            c[1:] += np.swapaxes(k_b, 1, 2) @ a
+            a = 0.5 * c
+        out.append(a[:, 0, 0] / dlag)
     return out
 
 

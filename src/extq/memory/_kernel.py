@@ -29,7 +29,7 @@ def reweight_kernel(w, lag):
     return _kernel(k, w, lag)
 
 
-def forward_kernel(w, d_f, f_f, g_f, lag):
+def forward_kernel(w, d, f, g, lag):
     """
     Correlation matrix kernel for forecasting.
 
@@ -38,12 +38,12 @@ def forward_kernel(w, d_f, f_f, g_f, lag):
     w : (n_frames,) ndarray of float
         Weight of each frame. Note that the last `lag` frames must have
         zero weight.
-    d_f : (n_frames,) ndarray of bool
+    d : (n_frames,) ndarray of bool
         Whether each frame is in the domain.
-    f_f : (n_frames-1,) ndarray of float
+    f : (n_frames-1,) ndarray of float
         Function to integrate. Note that this is defined at each *step*,
         not at each frame.
-    g_f : (n_frames,) ndarray of float
+    g : (n_frames,) ndarray of float
         Guess of the solution, with the correct boundary conditions.
     lag : int
         Lag time, in units of frames.
@@ -55,15 +55,27 @@ def forward_kernel(w, d_f, f_f, g_f, lag):
         matrices.
 
     """
+    n = len(d)
+    f = np.broadcast_to(f, n - 1)
+    assert n >= lag
+    assert d.shape == (n,)
+    assert f.shape == (n - 1,)
+    assert g.shape == (n,)
+    k = np.zeros((n - lag, 2, 2))
     if lag == 0:
-        k = forward_guess(d_f, g_f)
+        k[:, 0, 0] = d
+        k[:, 0, 1] = d * g
+        k[:, 1, 1] = 1.0
     else:
-        k = forward_transitions(d_f, f_f, g_f, lag)
-        k = k @ forward_guess(d_f, g_f)[lag:]
+        stop = np.minimum(np.arange(lag, n), forward_stop(d)[:-lag])
+        intf = np.insert(np.cumsum(f), 0, 0.0)
+        k[:, 0, 0] = d[stop]
+        k[:, 0, 1] = d[:-lag] * (g[stop] + (intf[stop] - intf[:-lag]))
+        k[:, 1, 1] = 1.0
     return _kernel(k, w, lag)
 
 
-def backward_kernel(w, d_b, f_b, g_b, lag):
+def backward_kernel(w, d, f, g, lag):
     """
     Correlation matrix kernel for aftcasting.
 
@@ -72,12 +84,12 @@ def backward_kernel(w, d_b, f_b, g_b, lag):
     w : (n_frames,) ndarray of float
         Weight of each frame. Note that the last `lag` frames must have
         zero weight.
-    d_b : (n_frames,) ndarray of bool
+    d : (n_frames,) ndarray of bool
         Whether each frame is in the domain.
-    f_b : (n_frames-1,) ndarray of float
+    f : (n_frames-1,) ndarray of float
         Function to integrate. Note that this is defined at each *step*,
         not at each frame.
-    g_b : (n_frames,) ndarray of float
+    g : (n_frames,) ndarray of float
         Guess of the solution, with the correct boundary conditions.
     lag : int
         Lag time, in units of frames.
@@ -89,11 +101,23 @@ def backward_kernel(w, d_b, f_b, g_b, lag):
         matrices.
 
     """
+    n = len(d)
+    f = np.broadcast_to(f, n - 1)
+    assert n >= lag
+    assert d.shape == (n,)
+    assert f.shape == (n - 1,)
+    assert g.shape == (n,)
+    k = np.zeros((n - lag, 2, 2))
     if lag == 0:
-        k = backward_guess(d_b, g_b)
+        k[:, 0, 0] = d
+        k[:, 1, 0] = d * g
+        k[:, 1, 1] = 1.0
     else:
-        k = backward_transitions(d_b, f_b, g_b, lag)
-        k = backward_guess(d_b, g_b)[:-lag] @ k
+        stop = np.maximum(np.arange(n - lag), backward_stop(d)[lag:])
+        intf = np.insert(np.cumsum(f), 0, 0.0)
+        k[:, 0, 0] = d[stop]
+        k[:, 1, 0] = d[lag:] * (g[stop] + (intf[lag:] - intf[stop]))
+        k[:, 1, 1] = 1.0
     return _kernel(k, w, lag)
 
 
