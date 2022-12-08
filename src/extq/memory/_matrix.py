@@ -70,7 +70,7 @@ def reweight_matrix(basis, weights, lag, test=None):
 
     Returns
     -------
-    (1 + n_basis, 1 + n_basis) ndarray of float
+    (n_basis + 1, n_basis + 1) ndarray of float
         Correlation matrix.
 
     """
@@ -237,7 +237,7 @@ def backward_committor_matrix(
 
     Returns
     -------
-    (1 + n_w_basis + n_basis, 1 + n_w_basis + n_basis) ndarray of float
+    (n_basis + n_w_basis + 1, n_basis + n_w_basis + 1) ndarray of float
         Correlation matrix.
 
     """
@@ -288,7 +288,7 @@ def backward_mfpt_matrix(
 
     Returns
     -------
-    (1 + n_w_basis + n_basis, 1 + n_w_basis + n_basis) ndarray of float
+    (n_basis + n_w_basis + 1, n_basis + n_w_basis + 1) ndarray of float
         Correlation matrix.
 
     """
@@ -349,7 +349,7 @@ def backward_feynman_kac_matrix(
 
     Returns
     -------
-    (1 + n_w_basis + n_basis, 1 + n_w_basis + n_basis) ndarray of float
+    (n_basis + n_w_basis + 1, n_basis + n_w_basis + 1) ndarray of float
         Correlation matrix.
 
     """
@@ -575,10 +575,10 @@ def _reweight_matrix(x_w, y_w, w, lag, mat):
     if mat is None:
         mat = np.full((2, 2), None)
     # fmt: off
-    mat[0, 0] = _build(m[0, 0], None, None, mat[0, 0], lag)
-    mat[0, 1] = _build(m[0, 0], None, y_w , mat[0, 1], lag)
-    mat[1, 0] = _build(m[0, 0], x_w , None, mat[1, 0], lag)
-    mat[1, 1] = _build(m[0, 0], x_w , y_w , mat[1, 1], lag)
+    mat[0, 0] = _build(m[0, 0], x_w , y_w , mat[0, 0], lag)
+    mat[0, 1] = _build(m[0, 0], x_w , None, mat[0, 1], lag)
+    mat[1, 0] = _build(m[0, 0], None, y_w , mat[1, 0], lag)
+    mat[1, 1] = _build(m[0, 0], None, None, mat[1, 1], lag)
     # fmt: on
     return mat
 
@@ -668,13 +668,13 @@ def _backward_matrix(x_w, y_w, x_b, y_b, w, d_b, f_b, g_b, lag, mat):
     if mat is None:
         mat = np.full((3, 3), None)
     # fmt: off
-    mat[0, 0] = _build(m[0, 0], None, None, mat[0, 0], lag)
-    mat[0, 1] = _build(m[0, 0], None, y_w , mat[0, 1], lag)
-    mat[0, 2] = _build(m[0, 1], None, y_b , mat[0, 2], lag)
-    mat[1, 0] = _build(m[0, 0], x_w , None, mat[1, 0], lag)
-    mat[1, 1] = _build(m[0, 0], x_w , y_w , mat[1, 1], lag)
-    mat[1, 2] = _build(m[0, 1], x_w , y_b , mat[1, 2], lag)
-    mat[2, 2] = _build(m[1, 1], x_b , y_b , mat[2, 2], lag)
+    mat[0, 0] = _build(m[0, 0], x_b , y_b , mat[0, 0], lag)
+    mat[1, 0] = _build(m[1, 0], x_w , y_b , mat[1, 0], lag)
+    mat[1, 1] = _build(m[1, 1], x_w , y_w , mat[1, 1], lag)
+    mat[1, 2] = _build(m[1, 1], x_w , None, mat[1, 2], lag)
+    mat[2, 0] = _build(m[1, 0], None, y_b , mat[2, 0], lag)
+    mat[2, 1] = _build(m[1, 1], None, y_w , mat[2, 1], lag)
+    mat[2, 2] = _build(m[1, 1], None, None, mat[2, 2], lag)
     # fmt: on
     return mat
 
@@ -684,8 +684,8 @@ def _reweight_integral_matrix(x_w, w, v, lag, mat):
     if mat is None:
         mat = np.full((2, 1), None)
     # fmt: off
-    mat[0, 0] = _build(m[0, 0], None, None, mat[0, 0], lag)
-    mat[1, 0] = _build(m[0, 0], x_w , None, mat[1, 0], lag)
+    mat[0, 0] = _build(m[0, 0], x_w , None, mat[0, 0], lag)
+    mat[1, 0] = _build(m[0, 0], None, None, mat[1, 0], lag)
     # fmt: on
     return mat
 
@@ -695,10 +695,10 @@ def _forward_integral_matrix(x_w, y_f, w, d_f, v, f_f, g_f, lag, mat):
     if mat is None:
         mat = np.full((2, 2), None)
     # fmt: off
-    mat[0, 0] = _build(m[0, 0], None, y_f , mat[0, 0], lag)
-    mat[0, 1] = _build(m[0, 1], None, None, mat[0, 1], lag)
-    mat[1, 0] = _build(m[0, 0], x_w , y_f , mat[1, 0], lag)
-    mat[1, 1] = _build(m[0, 1], x_w , None, mat[1, 1], lag)
+    mat[0, 0] = _build(m[0, 0], x_w , y_f , mat[0, 0], lag)
+    mat[0, 1] = _build(m[0, 1], x_w , None, mat[0, 1], lag)
+    mat[1, 0] = _build(m[0, 0], None, y_f , mat[1, 0], lag)
+    mat[1, 1] = _build(m[0, 1], None, None, mat[1, 1], lag)
     # fmt: on
     return mat
 
@@ -708,9 +708,9 @@ def _backward_integral_matrix(x_w, x_b, w, d_b, v, f_b, g_b, lag, mat):
     if mat is None:
         mat = np.full((3, 1), None)
     # fmt: off
-    mat[0, 0] = _build(m[0, 0], None, None, mat[0, 0], lag)
-    mat[1, 0] = _build(m[0, 0], x_w , None, mat[1, 0], lag)
-    mat[2, 0] = _build(m[1, 0], x_b , None, mat[2, 0], lag)
+    mat[0, 0] = _build(m[0, 0], x_b , None, mat[0, 0], lag)
+    mat[1, 0] = _build(m[1, 0], x_w , None, mat[1, 0], lag)
+    mat[2, 0] = _build(m[1, 0], None, None, mat[2, 0], lag)
     # fmt: on
     return mat
 
@@ -722,12 +722,12 @@ def _integral_matrix(
     if mat is None:
         mat = np.full((3, 2), None)
     # fmt: off
-    mat[0, 0] = _build(m[0, 0], None, y_f , mat[0, 0], lag)
-    mat[0, 1] = _build(m[0, 1], None, None, mat[0, 1], lag)
-    mat[1, 0] = _build(m[0, 0], x_w , y_f , mat[1, 0], lag)
-    mat[1, 1] = _build(m[0, 1], x_w , None, mat[1, 1], lag)
-    mat[2, 0] = _build(m[1, 0], x_b , y_f , mat[2, 0], lag)
-    mat[2, 1] = _build(m[1, 1], x_b , None, mat[2, 1], lag)
+    mat[0, 0] = _build(m[0, 0], x_b , y_f , mat[0, 0], lag)
+    mat[0, 1] = _build(m[0, 1], x_b , None, mat[0, 1], lag)
+    mat[1, 0] = _build(m[1, 0], x_w , y_f , mat[1, 0], lag)
+    mat[1, 1] = _build(m[1, 1], x_w , None, mat[1, 1], lag)
+    mat[2, 0] = _build(m[1, 0], None, y_f , mat[2, 0], lag)
+    mat[2, 1] = _build(m[1, 1], None, None, mat[2, 1], lag)
     # fmt: on
     return mat
 

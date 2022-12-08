@@ -364,15 +364,15 @@ def backward_transitions(d, f, g, lag):
 
     The element for the transition `t` to `t+lag` is ::
 
-        k[t] = [[ 1, b[s] + sum(f[s:t+lag]) ],
-                [ 0,                   d[s] ]]
+        k[t] = [[                   d[s], 0 ],
+                [ b[s] + sum(f[s:t+lag]), 1 ]]
 
     where ``b = ~d * g`` and ``s = t + max(0, lag-argmin(~d[t::-1]))``.
 
     Note that the identity element (``lag == 0``) is ::
 
-        k[t] = [[ 1, b[t] ],
-                [ 0, d[t] ]]
+        k[t] = [[ d[t], 0 ],
+                [ b[t], 1 ]]
 
     which is a projection matrix because the aftcast is restricted to
     an affine subspace.
@@ -405,15 +405,15 @@ def backward_transitions(d, f, g, lag):
     b = np.where(d, 0.0, g)
     k = np.zeros((n - lag, 2, 2))
     if lag == 0:
-        k[:, 0, 0] = 1.0
-        k[:, 0, 1] = b
-        k[:, 1, 1] = d
+        k[:, 0, 0] = d
+        k[:, 1, 0] = b
+        k[:, 1, 1] = 1.0
     else:
         stop = np.maximum(np.arange(n - lag), backward_stop(d)[lag:])
         intf = np.insert(np.cumsum(f), 0, 0.0)
-        k[:, 0, 0] = 1.0
-        k[:, 0, 1] = b[stop] + (intf[lag:] - intf[stop])
-        k[:, 1, 1] = d[stop]
+        k[:, 0, 0] = d[stop]
+        k[:, 1, 0] = b[stop] + (intf[lag:] - intf[stop])
+        k[:, 1, 1] = 1.0
     return k
 
 
@@ -438,7 +438,7 @@ def observable(v, n_left_indices, n_right_indices):
 
     """
     out = np.zeros((len(v), n_left_indices, n_right_indices))
-    out[:, -1, 0] = v
+    out[:, 0, 0] = v
     return out
 
 
@@ -483,8 +483,8 @@ def backward_guess(d, g):
 
     This is ::
 
-        m[t] = [[ 1, g[t] ],
-                [ 0, d[t] ]]
+        m[t] = [[ d[t], 0 ],
+                [ g[t], 1 ]]
 
     Note that this also applies the boundary conditions.
 
@@ -506,9 +506,9 @@ def backward_guess(d, g):
     assert d.shape == (n,)
     assert g.shape == (n,)
     out = np.zeros((n, 2, 2))
-    out[:, 0, 0] = 1.0
-    out[:, 0, 1] = g
-    out[:, 1, 1] = d
+    out[:, 0, 0] = d
+    out[:, 1, 0] = g
+    out[:, 1, 1] = 1.0
     return out
 
 

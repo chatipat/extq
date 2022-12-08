@@ -764,7 +764,7 @@ def reweight_transform(coeffs, basis, weights):
     """
     result = []
     for x_w, w in zip(basis, weights):
-        result.append(w * (coeffs[0] + x_w @ coeffs[1:]))
+        result.append(w * (coeffs[-1] + x_w @ coeffs[:-1]))
     return result
 
 
@@ -884,9 +884,9 @@ def aftcast_transform(coeffs, w_basis, basis, in_domain, guess):
     """
     result = []
     for x_w, x_b, d_b, g_b in zip(w_basis, basis, in_domain, guess):
-        n = x_w.shape[1] + 1
-        com = coeffs[0] + x_w @ coeffs[1:n]
-        result.append(g_b + np.where(d_b, x_b @ coeffs[n:], 0.0) / com)
+        n = x_b.shape[1]
+        com = coeffs[-1] + x_w @ coeffs[n:-1]
+        result.append(g_b + np.where(d_b, x_b @ coeffs[:n], 0.0) / com)
     return result
 
 
@@ -1000,7 +1000,9 @@ def backward_coeffs(mats, mems=None):
     gen = linalg.solve(mats[0], mats[1] - mats[0] + sum(mems))
     return linalg.solve(
         mats[0].T,
-        np.concatenate([[1.0], linalg.solve(gen.T[1:, 1:], -gen.T[1:, 0])]),
+        np.concatenate(
+            [linalg.solve(gen.T[:-1, :-1], -gen.T[:-1, -1]), [1.0]]
+        ),
     )
 
 
