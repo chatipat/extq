@@ -349,8 +349,8 @@ def _backward(mats, w_basis, basis, weights, in_domain, function, guess):
         k = _kernel.backward_transitions(d_b, f_b, g_b, 1)
         n = x_b.shape[1]
         u = np.empty((len(d_b), 2, v.shape[-1]))
-        u[:, 0] = w[:, None] * (v[-1] + x_w @ v[n:-1])
-        u[:, 1] = g_b[:, None] * u[:, 0] + (d_b * w)[:, None] * (x_b @ v[:n])
+        u[:, 1] = w[:, None] * (v[-1] + x_w @ v[n:-1])
+        u[:, 0] = g_b[:, None] * u[:, 1] + (d_b * w)[:, None] * (x_b @ v[:n])
         out.append((k, u))
     return out
 
