@@ -296,10 +296,6 @@ def _forward_feynman_kac(
         )
         for t in _memlags(lag, mem)
     ]
-    return _forward(mats, basis, in_domain, function, guess)
-
-
-def _forward(mats, basis, in_domain, function, guess):
     v = _right_coeffs(mats)
     out = []
     for y_f, d_f, f_f, g_f in zip(basis, in_domain, function, guess):
@@ -337,10 +333,6 @@ def _backward_feynman_kac(
         )
         for t in _memlags(lag, mem)
     ]
-    return _backward(mats, w_basis, basis, weights, in_domain, function, guess)
-
-
-def _backward(mats, w_basis, basis, weights, in_domain, function, guess):
     v = _left_coeffs(mats)
     out = []
     for x_w, x_b, w, d_b, f_b, g_b in zip(
