@@ -18,6 +18,14 @@ def solve(a, b):
         return scipy.linalg.solve(a, b)
 
 
+def factorized(a):
+    if scipy.sparse.issparse(a):
+        return scipy.sparse.linalg.factorized(a)
+    else:
+        lu, piv = scipy.linalg.lu_factor(a)
+        return lambda b: scipy.linalg.lu_solve((lu, piv), b)
+
+
 def scale_rows(a, b):
     if scipy.sparse.issparse(b):
         if isinstance(b, scipy.sparse.csr_matrix):
