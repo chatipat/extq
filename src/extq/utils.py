@@ -62,7 +62,7 @@ def shift_weights(weights, lag, maxlag):
     return result
 
 
-def splatter_weights(weights, lag, maxlag):
+def distribute_weights(weights, lag, maxlag):
     """Uniformly distribute weights for length maxlag short trajectories
     to length lag short trajectories.
 
