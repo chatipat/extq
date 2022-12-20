@@ -15,7 +15,9 @@ __all__ = [
 ]
 
 
-def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
+def reweight(
+    basis, lag, maxlag=None, guess=None, test_basis=None, normalize=True
+):
     """Estimate the change of measure to the invariant distribution.
 
     Parameters
@@ -37,6 +39,8 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
         same dimension as the basis used to estimate the change of
         measure. If None, use the basis that is used to estimate the
         change of measure.
+    normalize : bool, optional
+        If True (default), normalize output to one.
 
     Returns
     -------
@@ -64,7 +68,12 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None):
         a += wdx.T @ y[:-lag]
         b -= np.ravel(wdx.sum(axis=0))
     coeffs = linalg.solve(a, b)
-    return [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess)]
+    out = [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess)]
+    if normalize:
+        wsum = sum(np.sum(w) for w in out)
+        for w in out:
+            w /= wsum
+    return out
 
 
 def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):

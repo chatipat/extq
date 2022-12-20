@@ -203,7 +203,9 @@ def reweight(generator):
     return weights
 
 
-def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
+def rate(
+    generator, forward_q, backward_q, weights, rxn_coords=None, normalize=True
+):
     """Compute the TPT rate.
 
     Parameters
@@ -214,12 +216,14 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
         Forward committor at each point.
     backward_q : (M,) ndarray of float
         Backward committor at each point.
-    weights : (M,) ndarray of float.
+    weights : (M,) ndarray of float
         Change of measure at each point.
     rxn_coords : (M,) ndarray of float, optional
         Reaction coordinate at each point. This must be zero in the
         reactant state and one in the product state. If None, estimate
         the rate without using a reaction coordinate.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -239,15 +243,18 @@ def rate(generator, forward_q, backward_q, weights, rxn_coords=None):
     qp = forward_q.ravel()
 
     if rxn_coords is None:
-        return pi_qm @ generator @ qp
+        out = pi_qm @ generator @ qp
     else:
         rxn_coords = np.asarray(rxn_coords)
         assert rxn_coords.shape == shape
         h = rxn_coords.ravel()
-        return pi_qm @ (generator @ (qp * h) - h * (generator @ qp))
+        out = pi_qm @ (generator @ (qp * h) - h * (generator @ qp))
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
-def current(generator, forward_q, backward_q, weights, cv):
+def current(generator, forward_q, backward_q, weights, cv, normalize=True):
     """Compute the reactive current at each point.
 
     Parameters
@@ -262,6 +269,8 @@ def current(generator, forward_q, backward_q, weights, cv):
         Change of measure at each point.
     cv : (M,) ndarray of float
         Collective variable at each point.
+    normalize : bool
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -285,11 +294,15 @@ def current(generator, forward_q, backward_q, weights, cv):
 
     forward_flux = pi_qm * (generator @ (qp * h) - h * (generator @ qp))
     backward_flux = ((pi_qm * h) @ generator - (pi_qm @ generator) * h) * qp
-    result = 0.5 * (forward_flux - backward_flux)
-    return result.reshape(shape)
+    out = 0.5 * (forward_flux - backward_flux)
+    if normalize:
+        out /= np.sum(weights)
+    return out.reshape(shape)
 
 
-def integral(generator, forward_q, backward_q, weights, ks, kt):
+def integral(
+    generator, forward_q, backward_q, weights, ks, kt, normalize=True
+):
     """Integrate a TPT objective function over the reaction ensemble.
 
     Parameter
@@ -306,6 +319,8 @@ def integral(generator, forward_q, backward_q, weights, ks, kt):
         Spatial part of the integrand of the objective function.
     kt : (M,) ndarray of float
         Temporal part of the integrand of the objective function.
+    normalize : bool
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -327,10 +342,15 @@ def integral(generator, forward_q, backward_q, weights, ks, kt):
     qp = forward_q.ravel()
     gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
 
-    return pi_qm @ gen @ qp
+    out = pi_qm @ gen @ qp
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
-def pointwise_integral(generator, forward_q, backward_q, weights, ks, kt):
+def pointwise_integral(
+    generator, forward_q, backward_q, weights, ks, kt, normalize=True
+):
     """Calculate the contribution of each point to a TPT integral.
 
     Parameter
@@ -347,6 +367,8 @@ def pointwise_integral(generator, forward_q, backward_q, weights, ks, kt):
         Spatial part of the integrand of the objective function.
     kt : (M,) ndarray of float
         Temporal part of the integrand of the objective function.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -368,8 +390,10 @@ def pointwise_integral(generator, forward_q, backward_q, weights, ks, kt):
     qp = forward_q.ravel()
     gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
 
-    result = 0.5 * (pi_qm * (gen @ qp) + (pi_qm @ gen) * qp)
-    return result.reshape(shape)
+    out = 0.5 * (pi_qm * (gen @ qp) + (pi_qm @ gen) * qp)
+    if normalize:
+        out /= np.sum(weights)
+    return out.reshape(shape)
 
 
 def combine_k(ks1, kt1, ks2, kt2):

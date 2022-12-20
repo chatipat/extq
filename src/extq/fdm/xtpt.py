@@ -279,6 +279,7 @@ def extended_rate(
     transitions,
     rxn_coords=None,
     time_transitions=None,
+    normalize=True,
 ):
     """Compute the TPT rate using extended committors.
 
@@ -302,6 +303,8 @@ def extended_rate(
         the rate without using a reaction coordinate.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -311,7 +314,10 @@ def extended_rate(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return rate(gen, forward_q, backward_q, pi, rxn_coords)
+    out = rate(gen, forward_q, backward_q, pi, rxn_coords, normalize=False)
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def extended_current(
@@ -322,6 +328,7 @@ def extended_current(
     transitions,
     cv,
     time_transitions=None,
+    normalize=True,
 ):
     """Compute the reactive current using extended committors.
 
@@ -343,6 +350,8 @@ def extended_current(
         Collective variable at each point.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -352,7 +361,10 @@ def extended_current(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return current(gen, forward_q, backward_q, pi, cv)
+    out = current(gen, forward_q, backward_q, pi, cv, normalize=False)
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def extended_integral(
@@ -364,6 +376,7 @@ def extended_integral(
     ks,
     kt,
     time_transitions=None,
+    normalize=True,
 ):
     """Integrate an extended TPT objective function over the reaction ensemble.
 
@@ -387,6 +400,8 @@ def extended_integral(
         Temporal part of the integrand of the objective function.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -396,7 +411,18 @@ def extended_integral(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return integral(gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt)
+    out = integral(
+        gen,
+        forward_q,
+        backward_q,
+        pi,
+        scipy.sparse.bmat(ks),
+        kt,
+        normalize=False,
+    )
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def extended_pointwise_integral(
@@ -408,6 +434,7 @@ def extended_pointwise_integral(
     ks,
     kt,
     time_transitions=None,
+    normalize=True,
 ):
     """Calculate the contribution of each point to an extended TPT integral.
 
@@ -431,6 +458,8 @@ def extended_pointwise_integral(
         Temporal part of the integrand of the objective function.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -440,9 +469,18 @@ def extended_pointwise_integral(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return pointwise_integral(
-        gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt
+    out = pointwise_integral(
+        gen,
+        forward_q,
+        backward_q,
+        pi,
+        scipy.sparse.bmat(ks),
+        kt,
+        normalize=False,
     )
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def _extended_generator(generator, transitions, time_transitions=None):
