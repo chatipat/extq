@@ -2,6 +2,12 @@ import numpy as np
 import scipy.linalg
 import scipy.sparse
 
+__all__ = [
+    "whiten",
+    "center",
+    "add_constant_feature",
+]
+
 
 def whiten(trajs, weights=None, rtol=None, with_mean=True, with_std=True):
     """Whiten the data using PCA.

@@ -3,6 +3,11 @@ import numpy as np
 
 from ..moving_semigroup import moving_semigroup
 
+__all__ = [
+    "extended_rate",
+    "extended_current",
+]
+
 
 def extended_rate(
     forward_q,

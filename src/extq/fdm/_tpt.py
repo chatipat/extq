@@ -2,6 +2,20 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 
+__all__ = [
+    "forward_committor",
+    "backward_committor",
+    "forward_mfpt",
+    "backward_mfpt",
+    "forward_feynman_kac",
+    "backward_feynman_kac",
+    "reweight",
+    "rate",
+    "current",
+    "integral",
+    "pointwise_integral",
+]
+
 
 def forward_committor(generator, weights, in_domain, guess):
     """Compute the forward committor.

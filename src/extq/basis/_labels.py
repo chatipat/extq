@@ -1,6 +1,12 @@
 import numpy as np
 import scipy.sparse
 
+__all__ = [
+    "labels_to_basis",
+    "renumber_labels",
+    "renumber_basis",
+]
+
 
 def labels_to_basis(labels, num=None, sparse=True):
     if num is None:

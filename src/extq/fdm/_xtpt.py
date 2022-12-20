@@ -2,13 +2,26 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 
-from .tpt import backward_feynman_kac
-from .tpt import combine_k
-from .tpt import current
-from .tpt import forward_feynman_kac
-from .tpt import integral
-from .tpt import pointwise_integral
-from .tpt import rate
+from ._tpt import backward_feynman_kac
+from ._tpt import combine_k
+from ._tpt import current
+from ._tpt import forward_feynman_kac
+from ._tpt import integral
+from ._tpt import pointwise_integral
+from ._tpt import rate
+
+__all__ = [
+    "forward_extended_committor",
+    "backward_extended_committor",
+    "forward_extended_mfpt",
+    "backward_extended_mfpt",
+    "forward_extended_feynman_kac",
+    "backward_extended_feynman_kac",
+    "extended_rate",
+    "extended_current",
+    "extended_integral",
+    "extended_pointwise_integral",
+]
 
 
 def forward_extended_committor(

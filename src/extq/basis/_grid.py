@@ -2,6 +2,18 @@ import numpy as np
 
 from ._labels import _labels_to_basis
 
+__all__ = [
+    "grid1d_labels",
+    "grid2d_labels",
+    "grid3d_labels",
+    "grid1d_basis",
+    "grid2d_basis",
+    "grid3d_basis",
+    "grid1d_domain_basis",
+    "grid2d_domain_basis",
+    "grid3d_domain_basis",
+]
+
 
 def grid1d_labels(cv, edges):
     labels = []

@@ -4,6 +4,11 @@ import numpy as np
 from ..stop import backward_stop
 from ..stop import forward_stop
 
+__all__ = [
+    "rate",
+    "current",
+]
+
 
 def rate(
     forward_q, backward_q, weights, in_domain, rxn_coord, lag, normalize=True

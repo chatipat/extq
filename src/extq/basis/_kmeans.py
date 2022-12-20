@@ -4,6 +4,21 @@ import sklearn.cluster
 from ._labels import _labels_to_basis
 from ._labels import renumber_labels
 
+__all__ = [
+    "kmeans_labels",
+    "kmeans1d_labels",
+    "kmeans2d_labels",
+    "kmeans3d_labels",
+    "kmeans_basis",
+    "kmeans1d_basis",
+    "kmeans2d_basis",
+    "kmeans3d_basis",
+    "kmeans_domain_basis",
+    "kmeans1d_domain_basis",
+    "kmeans2d_domain_basis",
+    "kmeans3d_domain_basis",
+]
+
 
 def kmeans_labels(cvs, num, **kwargs):
     kmeans = sklearn.cluster.MiniBatchKMeans(n_clusters=num, **kwargs)
