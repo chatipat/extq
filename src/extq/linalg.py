@@ -35,7 +35,10 @@ def scale_rows(a, b):
         else:
             return scipy.sparse.diags(a) @ b
     else:
-        return a[:, None] * b
+        if np.ndim(b) >= 2:
+            return a[:, None] * b
+        else:
+            return a * b
 
 
 def scale_cols(a, b):
@@ -47,7 +50,7 @@ def scale_cols(a, b):
         else:
             return a @ scipy.sparse.diags(b)
     else:
-        return a * b[None, :]
+        return a * b
 
 
 def _scale_rows_csr(a, b):
