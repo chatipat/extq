@@ -39,6 +39,7 @@ def rate(
         Estimated TPT rate.
 
     """
+    assert lag > 0
     out = 0.0
     for qp, qm, w, d, h in zip(
         forward_q, backward_q, weights, in_domain, rxn_coord
@@ -49,7 +50,9 @@ def rate(
         assert w.shape == (n_frames,)
         assert d.shape == (n_frames,)
         assert h.shape == (n_frames,)
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
         out += _rate_helper(qp, qm, w, d, h, lag)
     if normalize:
         wsum = sum(np.sum(w) for w in weights)
@@ -120,6 +123,7 @@ def current(
         Estimated reactive current at each frame.
 
     """
+    assert lag > 0
     out = []
     for qp, qm, w, d, f in zip(forward_q, backward_q, weights, in_domain, cv):
         n_frames = w.shape[0]
@@ -128,7 +132,9 @@ def current(
         assert w.shape == (n_frames,)
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames,)
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
         tp = forward_stop(d)
         tm = backward_stop(d)
         j = _current_helper(qp, qm, w, tp, tm, f, lag)

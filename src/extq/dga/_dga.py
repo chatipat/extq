@@ -3,6 +3,7 @@ import numpy as np
 from .. import linalg
 from ..stop import backward_stop
 from ..stop import forward_stop
+from ..utils import uniform_weights
 
 __all__ = [
     "reweight",
@@ -51,15 +52,11 @@ def reweight(
     """
     if maxlag is None:
         maxlag = lag
-    assert maxlag >= lag
+    assert 0 < lag <= maxlag
     if test_basis is None:
         test_basis = basis
     if guess is None:
-        guess = []
-        for x in basis:
-            w = np.ones(x.shape[0])
-            w[-maxlag:] = 0.0
-            guess.append(w)
+        guess = uniform_weights(basis, maxlag)
     n_basis = None
     a = 0.0
     b = 0.0
@@ -69,7 +66,9 @@ def reweight(
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
-        assert np.all(w[-maxlag:] == 0.0)
+        assert np.all(w[max(0, n_frames - maxlag) :] == 0.0)
+        if n_frames <= maxlag:
+            continue
         wdx = linalg.scale_rows(w[:-lag], x[lag:] - x[:-lag])
         a += wdx.T @ y[:-lag]
         b -= np.ravel(wdx.sum(axis=0))
@@ -195,6 +194,7 @@ def forward_feynman_kac(
         each frame of the trajectory.
 
     """
+    assert lag > 0
     if test_basis is None:
         test_basis = basis
     n_basis = None
@@ -212,7 +212,9 @@ def forward_feynman_kac(
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
         iy = np.minimum(np.arange(lag, n_frames), forward_stop(d)[:-lag])
         intf = np.concatenate([np.zeros(1), np.cumsum(f)])
         integral = intf[iy] - intf[:-lag]
@@ -336,6 +338,7 @@ def backward_feynman_kac(
         each frame of the trajectory.
 
     """
+    assert lag > 0
     if test_basis is None:
         test_basis = basis
     n_basis = None
@@ -353,7 +356,9 @@ def backward_feynman_kac(
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
         iy = np.maximum(np.arange(n_frames - lag), backward_stop(d)[lag:])
         intf = np.concatenate([np.zeros(1), np.cumsum(f)])
         integral = intf[lag:] - intf[iy]

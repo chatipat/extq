@@ -166,6 +166,7 @@ def forward_extended_feynman_kac(
         each frame.
 
     """
+    assert lag > 0
     if test_basis is None:
         test_basis = basis
     n_indices = None
@@ -190,7 +191,9 @@ def forward_extended_feynman_kac(
         assert f.shape == (n_indices, n_indices, n_frames - 1)
         assert g.shape == (n_indices, n_frames)
 
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
 
         m = _forward_transitions_helper(m, d, f, g, lag)
         m = np.moveaxis(m, 0, -1)
@@ -386,6 +389,7 @@ def backward_extended_feynman_kac(
         each frame.
 
     """
+    assert lag > 0
     if test_basis is None:
         test_basis = basis
     n_indices = None
@@ -410,7 +414,9 @@ def backward_extended_feynman_kac(
         assert f.shape == (n_indices, n_indices, n_frames - 1)
         assert g.shape == (n_indices, n_frames)
 
-        assert np.all(w[-lag:] == 0.0)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
 
         m = _backward_transitions_helper(m, d, f, g, lag)
         m = np.moveaxis(m, 0, -1)
