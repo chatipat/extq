@@ -138,7 +138,9 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
     function = np.where(in_domain, function, 0.0)
     guess = np.asarray(guess)
 
+    size = weights.size
     shape = weights.shape
+    assert generator.shape == (size, size)
     assert in_domain.shape == shape
     assert function.shape == shape
     assert guess.shape == shape
@@ -249,7 +251,9 @@ def rate(
     forward_q = np.asarray(forward_q)
     backward_q = np.asarray(backward_q)
 
+    size = weights.size
     shape = weights.shape
+    assert generator.shape == (size, size)
     assert forward_q.shape == shape
     assert backward_q.shape == shape
 
@@ -296,7 +300,9 @@ def current(generator, forward_q, backward_q, weights, cv, normalize=True):
     forward_q = np.asarray(forward_q)
     backward_q = np.asarray(backward_q)
 
+    size = weights.size
     shape = weights.shape
+    assert generator.shape == (size, size)
     assert forward_q.shape == shape
     assert backward_q.shape == shape
 
@@ -347,9 +353,12 @@ def integral(
     backward_q = np.asarray(backward_q)
     kt = np.asarray(kt)
 
+    size = weights.size
     shape = weights.shape
+    assert generator.shape == (size, size)
     assert forward_q.shape == shape
     assert backward_q.shape == shape
+    assert ks.shape == (size, size)
     assert kt.shape == shape
 
     pi_qm = (weights * backward_q).ravel()
@@ -395,9 +404,12 @@ def pointwise_integral(
     backward_q = np.asarray(backward_q)
     kt = np.asarray(kt)
 
+    size = weights.size
     shape = weights.shape
+    assert generator.shape == (size, size)
     assert forward_q.shape == shape
     assert backward_q.shape == shape
+    assert ks.shape == (size, size)
     assert kt.shape == shape
 
     pi_qm = (weights * backward_q).ravel()

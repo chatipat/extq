@@ -60,9 +60,15 @@ def reweight(
             w = np.ones(x.shape[0])
             w[-maxlag:] = 0.0
             guess.append(w)
+    n_basis = None
     a = 0.0
     b = 0.0
     for x, y, w in zip(test_basis, basis, guess):
+        n_frames = x.shape[0]
+        n_basis = x.shape[1] if n_basis is None else n_basis
+        assert x.shape == (n_frames, n_basis)
+        assert y.shape == (n_frames, n_basis)
+        assert w.shape == (n_frames,)
         assert np.all(w[-maxlag:] == 0.0)
         wdx = linalg.scale_rows(w[:-lag], x[lag:] - x[:-lag])
         a += wdx.T @ y[:-lag]
@@ -191,14 +197,23 @@ def forward_feynman_kac(
     """
     if test_basis is None:
         test_basis = basis
+    n_basis = None
     a = 0.0
     b = 0.0
     for x, y, w, d, f, g in zip(
         test_basis, basis, weights, in_domain, function, guess
     ):
+        n_frames = x.shape[0]
+        n_basis = x.shape[1] if n_basis is None else n_basis
+        f = np.broadcast_to(f, n_frames - 1)
+        assert x.shape == (n_frames, n_basis)
+        assert y.shape == (n_frames, n_basis)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert f.shape == (n_frames - 1,)
+        assert g.shape == (n_frames,)
         assert np.all(w[-lag:] == 0.0)
-        iy = np.minimum(np.arange(lag, len(d)), forward_stop(d)[:-lag])
-        f = np.broadcast_to(f, len(d) - 1)
+        iy = np.minimum(np.arange(lag, n_frames), forward_stop(d)[:-lag])
         intf = np.concatenate([np.zeros(1), np.cumsum(f)])
         integral = intf[iy] - intf[:-lag]
         wx = linalg.scale_rows(w[:-lag], x[:-lag])
@@ -323,14 +338,23 @@ def backward_feynman_kac(
     """
     if test_basis is None:
         test_basis = basis
+    n_basis = None
     a = 0.0
     b = 0.0
     for x, y, w, d, f, g in zip(
         test_basis, basis, weights, in_domain, function, guess
     ):
+        n_frames = x.shape[0]
+        n_basis = x.shape[1] if n_basis is None else n_basis
+        f = np.broadcast_to(f, n_frames - 1)
+        assert x.shape == (n_frames, n_basis)
+        assert y.shape == (n_frames, n_basis)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert f.shape == (n_frames - 1,)
+        assert g.shape == (n_frames,)
         assert np.all(w[-lag:] == 0.0)
-        iy = np.maximum(np.arange(len(d) - lag), backward_stop(d)[lag:])
-        f = np.broadcast_to(f, len(d) - 1)
+        iy = np.maximum(np.arange(n_frames - lag), backward_stop(d)[lag:])
         intf = np.concatenate([np.zeros(1), np.cumsum(f)])
         integral = intf[lag:] - intf[iy]
         wx = linalg.scale_rows(w[:-lag], x[lag:])

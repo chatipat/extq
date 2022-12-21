@@ -168,36 +168,43 @@ def forward_extended_feynman_kac(
     """
     if test_basis is None:
         test_basis = basis
+    n_indices = None
+    n_basis = None
     a = 0.0
     b = 0.0
     for x, y, w, m, d, f, g in zip(
         test_basis, basis, weights, transitions, in_domain, function, guess
     ):
+        n_frames = x[0].shape[0]
+        n_indices = len(x) if n_indices is None else n_indices
+        n_basis = x[0].shape[1] if n_basis is None else n_basis
+        f = np.broadcast_to(f, (n_indices, n_indices, n_frames - 1))
+
+        assert len(x) == n_indices
+        assert (xi.shape == (n_frames, n_basis) for xi in x)
+        assert len(y) == n_indices
+        assert (yi.shape == (n_frames, n_basis) for yi in y)
+        assert w.shape == (n_frames,)
+        assert m.shape == (n_indices, n_indices, n_frames - 1)
+        assert d.shape == (n_indices, n_frames)
+        assert f.shape == (n_indices, n_indices, n_frames - 1)
+        assert g.shape == (n_indices, n_frames)
+
         assert np.all(w[-lag:] == 0.0)
 
-        ni, _, nt = m.shape
-        dtype = np.result_type(*x, *y, w, m, g)
-        if np.ndim(f) == 0:
-            f = np.full((ni, ni, nt), f, dtype=dtype)
-
-        assert m.shape == (ni, ni, nt)
-        assert d.shape == (ni, nt + 1)
-        assert f.shape == (ni, ni, nt)
-        assert g.shape == (ni, nt + 1)
-
-        m = _forward_transitions_helper(ni, nt, m, d, f, g, lag, dtype)
+        m = _forward_transitions_helper(m, d, f, g, lag)
         m = np.moveaxis(m, 0, -1)
 
-        for i in range(ni):
+        for i in range(n_indices):
             wx = linalg.scale_rows(w[:-lag], x[i][:-lag])
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(ni):
+            for j in range(n_indices):
                 yi += linalg.scale_rows(m[i, j], y[j][lag:])
                 gi += linalg.scale_rows(m[i, j], g[j][lag:])
-            gi += m[i, ni]  # integral and boundary conditions
+            gi += m[i, -1]  # integral and boundary conditions
 
             yi -= y[i][:-lag]
             gi -= g[i][:-lag]
@@ -210,17 +217,19 @@ def forward_extended_feynman_kac(
 
 
 @nb.njit
-def _forward_transitions_helper(ni, nt, m, d, f, g, lag, dtype):
-    r = np.zeros((nt, ni + 1, ni + 1), dtype=dtype)
-    for n in range(nt):
-        for i in range(ni):
+def _forward_transitions_helper(m, d, f, g, lag):
+    n_indices = d.shape[0]
+    n_frames = d.shape[1]
+    r = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
+    for n in range(n_frames - 1):
+        for i in range(n_indices):
             if d[i, n]:
-                for j in range(ni):
+                for j in range(n_indices):
                     r[n, i, j] = m[i, j, n]
-                    r[n, i, ni] += m[i, j, n] * f[i, j, n]  # integral
+                    r[n, i, -1] += m[i, j, n] * f[i, j, n]  # integral
             else:
-                r[n, i, ni] = g[i, n]  # boundary conditions
-        r[n, ni, ni] = 1.0
+                r[n, i, -1] = g[i, n]  # boundary conditions
+        r[n, -1, -1] = 1.0
     r = moving_matmul(r, lag)
     return r
 
@@ -379,36 +388,43 @@ def backward_extended_feynman_kac(
     """
     if test_basis is None:
         test_basis = basis
+    n_indices = None
+    n_basis = None
     a = 0.0
     b = 0.0
     for x, y, w, m, d, f, g in zip(
         test_basis, basis, weights, transitions, in_domain, function, guess
     ):
+        n_frames = x[0].shape[0]
+        n_indices = len(x) if n_indices is None else n_indices
+        n_basis = x[0].shape[1] if n_basis is None else n_basis
+        f = np.broadcast_to(f, (n_indices, n_indices, n_frames - 1))
+
+        assert len(x) == n_indices
+        assert (xi.shape == (n_frames, n_basis) for xi in x)
+        assert len(y) == n_indices
+        assert (yi.shape == (n_frames, n_basis) for yi in y)
+        assert w.shape == (n_frames,)
+        assert m.shape == (n_indices, n_indices, n_frames - 1)
+        assert d.shape == (n_indices, n_frames)
+        assert f.shape == (n_indices, n_indices, n_frames - 1)
+        assert g.shape == (n_indices, n_frames)
+
         assert np.all(w[-lag:] == 0.0)
 
-        ni, _, nt = m.shape
-        dtype = np.result_type(*x, *y, w, m, g)
-        if np.ndim(f) == 0:
-            f = np.full((ni, ni, nt), f, dtype=dtype)
-
-        assert m.shape == (ni, ni, nt)
-        assert d.shape == (ni, nt + 1)
-        assert f.shape == (ni, ni, nt)
-        assert g.shape == (ni, nt + 1)
-
-        m = _backward_transitions_helper(ni, nt, m, d, f, g, lag, dtype)
+        m = _backward_transitions_helper(m, d, f, g, lag)
         m = np.moveaxis(m, 0, -1)
 
-        for i in range(ni):
+        for i in range(n_indices):
             wx = linalg.scale_rows(w[:-lag], x[i][lag:])
 
             yi = 0.0
             gi = 0.0
 
-            for j in range(ni):
+            for j in range(n_indices):
                 yi += linalg.scale_rows(m[j, i], y[j][:-lag])
                 gi += linalg.scale_rows(m[j, i], g[j][:-lag])
-            gi += m[ni, i]  # integral and boundary conditions
+            gi += m[-1, i]  # integral and boundary conditions
 
             yi -= y[i][lag:]
             gi -= g[i][lag:]
@@ -421,17 +437,19 @@ def backward_extended_feynman_kac(
 
 
 @nb.njit
-def _backward_transitions_helper(ni, nt, m, d, f, g, lag, dtype):
-    r = np.zeros((nt, ni + 1, ni + 1), dtype=dtype)
-    for n in range(nt):
-        for j in range(ni):
+def _backward_transitions_helper(m, d, f, g, lag):
+    n_indices = d.shape[0]
+    n_frames = d.shape[1]
+    r = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
+    for n in range(n_frames - 1):
+        for j in range(n_indices):
             if d[j, n + 1]:
-                for i in range(ni):
+                for i in range(n_indices):
                     r[n, i, j] = m[i, j, n]
-                    r[n, ni, j] += m[i, j, n] * f[i, j, n]  # integral
+                    r[n, -1, j] += m[i, j, n] * f[i, j, n]  # integral
             else:
-                r[n, ni, j] = g[j, n + 1]  # boundary conditions
-        r[n, ni, ni] = 1.0
+                r[n, -1, j] = g[j, n + 1]  # boundary conditions
+        r[n, -1, -1] = 1.0
     r = moving_matmul(r, lag)
     return r
 

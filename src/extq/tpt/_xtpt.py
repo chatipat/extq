@@ -49,19 +49,20 @@ def extended_rate(
         Estimated TPT rate.
 
     """
+    n_indices = None
     out = 0.0
     for qp, qm, w, m, d, h in zip(
         forward_q, backward_q, weights, transitions, in_domain, rxn_coord
     ):
-        assert np.all(w[-lag:] == 0.0)
         n_frames = w.shape[0]
-        n_indices = m.shape[0]
+        n_indices = m.shape[0] if n_indices is None else n_indices
         assert qp.shape == (n_indices, n_frames)
         assert qm.shape == (n_indices, n_frames)
         assert w.shape == (n_frames,)
         assert m.shape == (n_indices, n_indices, n_frames - 1)
         assert d.shape == (n_indices, n_frames)
         assert h.shape == (n_indices, n_frames)
+        assert np.all(w[-lag:] == 0.0)
         out += _extended_rate_helper(qp, qm, w, m, d, h, lag)
     if normalize:
         wsum = sum(np.sum(w) for w in weights)
@@ -160,19 +161,20 @@ def extended_current(
         Estimated reactive current at each frame.
 
     """
+    n_indices = None
     out = []
     for qp, qm, w, m, d, f in zip(
         forward_q, backward_q, weights, transitions, in_domain, cv
     ):
-        assert np.all(w[-lag:] == 0.0)
         n_frames = w.shape[0]
-        n_indices = m.shape[0]
+        n_indices = m.shape[0] if n_indices is None else n_indices
         assert qp.shape == (n_indices, n_frames)
         assert qm.shape == (n_indices, n_frames)
         assert w.shape == (n_frames,)
         assert m.shape == (n_indices, n_indices, n_frames - 1)
         assert d.shape == (n_indices, n_frames)
         assert f.shape == (n_indices, n_frames)
+        assert np.all(w[-lag:] == 0.0)
         j = _extended_current_helper(qp, qm, w, m, d, f, lag)
         out.append(j)
     if normalize:

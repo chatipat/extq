@@ -43,6 +43,12 @@ def rate(
     for qp, qm, w, d, h in zip(
         forward_q, backward_q, weights, in_domain, rxn_coord
     ):
+        n_frames = w.shape[0]
+        assert qp.shape == (n_frames,)
+        assert qm.shape == (n_frames,)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert h.shape == (n_frames,)
         assert np.all(w[-lag:] == 0.0)
         out += _rate_helper(qp, qm, w, d, h, lag)
     if normalize:
@@ -116,6 +122,12 @@ def current(
     """
     out = []
     for qp, qm, w, d, f in zip(forward_q, backward_q, weights, in_domain, cv):
+        n_frames = w.shape[0]
+        assert qp.shape == (n_frames,)
+        assert qm.shape == (n_frames,)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert f.shape == (n_frames,)
         assert np.all(w[-lag:] == 0.0)
         tp = forward_stop(d)
         tm = backward_stop(d)
