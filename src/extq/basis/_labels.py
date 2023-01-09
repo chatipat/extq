@@ -1,3 +1,5 @@
+"""Functions for manipulating labels."""
+
 import numpy as np
 import scipy.sparse
 
@@ -9,6 +11,27 @@ __all__ = [
 
 
 def labels_to_basis(labels, num=None, sparse=True):
+    """
+    Construct a basis of indicator functions given labels.
+
+    Parameters
+    ----------
+    labels : sequence of (n_frames[i],) ndarray of int
+        Label at each frame. Labels are assumed to be consecutive
+        integers starting from zero.
+    num : int, optional
+        Number of labels / basis functions. If None (default), determine
+        this from `labels`.
+    sparse : bool, optional
+        If True (default), return a list of sparse matrices instead of
+        a list of dense arrays.
+
+    Returns
+    -------
+    list of (n_frames[i], num) {ndarray, sparse matrix} of float
+        Basis of indicator functions.
+
+    """
     if num is None:
         num = max(np.max(indices) for indices in labels) + 1
     basis = []
@@ -18,6 +41,31 @@ def labels_to_basis(labels, num=None, sparse=True):
 
 
 def _labels_to_basis(indices, cols, sparse=True, mask=None):
+    """
+    Construct a basis of indicator functions given labels for a single
+    trajectory.
+
+    Parameters
+    ----------
+    indices : (n_frames,) ndarray of int
+        Label at each frame. Labels are assumed to be consecutive
+        integers starting from zero.
+    cols : int
+        Number of labels / basis functions.
+    sparse : bool, optional
+        If True (default), return a list of sparse matrices instead of
+        a list of dense arrays.
+    mask : (n_frames,) ndarray of bool, optional
+        Whether each frame in the domain. Basis functions evaluate to
+        zero for frames outside of the domain. If None (default), assume
+        that every frame is in the domain.
+
+    Returns
+    -------
+    list of (n_frames, cols) {ndarray, sparse matrix} of float
+        Basis of indicator functions.
+
+    """
     rows = len(indices)
     row_ind = np.arange(rows)
     col_ind = indices
@@ -36,6 +84,21 @@ def _labels_to_basis(indices, cols, sparse=True, mask=None):
 
 
 def renumber_labels(labels):
+    """
+    Make labels consecutive (starting from zero).
+
+    Parameters
+    ----------
+    labels : list of (n_frames[i],) ndarray of int
+        Label at each frame.
+
+    Returns
+    -------
+    list of (n_frames[i],) ndarray of int
+        New label at each frame. These new labels are consecutive,
+        starting from zero, and each label appears at least once.
+
+    """
     unique = np.unique(np.concatenate(labels))
     assert np.min(unique) >= 0
     renumber = np.empty(np.max(unique) + 1, dtype=unique.dtype)
@@ -44,5 +107,20 @@ def renumber_labels(labels):
 
 
 def renumber_basis(basis):
+    """
+    Remove basis functions that evaluate to zero at every frame.
+
+    Parameters
+    ----------
+    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
+        Basis functions at each frame.
+
+    Returns
+    -------
+    list of (n_frames[i], n_nonzero_basis) {ndarray, sparse matrix} of float
+        Basis functions that are nonzero in at least one frame of the
+        data set.
+
+    """
     mask = sum(np.ravel((x != 0).sum(axis=0)).astype(bool) for x in basis)
     return [x[:, mask] for x in basis]
