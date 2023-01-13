@@ -1,6 +1,15 @@
 import numpy as np
 import scipy.sparse
 
+__all__ = [
+    "generator_reversible_1d",
+    "generator_reversible_2d",
+    "generator_reversible_3d",
+    "generator_irreversible_1d",
+    "generator_irreversible_2d",
+    "generator_irreversible_3d",
+]
+
 
 def generator_reversible_1d(potential, kT, x):
     """Compute the generator matrix for a reversible 1D potential.

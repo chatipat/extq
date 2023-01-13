@@ -21,13 +21,12 @@ def uniform_weights(trajs, maxlag):
         n_frames[i]-maxlag trajectories are one.
 
     """
+    assert maxlag >= 0
     weights = []
     for traj in trajs:
-        w = np.ones(np.shape(traj)[0])
-        if maxlag > len(w):
-            w[:] = 0.0
-        else:
-            w[len(w) - maxlag :] = 0.0
+        n_frames = np.shape(traj)[0]
+        w = np.ones(n_frames)
+        w[max(0, n_frames - maxlag) :] = 0.0
         weights.append(w)
     return weights
 
@@ -56,13 +55,14 @@ def shift_weights(weights, lag, maxlag):
     assert 0 <= lag <= maxlag
     result = []
     for w in weights:
-        assert np.all(w[len(w) - maxlag :] == 0.0)
+        (n_frames,) = w.shape
+        assert np.all(w[max(0, n_frames - maxlag) :] == 0.0)
         new_w = np.roll(w, maxlag - lag)
         result.append(new_w)
     return result
 
 
-def splatter_weights(weights, lag, maxlag):
+def distribute_weights(weights, lag, maxlag):
     """Uniformly distribute weights for length maxlag short trajectories
     to length lag short trajectories.
 
@@ -87,9 +87,12 @@ def splatter_weights(weights, lag, maxlag):
     nlags = maxlag - lag + 1
     result = []
     for w in weights:
-        assert np.all(w[len(w) - maxlag :] == 0.0)
-        window = np.full(nlags, 1 / nlags, dtype=w.dtype)
-        temp = scipy.signal.convolve(w[: len(w) - maxlag], window)
-        new_w = np.concatenate((temp, np.zeros(lag, dtype=w.dtype)))
+        (n_frames,) = w.shape
+        assert np.all(w[np.max(0, n_frames - maxlag) :] == 0.0)
+        new_w = np.zeros(n_frames, dtype=w.dtype)
+        if n_frames > maxlag:
+            window = np.full(nlags, 1 / nlags, dtype=w.dtype)
+            temp = scipy.signal.convolve(w[: n_frames - maxlag], window)
+            new_w[: n_frames - lag] = temp
         result.append(new_w)
     return result

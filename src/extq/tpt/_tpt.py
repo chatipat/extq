@@ -4,8 +4,15 @@ import numpy as np
 from ..stop import backward_stop
 from ..stop import forward_stop
 
+__all__ = [
+    "rate",
+    "current",
+]
 
-def rate(forward_q, backward_q, weights, in_domain, rxn_coord, lag):
+
+def rate(
+    forward_q, backward_q, weights, in_domain, rxn_coord, lag, normalize=True
+):
     """Estimate the TPT rate.
 
     Parameters
@@ -23,6 +30,8 @@ def rate(forward_q, backward_q, weights, in_domain, rxn_coord, lag):
         reactant state and one in the product state.
     lag : int
         Lag time in units of frames.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -30,15 +39,25 @@ def rate(forward_q, backward_q, weights, in_domain, rxn_coord, lag):
         Estimated TPT rate.
 
     """
-    numer = 0.0
-    denom = 0.0
+    assert lag > 0
+    out = 0.0
     for qp, qm, w, d, h in zip(
         forward_q, backward_q, weights, in_domain, rxn_coord
     ):
-        assert np.all(w[-lag:] == 0.0)
-        numer += _rate_helper(qp, qm, w, d, h, lag)
-        denom += np.sum(w)
-    return numer / denom
+        n_frames = w.shape[0]
+        assert qp.shape == (n_frames,)
+        assert qm.shape == (n_frames,)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert h.shape == (n_frames,)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
+        out += _rate_helper(qp, qm, w, d, h, lag)
+    if normalize:
+        wsum = sum(np.sum(w) for w in weights)
+        out /= wsum
+    return out
 
 
 @nb.njit
@@ -76,7 +95,9 @@ def _rate_helper(qp, qm, w, d, h, lag):
     return total / lag
 
 
-def current(forward_q, backward_q, weights, in_domain, cv, lag):
+def current(
+    forward_q, backward_q, weights, in_domain, cv, lag, normalize=True
+):
     """Estimate the reactive current at each frame.
 
     Parameters
@@ -93,6 +114,8 @@ def current(forward_q, backward_q, weights, in_domain, cv, lag):
         Collective variable at each frame.
     lag : int
         Lag time in units of frames.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -100,14 +123,27 @@ def current(forward_q, backward_q, weights, in_domain, cv, lag):
         Estimated reactive current at each frame.
 
     """
-    result = []
-    denom = sum(np.sum(w) for w in weights)
+    assert lag > 0
+    out = []
     for qp, qm, w, d, f in zip(forward_q, backward_q, weights, in_domain, cv):
-        assert np.all(w[-lag:] == 0.0)
+        n_frames = w.shape[0]
+        assert qp.shape == (n_frames,)
+        assert qm.shape == (n_frames,)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert f.shape == (n_frames,)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            continue
         tp = forward_stop(d)
         tm = backward_stop(d)
-        result.append(_current_helper(qp, qm, w, tp, tm, f, lag) / denom)
-    return result
+        j = _current_helper(qp, qm, w, tp, tm, f, lag)
+        out.append(j)
+    if normalize:
+        wsum = sum(np.sum(w) for w in weights)
+        for j in out:
+            j /= wsum
+    return out
 
 
 @nb.njit

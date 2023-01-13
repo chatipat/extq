@@ -2,13 +2,26 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.linalg
 
-from .tpt import backward_feynman_kac
-from .tpt import combine_k
-from .tpt import current
-from .tpt import forward_feynman_kac
-from .tpt import integral
-from .tpt import pointwise_integral
-from .tpt import rate
+from ._tpt import backward_feynman_kac
+from ._tpt import combine_k
+from ._tpt import current
+from ._tpt import forward_feynman_kac
+from ._tpt import integral
+from ._tpt import pointwise_integral
+from ._tpt import rate
+
+__all__ = [
+    "forward_extended_committor",
+    "backward_extended_committor",
+    "forward_extended_mfpt",
+    "backward_extended_mfpt",
+    "forward_extended_feynman_kac",
+    "backward_extended_feynman_kac",
+    "extended_rate",
+    "extended_current",
+    "extended_integral",
+    "extended_pointwise_integral",
+]
 
 
 def forward_extended_committor(
@@ -279,6 +292,7 @@ def extended_rate(
     transitions,
     rxn_coords=None,
     time_transitions=None,
+    normalize=True,
 ):
     """Compute the TPT rate using extended committors.
 
@@ -302,6 +316,8 @@ def extended_rate(
         the rate without using a reaction coordinate.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -311,7 +327,10 @@ def extended_rate(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return rate(gen, forward_q, backward_q, pi, rxn_coords)
+    out = rate(gen, forward_q, backward_q, pi, rxn_coords, normalize=False)
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def extended_current(
@@ -322,6 +341,7 @@ def extended_current(
     transitions,
     cv,
     time_transitions=None,
+    normalize=True,
 ):
     """Compute the reactive current using extended committors.
 
@@ -343,6 +363,8 @@ def extended_current(
         Collective variable at each point.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -352,7 +374,10 @@ def extended_current(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return current(gen, forward_q, backward_q, pi, cv)
+    out = current(gen, forward_q, backward_q, pi, cv, normalize=False)
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def extended_integral(
@@ -364,6 +389,7 @@ def extended_integral(
     ks,
     kt,
     time_transitions=None,
+    normalize=True,
 ):
     """Integrate an extended TPT objective function over the reaction ensemble.
 
@@ -387,6 +413,8 @@ def extended_integral(
         Temporal part of the integrand of the objective function.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -396,7 +424,18 @@ def extended_integral(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return integral(gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt)
+    out = integral(
+        gen,
+        forward_q,
+        backward_q,
+        pi,
+        scipy.sparse.bmat(ks),
+        kt,
+        normalize=False,
+    )
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def extended_pointwise_integral(
@@ -408,6 +447,7 @@ def extended_pointwise_integral(
     ks,
     kt,
     time_transitions=None,
+    normalize=True,
 ):
     """Calculate the contribution of each point to an extended TPT integral.
 
@@ -431,6 +471,8 @@ def extended_pointwise_integral(
         Temporal part of the integrand of the objective function.
     time_transitions : (n_indices, n_indices, n_points) ndarray of float, optional
         Time-dependent transitions between indices.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
 
     Returns
     -------
@@ -440,9 +482,18 @@ def extended_pointwise_integral(
     """
     pi = np.array([weights] * len(transitions))
     gen = _extended_generator(generator, transitions, time_transitions)
-    return pointwise_integral(
-        gen, forward_q, backward_q, pi, scipy.sparse.bmat(ks), kt
+    out = pointwise_integral(
+        gen,
+        forward_q,
+        backward_q,
+        pi,
+        scipy.sparse.bmat(ks),
+        kt,
+        normalize=False,
     )
+    if normalize:
+        out /= np.sum(weights)
+    return out
 
 
 def _extended_generator(generator, transitions, time_transitions=None):

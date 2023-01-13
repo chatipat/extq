@@ -1,6 +1,10 @@
 import numpy as np
 import scipy.sparse
 
+__all__ = [
+    "spouter",
+]
+
 
 def spouter(m, op, a, b):
     """Compute the outer op of two vectors at nonzero entries of m.

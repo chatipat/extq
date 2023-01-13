@@ -3,6 +3,11 @@ import numpy as np
 from ..stop import backward_stop
 from ..stop import forward_stop
 
+__all__ = [
+    "rate_jstrahan",
+    "current_jstrahan",
+]
+
 
 def rate_jstrahan(forward_q, backward_q, weights, in_domain, lag):
     """Estimate the TPT rate using John Strahan's estimator.
