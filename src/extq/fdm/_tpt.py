@@ -133,27 +133,21 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
         Solution of the Feynman-Kac formula at each point.
 
     """
-    weights = np.asarray(weights)
-    in_domain = np.asarray(in_domain)
-    function = np.where(in_domain, function, 0.0)
-    guess = np.asarray(guess)
+    w, d, f, g = np.broadcast_arrays(weights, in_domain, function, guess)
 
-    size = weights.size
-    shape = weights.shape
+    size = w.size
+    shape = w.shape
     assert generator.shape == (size, size)
-    assert in_domain.shape == shape
-    assert function.shape == shape
-    assert guess.shape == shape
 
-    d = in_domain.ravel()
-    f = function.ravel()
-    g = guess.ravel()
+    d = np.ravel(d)
+    f = np.ravel(f)
+    g = np.ravel(g)
 
     a = generator[d, :][:, d]
     b = -generator[d, :] @ g - f[d]
     coeffs = scipy.sparse.linalg.spsolve(a, b)
     return (
-        g + scipy.sparse.identity(len(g), format="csr")[:, d] @ coeffs
+        g + scipy.sparse.identity(size, format="csr")[:, d] @ coeffs
     ).reshape(shape)
 
 
@@ -179,13 +173,12 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
         Solution of the Feynman-Kac formula at each point.
 
     """
-    pi = np.ravel(weights)
+    w, d, f, g = np.broadcast_arrays(weights, in_domain, function, guess)
+    pi = np.ravel(w)
     adjoint_generator = (
         scipy.sparse.diags(1.0 / pi) @ generator.T @ scipy.sparse.diags(pi)
     )
-    return forward_feynman_kac(
-        adjoint_generator, weights, in_domain, function, guess
-    )
+    return forward_feynman_kac(adjoint_generator, w, d, f, g)
 
 
 def reweight(generator):
@@ -247,25 +240,20 @@ def rate(
         TPT rate.
 
     """
-    weights = np.asarray(weights)
-    forward_q = np.asarray(forward_q)
-    backward_q = np.asarray(backward_q)
+    w, qp, qm = np.broadcast_arrays(weights, forward_q, backward_q)
 
-    size = weights.size
-    shape = weights.shape
+    size = w.size
+    shape = w.shape
     assert generator.shape == (size, size)
-    assert forward_q.shape == shape
-    assert backward_q.shape == shape
 
-    pi_qm = (weights * backward_q).ravel()
-    qp = forward_q.ravel()
+    pi_qm = np.ravel(w * qm)
+    qp = np.ravel(qp)
 
     if rxn_coords is None:
         out = pi_qm @ generator @ qp
     else:
-        rxn_coords = np.asarray(rxn_coords)
-        assert rxn_coords.shape == shape
-        h = rxn_coords.ravel()
+        h = np.broadcast_to(rxn_coords, shape)
+        h = np.ravel(h)
         out = pi_qm @ (generator @ (qp * h) - h * (generator @ qp))
     if normalize:
         out /= np.sum(weights)
@@ -296,21 +284,15 @@ def current(generator, forward_q, backward_q, weights, cv, normalize=True):
         Reactive current at each point.
 
     """
-    weights = np.asarray(weights)
-    forward_q = np.asarray(forward_q)
-    backward_q = np.asarray(backward_q)
+    w, qp, qm, h = np.broadcast_arrays(weights, forward_q, backward_q, cv)
 
-    size = weights.size
-    shape = weights.shape
+    size = w.size
+    shape = w.shape
     assert generator.shape == (size, size)
-    assert forward_q.shape == shape
-    assert backward_q.shape == shape
 
-    cv = np.broadcast_to(cv, shape)
-
-    pi_qm = (weights * backward_q).ravel()
-    qp = forward_q.ravel()
-    h = cv.ravel()
+    pi_qm = np.ravel(w * qm)
+    qp = np.ravel(qp)
+    h = np.ravel(h)
 
     forward_flux = pi_qm * (generator @ (qp * h) - h * (generator @ qp))
     backward_flux = ((pi_qm * h) @ generator - (pi_qm @ generator) * h) * qp
@@ -320,25 +302,19 @@ def current(generator, forward_q, backward_q, weights, cv, normalize=True):
     return out.reshape(shape)
 
 
-def integral(
-    generator, forward_q, backward_q, weights, ks, kt, normalize=True
-):
+def integral(generator, forward_q, backward_q, weights, normalize=True):
     """Integrate a TPT objective function over the reaction ensemble.
 
     Parameter
     ---------
     generator : (M, M) sparse matrix of float
-        Generator matrix.
+        Generator matrix, modified to encode the TPT objective function.
     forward_q : (M,) ndarray of float
         Forward committor at each point.
     backward_q : (M,) ndarray of float
         Backward committor at each point.
     weights : (M,) ndarray of float.
         Change of measure at each point.
-    ks : (M, M) sparse matrix of float
-        Spatial part of the integrand of the objective function.
-    kt : (M,) ndarray of float
-        Temporal part of the integrand of the objective function.
     normalize : bool
         If True (default), normalize `weights` to one.
 
@@ -348,48 +324,35 @@ def integral(
         Integral of the objective function over the reaction ensemble.
 
     """
-    weights = np.asarray(weights)
-    forward_q = np.asarray(forward_q)
-    backward_q = np.asarray(backward_q)
-    kt = np.asarray(kt)
+    w, qp, qm = np.broadcast_arrays(weights, forward_q, backward_q)
 
-    size = weights.size
-    shape = weights.shape
+    size = w.size
     assert generator.shape == (size, size)
-    assert forward_q.shape == shape
-    assert backward_q.shape == shape
-    assert ks.shape == (size, size)
-    assert kt.shape == shape
 
-    pi_qm = (weights * backward_q).ravel()
-    qp = forward_q.ravel()
-    gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
+    pi_qm = np.ravel(w * qm)
+    qp = np.ravel(qp)
 
-    out = pi_qm @ gen @ qp
+    out = pi_qm @ generator @ qp
     if normalize:
         out /= np.sum(weights)
     return out
 
 
 def pointwise_integral(
-    generator, forward_q, backward_q, weights, ks, kt, normalize=True
+    generator, forward_q, backward_q, weights, normalize=True
 ):
     """Calculate the contribution of each point to a TPT integral.
 
     Parameter
     ---------
     generator : (M, M) sparse matrix of float
-        Generator matrix.
+        Generator matrix, modified to encode the TPT objective function.
     forward_q : (M,) ndarray of float
         Forward committor at each point.
     backward_q : (M,) ndarray of float
         Backward committor at each point.
     weights : (M,) ndarray of float.
         Change of measure at each point.
-    ks : (M, M) sparse matrix of float
-        Spatial part of the integrand of the objective function.
-    kt : (M,) ndarray of float
-        Temporal part of the integrand of the objective function.
     normalize : bool, optional
         If True (default), normalize `weights` to one.
 
@@ -399,57 +362,16 @@ def pointwise_integral(
         Contribution of each point to the TPT integral.
 
     """
-    weights = np.asarray(weights)
-    forward_q = np.asarray(forward_q)
-    backward_q = np.asarray(backward_q)
-    kt = np.asarray(kt)
+    w, qp, qm = np.broadcast_arrays(weights, forward_q, backward_q)
 
-    size = weights.size
-    shape = weights.shape
+    size = w.size
+    shape = w.shape
     assert generator.shape == (size, size)
-    assert forward_q.shape == shape
-    assert backward_q.shape == shape
-    assert ks.shape == (size, size)
-    assert kt.shape == shape
 
-    pi_qm = (weights * backward_q).ravel()
-    qp = forward_q.ravel()
-    gen = generator.multiply(ks) + scipy.sparse.diags(kt.ravel())
+    pi_qm = np.ravel(w * qm)
+    qp = np.ravel(qp)
 
-    out = 0.5 * (pi_qm * (gen @ qp) + (pi_qm @ gen) * qp)
+    out = 0.5 * (pi_qm * (generator @ qp) + (pi_qm @ generator) * qp)
     if normalize:
         out /= np.sum(weights)
     return out.reshape(shape)
-
-
-def combine_k(ks1, kt1, ks2, kt2):
-    """Combine TPT objective functions.
-
-    Parameters
-    ----------
-    ks1, ks2 : (M, M) sparse matrix of float
-        Spatial part of the integrand of each input objective function.
-    kt1, kt2 : (M,) ndarray of float
-        Temporal part of the integrand of each input objective function.
-
-    Returns
-    -------
-    ks : (M, M) sparse matrix of float
-        Spatial part of the integrand of the combined objective function.
-    kt : (M,) ndarray of float
-        Temporal part of the integrand of the combined objective function.
-
-    """
-    kt1 = np.asarray(kt1)
-    kt2 = np.asarray(kt2)
-    shape = kt1.shape
-    size = kt1.size
-
-    assert ks1.shape == (size, size)
-    assert ks2.shape == (size, size)
-    assert kt1.shape == shape
-    assert kt2.shape == shape
-
-    ks = ks1.multiply(ks2)
-    kt = kt1.ravel() * ks2.diagonal() + kt2.ravel() * ks1.diagonal()
-    return ks, kt.reshape(shape)
