@@ -43,7 +43,7 @@ Overview
 
 .. end-badges
 
-Extended committors.
+Dynamical analysis of trajectory data.
 
 * Free software: MIT license
 
