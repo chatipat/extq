@@ -3,8 +3,11 @@
 import numpy as np
 
 from ..integral import integral_windows
-from ..stop import backward_stop
-from ..stop import forward_stop
+from ._transitions import (
+    backward_feynman_kac_transitions,
+    constant_transitions,
+    forward_feynman_kac_transitions,
+)
 
 
 def reweight_kernel(w, lag):
@@ -29,9 +32,10 @@ def reweight_kernel(w, lag):
     return _kernel(k, w, lag)
 
 
-def forward_kernel(w, d, f, g, lag):
+def forward_feynman_kac_kernel(w, d, f, g, lag):
     """
-    Correlation matrix kernel for forecasting.
+    Correlation matrix kernel for solving a forward-in-time Feynman-Kac
+    problem.
 
     Parameters
     ----------
@@ -51,33 +55,18 @@ def forward_kernel(w, d, f, g, lag):
     Returns
     -------
     (2, 2, n_frames-lag) ndarray of float
-        Correlation matrix kernel for computing forecast correlation
-        matrices.
+        Correlation matrix kernel for computing correlation matrices for
+        the forward-in-time Feynman-Kac problem.
 
     """
-    n = len(d)
-    f = np.broadcast_to(f, n - 1)
-    assert n >= lag
-    assert d.shape == (n,)
-    assert f.shape == (n - 1,)
-    assert g.shape == (n,)
-    k = np.zeros((n - lag, 2, 2))
-    if lag == 0:
-        k[:, 0, 0] = d
-        k[:, 0, 1] = d * g
-        k[:, 1, 1] = 1.0
-    else:
-        stop = np.minimum(np.arange(lag, n), forward_stop(d)[:-lag])
-        intf = np.insert(np.cumsum(f), 0, 0.0)
-        k[:, 0, 0] = d[stop]
-        k[:, 0, 1] = d[:-lag] * (g[stop] + (intf[stop] - intf[:-lag]))
-        k[:, 1, 1] = 1.0
+    k = forward_feynman_kac_transitions(d, f, g, lag)
     return _kernel(k, w, lag)
 
 
-def backward_kernel(w, d, f, g, lag):
+def backward_feynman_kac_kernel(w, d, f, g, lag):
     """
-    Correlation matrix kernel for aftcasting.
+    Correlation matrix kernel for solving a backward-in-time Feynman-Kac
+    problem.
 
     Parameters
     ----------
@@ -97,27 +86,11 @@ def backward_kernel(w, d, f, g, lag):
     Returns
     -------
     (2, 2, n_frames-lag) ndarray of float
-        Correlation matrix kernel for computing aftcast correlation
-        matrices.
+        Correlation matrix kernel for computing correlation matrices for
+        the backward-in-time Feynman-Kac problem.
 
     """
-    n = len(d)
-    f = np.broadcast_to(f, n - 1)
-    assert n >= lag
-    assert d.shape == (n,)
-    assert f.shape == (n - 1,)
-    assert g.shape == (n,)
-    k = np.zeros((n - lag, 2, 2))
-    if lag == 0:
-        k[:, 0, 0] = d
-        k[:, 1, 0] = d * g
-        k[:, 1, 1] = 1.0
-    else:
-        stop = np.maximum(np.arange(n - lag), backward_stop(d)[lag:])
-        intf = np.insert(np.cumsum(f), 0, 0.0)
-        k[:, 0, 0] = d[stop]
-        k[:, 1, 0] = d[lag:] * (g[stop] + (intf[lag:] - intf[stop]))
-        k[:, 1, 1] = 1.0
+    k = backward_feynman_kac_transitions(d, f, g, lag)
     return _kernel(k, w, lag)
 
 
@@ -159,9 +132,9 @@ def reweight_integral_kernel(w, v, lag):
 def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
     r"""
     Correlation matrix kernel for computing ergodic averages involving
-    forecasts.
+    a forward-in-time Feynman-Kac statistic.
 
-    For the forecast :math:`u_+`, the average computed is
+    For the statistic :math:`u_+`, the average computed is
     :math:`\langle v(X_t,X_{t+1}) u_+(X_{t+1}) \rangle`.
 
     Parameters
@@ -179,7 +152,7 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
         Function to integrate. Note that this is defined at each *step*,
         not at each frame.
     g_f : (n_frames,) ndarray of float
-        Guess of the forecast, with the correct boundary conditions.
+        Guess of the statistic, with the correct boundary conditions.
     lag : int
         Lag time, in units of frames.
 
@@ -187,26 +160,26 @@ def forward_integral_kernel(w, d_f, v, f_f, g_f, lag):
     -------
     (1, 2, n_frames-lag) ndarray of float
         Correlation matrix for computing correlation matrices for
-        ergodic averages involving forecasts.
+        ergodic averages involving a forward-in-time Feynman-Kac
+        statistic.
 
     """
     if lag == 0:
         k = np.zeros((len(w), 1, 2))
     else:
         kb = constant_transitions(len(w), 1)
-        kf = forward_transitions(d_f, f_f, g_f, 1)
-        kv = observable(v, 1, 2)
+        kf = forward_feynman_kac_transitions(d_f, f_f, g_f, 1)
+        kv = observable(v, 1, 2) @ forward_guess(d_f, g_f)[1:]
         k = integral_windows(kb, kf, kv, 1, lag)
-        k = k @ forward_guess(d_f, g_f)[lag:]
     return _kernel(k, w, lag)
 
 
 def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
     r"""
     Correlation matrix kernel for computing ergodic averages involving
-    aftcasts.
+    a backward-in-time Feynman-Kac statistic.
 
-    For the aftcast :math:`u_-`, the average computed is
+    For the statistic :math:`u_-`, the average computed is
     :math:`\langle u_-(X_t) v(X_t,X_{t+1}) \rangle`.
 
     Parameters
@@ -224,7 +197,7 @@ def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
         Function to integrate. Note that this is defined at each *step*,
         not at each frame.
     g_b : (n_frames,) ndarray of float
-        Guess of the aftcast, with the correct boundary conditions.
+        Guess of the statistic, with the correct boundary conditions.
     lag : int
         Lag time, in units of frames.
 
@@ -232,27 +205,28 @@ def backward_integral_kernel(w, d_b, v, f_b, g_b, lag):
     -------
     (2, 1, n_frames-lag) ndarray of float
         Correlation matrix for computing correlation matrices for
-        ergodic averages involving aftcasts.
+        ergodic averages involving a backward-in-time Feynman-Kac
+        statistic.
 
     """
     if lag == 0:
         k = np.zeros((len(w), 2, 1))
     else:
-        kb = backward_transitions(d_b, f_b, g_b, 1)
+        kb = backward_feynman_kac_transitions(d_b, f_b, g_b, 1)
         kf = constant_transitions(len(w), 1)
-        kv = observable(v, 2, 1)
+        kv = backward_guess(d_b, g_b)[:-1] @ observable(v, 2, 1)
         k = integral_windows(kb, kf, kv, 1, lag)
-        k = backward_guess(d_b, g_b)[:-lag] @ k
     return _kernel(k, w, lag)
 
 
 def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
     r"""
     Correlation matrix kernel for computing ergodic averages involving
-    both forecasts and aftcasts.
+    both forward-in-time and backward-in-time Feynman-Kac statistics.
 
-    For the forecast :math:`u_+` and the aftcast :math:`u_-`, the
-    average computed is :math:`\langle u_-(X_t) v(X_t,X_{t+1}) \rangle`.
+    For the forward-in-time statistic :math:`u_+` and the
+    backward-in-time statistic :math:`u_-`, the average computed is
+    :math:`\langle u_-(X_t) v(X_t,X_{t+1}) \rangle`.
 
     Parameters
     ----------
@@ -260,23 +234,27 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
         Weight of each frame. Note that the last `lag` frames must have
         zero weight.
     d_b : (n_frames,) ndarray of bool
-        For the aftcast, whether each frame is in the domain.
+        For the backward-in-time statistic, whether each frame is in the
+        domain.
     d_f : (n_frames,) ndarray of bool
-        For the forecast, whether each frame is in the domain.
+        For the forward-in-time statistic, whether each frame is in the
+        domain.
     v : (n_frames-1,) ndarray of float
         Observable for which to compute the ergodic average. Note that
         this is defined at each *step*, not at each frame, so ``v[t]``
         is a function of frames ``t`` and ``t+1``.
     f_b : (n_frames-1,) ndarray of float
-        Function to integrate for the aftcast. Note that this is
-        defined at each *step*, not at each frame.
+        Function to integrate for the backward-in-time statistic. Note
+        that this is defined at each *step*, not at each frame.
     f_f : (n_frames-1,) ndarray of float
-        Function to integrate for the forecast. Note that this is
-        defined at each *step*, not at each frame.
+        Function to integrate for the forward-in-time statistic. Note
+        that this is defined at each *step*, not at each frame.
     g_b : (n_frames,) ndarray of float
-        Guess of the aftcast, with the correct boundary conditions.
+        Guess of the backward-in-time statistic, with the correct
+        boundary conditions.
     g_f : (n_frames,) ndarray of float
-        Guess of the forecast, with the correct boundary conditions.
+        Guess of the forward-in-time statistic, with the correct
+        boundary conditions.
     lag : int
         Lag time, in units of frames.
 
@@ -284,161 +262,22 @@ def integral_kernel(w, d_b, d_f, v, f_b, f_f, g_b, g_f, lag):
     -------
     (2, 2, n_frames-lag) ndarray of float
         Correlation matrix for computing correlation matrices for
-        ergodic averages involving forecasts and aftcasts.
+        ergodic averages involving both forward-in-time and
+        backward-in-time Feynman-Kac statistics.
 
     """
     if lag == 0:
         k = np.zeros((len(w), 2, 2))
     else:
-        kb = backward_transitions(d_b, f_b, g_b, 1)
-        kf = forward_transitions(d_f, f_f, g_f, 1)
-        kv = observable(v, 2, 2)
+        kb = backward_feynman_kac_transitions(d_b, f_b, g_b, 1)
+        kf = forward_feynman_kac_transitions(d_f, f_f, g_f, 1)
+        kv = (
+            backward_guess(d_b, g_b)[:-1]
+            @ observable(v, 2, 2)
+            @ forward_guess(d_f, g_f)[1:]
+        )
         k = integral_windows(kb, kf, kv, 1, lag)
-        k = backward_guess(d_b, g_b)[:-lag] @ k @ forward_guess(d_f, g_f)[lag:]
     return _kernel(k, w, lag)
-
-
-def constant_transitions(n_frames, lag):
-    """
-    Transition kernel for a constant function.
-
-    The element for the transition `t` to `t+lag` is ::
-
-        k[t] = [[1]]
-
-    Parameters
-    ----------
-    n_frames : int
-        Number of frames in the trajectory.
-    lag : int
-        Lag time, in units of frames.
-
-    Returns
-    -------
-    (n_frames[i]-lag, 1, 1) ndarray of float
-        Constant function transition kernel at each frame.
-
-    """
-    assert n_frames >= lag
-    return np.ones((n_frames - lag, 1, 1))
-
-
-def forward_transitions(d, f, g, lag):
-    """
-    Transition kernel for a forecast.
-
-    The element for the transition `t` to `t+lag` is ::
-
-        k[t] = [[ d[s], b[s] + sum(f[t:s]) ],
-                [    0,                  1 ]]
-
-    where ``b = ~d * g`` and ``s = t + min(lag, argmin(~d[t:]))``.
-
-    Note that the identity element (``lag == 0``) is ::
-
-        k[t] = [[ d[t], b[t] ],
-                [    0,    1 ]]
-
-    which is a projection matrix because the forecast is restricted to
-    an affine subspace.
-
-    Parameters
-    ----------
-    d : (n_frames,) ndarray of bool
-        Whether each frame is in the domain.
-    f : (n_frames-1,) ndarray of float
-        Function to integrate. Note that this is defined at each *step*,
-        not at each frame.
-    g : (n_frames,) ndarray of float
-        Guess of the solution, with the correct boundary conditions.
-    lag : int
-        Lag time, in units of frames.
-
-    Returns
-    -------
-    k : (n_frames-lag, 2, 2) ndarray of float
-        At each step ``t``, the kernel corresponding to the transition
-        from frame ``t`` to frame ``t+lag``.
-
-    """
-    n = len(d)
-    f = np.broadcast_to(f, n - 1)
-    assert n >= lag
-    assert d.shape == (n,)
-    assert f.shape == (n - 1,)
-    assert g.shape == (n,)
-    b = np.where(d, 0.0, g)
-    k = np.zeros((n - lag, 2, 2))
-    if lag == 0:
-        k[:, 0, 0] = d
-        k[:, 0, 1] = b
-        k[:, 1, 1] = 1.0
-    else:
-        stop = np.minimum(np.arange(lag, n), forward_stop(d)[:-lag])
-        intf = np.insert(np.cumsum(f), 0, 0.0)
-        k[:, 0, 0] = d[stop]
-        k[:, 0, 1] = b[stop] + (intf[stop] - intf[:-lag])
-        k[:, 1, 1] = 1.0
-    return k
-
-
-def backward_transitions(d, f, g, lag):
-    """
-    Transition kernel for an aftcast.
-
-    The element for the transition `t` to `t+lag` is ::
-
-        k[t] = [[                   d[s], 0 ],
-                [ b[s] + sum(f[s:t+lag]), 1 ]]
-
-    where ``b = ~d * g`` and ``s = t + max(0, lag-argmin(~d[t::-1]))``.
-
-    Note that the identity element (``lag == 0``) is ::
-
-        k[t] = [[ d[t], 0 ],
-                [ b[t], 1 ]]
-
-    which is a projection matrix because the aftcast is restricted to
-    an affine subspace.
-
-    Parameters
-    ----------
-    d : (n_frames,) ndarray of bool
-        Whether each frame is in the domain.
-    f : (n_frames-1,) ndarray of float
-        Function to integrate. Note that this is defined at each *step*,
-        not at each frame.
-    g : (n_frames,) ndarray of float
-        Guess of the solution, with the correct boundary conditions.
-    lag : int
-        Lag time, in units of frames.
-
-    Returns
-    -------
-    k : (n_frames-lag, 2, 2) ndarray of float
-        At each step ``t``, the kernel corresponding to the transition
-        from frame ``t`` to frame ``t+lag``.
-
-    """
-    n = len(d)
-    f = np.broadcast_to(f, n - 1)
-    assert n >= lag
-    assert d.shape == (n,)
-    assert f.shape == (n - 1,)
-    assert g.shape == (n,)
-    b = np.where(d, 0.0, g)
-    k = np.zeros((n - lag, 2, 2))
-    if lag == 0:
-        k[:, 0, 0] = d
-        k[:, 1, 0] = b
-        k[:, 1, 1] = 1.0
-    else:
-        stop = np.maximum(np.arange(n - lag), backward_stop(d)[lag:])
-        intf = np.insert(np.cumsum(f), 0, 0.0)
-        k[:, 0, 0] = d[stop]
-        k[:, 1, 0] = b[stop] + (intf[lag:] - intf[stop])
-        k[:, 1, 1] = 1.0
-    return k
 
 
 def observable(v, n_left_indices, n_right_indices):
@@ -457,7 +296,7 @@ def observable(v, n_left_indices, n_right_indices):
 
     Returns
     -------
-    (n_frames, n_left_indices, n_right_indices) ndarray of float
+    (n_frames-1, n_left_indices, n_right_indices) ndarray of float
         Transition kernel for the observable.
 
     """
@@ -468,14 +307,12 @@ def observable(v, n_left_indices, n_right_indices):
 
 def forward_guess(d, g):
     """
-    Matrices to apply the guess function to a forecast kernel.
+    Matrices to unhomogenize the forward-in-time Feynman-Kac problem.
 
     This is ::
 
         m[t] = [[ d[t], g[t] ],
                 [    0,    1 ]]
-
-    Note that this also applies the boundary conditions.
 
     Parameters
     ----------
@@ -487,8 +324,7 @@ def forward_guess(d, g):
     Returns
     -------
     (n_frames, 2, 2) ndarray of float
-        At each frame, a matrix to apply the guess function to an
-        forecast kernel.
+        At each frame, a matrix to unhomogenize the Feynman-Kac problem.
 
     """
     n = len(d)
@@ -503,14 +339,12 @@ def forward_guess(d, g):
 
 def backward_guess(d, g):
     """
-    Matrices to apply the guess function to an aftcast kernel.
+    Matrices to unhomogenize the backward-in-time Feynman-Kac problem.
 
     This is ::
 
         m[t] = [[ d[t], 0 ],
                 [ g[t], 1 ]]
-
-    Note that this also applies the boundary conditions.
 
     Parameters
     ----------
@@ -522,8 +356,7 @@ def backward_guess(d, g):
     Returns
     -------
     (n_frames, 2, 2) ndarray of float
-        At each frame, a matrix to apply the guess function to an
-        aftcast kernel.
+        At each frame, a matrix to unhomogenize the Feynman-Kac problem.
 
     """
     n = len(d)

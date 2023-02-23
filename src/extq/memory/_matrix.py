@@ -207,7 +207,7 @@ def forward_feynman_kac_matrix(
     for x_f, y_f, w, in_d, f, g in zip(
         test, basis, weights, in_domain, function, guess
     ):
-        m = _kernel.forward_kernel(w, in_d, f, g, lag)
+        m = _kernel.forward_feynman_kac_kernel(w, in_d, f, g, lag)
         # fmt: off
         mat[0, 0] = _build(m[0, 0], x_f , y_f , mat[0, 0], lag)
         mat[0, 1] = _build(m[0, 1], x_f , None, mat[0, 1], lag)
@@ -373,7 +373,7 @@ def backward_feynman_kac_matrix(
     for x_w, y_w, x_b, y_b, w, in_d, f, g in zip(
         w_basis, w_test, basis, test, weights, in_domain, function, guess
     ):
-        m = _kernel.backward_kernel(w, in_d, f, g, lag)
+        m = _kernel.backward_feynman_kac_kernel(w, in_d, f, g, lag)
         # fmt: off
         mat[0, 0] = _build(m[0, 0], x_b , y_b , mat[0, 0], lag)
         mat[1, 0] = _build(m[1, 0], x_w , y_b , mat[1, 0], lag)

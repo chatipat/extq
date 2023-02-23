@@ -2,10 +2,14 @@ import numpy as np
 
 from .. import linalg
 from ..integral import integral_coeffs as _integral_coeffs
-from . import _dga
-from . import _kernel
-from . import _matrix
-from . import _memory
+from . import _dga, _matrix, _memory
+from ._transitions import (
+    backward_feynman_kac_transitions,
+    backward_feynman_kac_unhomogenize,
+    constant_transitions,
+    forward_feynman_kac_transitions,
+    forward_feynman_kac_unhomogenize,
+)
 
 __all__ = [
     "reweight_integral_coeffs",
@@ -264,11 +268,15 @@ def integral_coeffs(
 def _constant(weights):
     out = []
     for w in weights:
-        k = _kernel.constant_transitions(len(w), 1)
+        k = constant_transitions(len(w), 1)
+
+        m = np.ones((len(w), 1))
+
         u = np.empty((len(w), 1, 2))
         u[:, 0, 0] = 1.0
         u[:, 0, 1] = -1.0
-        out.append((k, u))
+
+        out.append((k, m, u))
     return out
 
 
@@ -280,10 +288,14 @@ def _reweight(basis, weights, lag, mem=0, test=None):
     v = _left_coeffs(mats)
     out = []
     for x_w, w in zip(basis, weights):
-        k = _kernel.constant_transitions(len(w), 1)
+        k = constant_transitions(len(w), 1)
+
+        m = np.ones((len(w), 1))
+
         u = np.empty((len(w), 1, mem + 2))
         u[:, 0] = w[:, None] * (v[-1] + x_w @ v[:-1])
-        out.append((k, u))
+
+        out.append((k, m, u))
     return out
 
 
@@ -299,11 +311,14 @@ def _forward_feynman_kac(
     v = _right_coeffs(mats)
     out = []
     for y_f, d_f, f_f, g_f in zip(basis, in_domain, function, guess):
-        k = _kernel.forward_transitions(d_f, f_f, g_f, 1)
+        k = forward_feynman_kac_transitions(d_f, f_f, g_f, 1)
+        m = forward_feynman_kac_unhomogenize(d_f, g_f)
+
         u = np.empty((len(d_f), 2, v.shape[-1]))
+        u[:, 0] = y_f @ v[:-1]
         u[:, 1] = v[-1]
-        u[:, 0] = g_f[:, None] * u[:, 1] + d_f[:, None] * (y_f @ v[:-1])
-        out.append((k, u))
+
+        out.append((k, m, u))
     return out
 
 
@@ -338,12 +353,15 @@ def _backward_feynman_kac(
     for x_w, x_b, w, d_b, f_b, g_b in zip(
         w_basis, basis, weights, in_domain, function, guess
     ):
-        k = _kernel.backward_transitions(d_b, f_b, g_b, 1)
+        k = backward_feynman_kac_transitions(d_b, f_b, g_b, 1)
+        m = backward_feynman_kac_unhomogenize(d_b, f_b)
+
         n = x_b.shape[1]
         u = np.empty((len(d_b), 2, v.shape[-1]))
+        u[:, 0] = w[:, None] * (x_b @ v[:n])
         u[:, 1] = w[:, None] * (v[-1] + x_w @ v[n:-1])
-        u[:, 0] = g_b[:, None] * u[:, 1] + (d_b * w)[:, None] * (x_b @ v[:n])
-        out.append((k, u))
+
+        out.append((k, m, u))
     return out
 
 
@@ -378,9 +396,11 @@ def _combine(left, right, obslag, lag, mem=0):
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
     out = []
-    for (k_b, u_b), (k_f, u_f) in zip(left, right):
+    for (k_b, m_b, u_b), (k_f, m_f, u_f) in zip(left, right):
         nf, ni, nk = u_b.shape
         _, nj, nl = u_f.shape
+        assert m_b.shape == (nf, ni)
+        assert m_f.shape == (nf, nj)
         assert u_b.shape == (nf, ni, nk)
         assert u_f.shape == (nf, nj, nl)
         assert k_b.shape == (nf - 1, ni, ni)
@@ -405,7 +425,10 @@ def _combine(left, right, obslag, lag, mem=0):
             c[:-1] += a @ np.swapaxes(k_f, 1, 2)
             c[1:] += np.swapaxes(k_b, 1, 2) @ a
             a = 0.5 * c
-        out.append(a[:, 0, 0] / dlag)
+            a = np.sum(m_b[:, :, None] * a * m_f[:, None, :], axis=(1, 2))
+        else:
+            a = np.sum(m_b[:-1, :, None] * a * m_f[1:, None, :], axis=(1, 2))
+        out.append(a / dlag)
     return out
 
 
