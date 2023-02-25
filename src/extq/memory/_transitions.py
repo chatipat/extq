@@ -87,36 +87,6 @@ def forward_feynman_kac_transitions(d, f, g, lag):
     return k
 
 
-def forward_feynman_kac_unhomogenize(d, g):
-    """
-    Unhomogenize the forward-in-time Feynman-Kac problem.
-
-    This is ::
-
-        m[t] = [ d[t], g[t] ]
-
-    Parameters
-    ----------
-    d : (n_frames,) ndarray of bool
-        Whether each frame is in the domain.
-    g : (n_frames,) ndarray of float
-        Guess of the solution, with the correct boundary conditions.
-
-    Returns
-    -------
-    (n_frames, 2) ndarray of float
-        At each frame, a vector to unhomogenize the Feynman-Kac problem.
-
-    """
-    n = len(d)
-    assert d.shape == (n,)
-    assert g.shape == (n,)
-    out = np.zeros((n, 2))
-    out[:, 0] = d
-    out[:, 1] = g
-    return out
-
-
 def backward_feynman_kac_transitions(d, f, g, lag):
     """
     Transition kernel for a backward-in-time Feynman-Kac statistic.
@@ -172,33 +142,3 @@ def backward_feynman_kac_transitions(d, f, g, lag):
         k[:, 1, 0] = (g[stop] - g[lag:]) + (intf[lag:] - intf[stop])
         k[:, 1, 1] = 1.0
     return k
-
-
-def backward_feynman_kac_unhomogenize(d, g):
-    """
-    Unhomogenize the backward-in-time Feynman-Kac problem.
-
-    This is ::
-
-        m[t] = [ d[t], g[t] ]
-
-    Parameters
-    ----------
-    d : (n_frames,) ndarray of bool
-        Whether each frame is in the domain.
-    g : (n_frames,) ndarray of float
-        Guess of the solution, with the correct boundary conditions.
-
-    Returns
-    -------
-    (n_frames, 2) ndarray of float
-        At each frame, a vector to unhomogenize the Feynman-Kac problem.
-
-    """
-    n = len(d)
-    assert d.shape == (n,)
-    assert g.shape == (n,)
-    out = np.zeros((n, 2))
-    out[:, 0] = d
-    out[:, 1] = g
-    return out
