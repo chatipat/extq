@@ -20,7 +20,7 @@ def forward_stop(in_domain):
 
     """
     n = len(in_domain)
-    result = np.empty(n, dtype=np.int32)
+    result = np.empty(n, dtype=np.int_)
     stop_time = n
     for t in range(n - 1, -1, -1):
         if not in_domain[t]:
@@ -47,7 +47,7 @@ def backward_stop(in_domain):
 
     """
     n = len(in_domain)
-    result = np.empty(n, dtype=np.int32)
+    result = np.empty(n, dtype=np.int_)
     stop_time = -1
     for t in range(n):
         if not in_domain[t]:
