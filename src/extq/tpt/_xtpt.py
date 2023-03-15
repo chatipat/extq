@@ -1,5 +1,6 @@
 import numba as nb
 import numpy as np
+from more_itertools import zip_equal
 
 from ..moving_semigroup import moving_semigroup
 
@@ -52,7 +53,7 @@ def extended_rate(
     assert lag > 0
     n_indices = None
     out = 0.0
-    for qp, qm, w, m, d, h in zip(
+    for qp, qm, w, m, d, h in zip_equal(
         forward_q, backward_q, weights, transitions, in_domain, rxn_coord
     ):
         n_frames = w.shape[0]
@@ -167,7 +168,7 @@ def extended_current(
     assert lag > 0
     n_indices = None
     out = []
-    for qp, qm, w, m, d, f in zip(
+    for qp, qm, w, m, d, f in zip_equal(
         forward_q, backward_q, weights, transitions, in_domain, cv
     ):
         n_frames = w.shape[0]

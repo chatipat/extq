@@ -1,5 +1,6 @@
 import numba as nb
 import numpy as np
+from more_itertools import zip_equal
 
 from .. import linalg
 from ..moving_semigroup import moving_matmul
@@ -173,7 +174,7 @@ def forward_extended_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, m, d, f, g in zip(
+    for x, y, w, m, d, f, g in zip_equal(
         test_basis, basis, weights, transitions, in_domain, function, guess
     ):
         n_frames = x[0].shape[0]
@@ -396,7 +397,7 @@ def backward_extended_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, m, d, f, g in zip(
+    for x, y, w, m, d, f, g in zip_equal(
         test_basis, basis, weights, transitions, in_domain, function, guess
     ):
         n_frames = x[0].shape[0]
@@ -462,6 +463,6 @@ def _backward_transitions_helper(m, d, f, g, lag):
 
 def transform(coeffs, basis, guess):
     return [
-        np.array([yi @ coeffs + gi for yi, gi in zip(y, g)])
-        for y, g in zip(basis, guess)
+        np.array([yi @ coeffs + gi for yi, gi in zip_equal(y, g)])
+        for y, g in zip_equal(basis, guess)
     ]

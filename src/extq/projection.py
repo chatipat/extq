@@ -1,4 +1,5 @@
 import numpy as np
+from more_itertools import zip_equal
 
 
 def density1d(cv, weights, edges):
@@ -21,7 +22,7 @@ def density1d(cv, weights, edges):
 
     """
     numer = 0.0
-    for x, w in zip(cv, weights):
+    for x, w in zip_equal(cv, weights):
         numer += np.histogram(x, bins=edges, weights=w)[0]
     denom = np.diff(edges)
     return numer / denom
@@ -47,7 +48,7 @@ def density2d(cv1, cv2, weights, edges1, edges2):
 
     """
     numer = 0.0
-    for x, y, w in zip(cv1, cv2, weights):
+    for x, y, w in zip_equal(cv1, cv2, weights):
         numer += np.histogram2d(x, y, bins=(edges1, edges2), weights=w)[0]
     denom = np.einsum("i,j->ij", np.diff(edges1), np.diff(edges2))
     return numer / denom
@@ -74,7 +75,7 @@ def density3d(cv1, cv2, cv3, weights, edges1, edges2, edges3):
 
     """
     numer = 0.0
-    for x, y, z, w in zip(cv1, cv2, cv3, weights):
+    for x, y, z, w in zip_equal(cv1, cv2, cv3, weights):
         numer += np.histogramdd(
             (x, y, z), bins=(edges1, edges2, edges3), weights=w
         )[0]
@@ -106,7 +107,7 @@ def average1d(cv, func, weights, edges):
     """
     numer = 0.0
     denom = 0.0
-    for x, f, w in zip(cv, func, weights):
+    for x, f, w in zip_equal(cv, func, weights):
         numer += np.histogram(x, bins=edges, weights=f * w)[0]
         denom += np.histogram(x, bins=edges, weights=w)[0]
     return numer / denom
@@ -134,7 +135,7 @@ def average2d(cv1, cv2, func, weights, edges1, edges2):
     """
     numer = 0.0
     denom = 0.0
-    for x, y, f, w in zip(cv1, cv2, func, weights):
+    for x, y, f, w in zip_equal(cv1, cv2, func, weights):
         numer += np.histogram2d(x, y, bins=(edges1, edges2), weights=f * w)[0]
         denom += np.histogram2d(x, y, bins=(edges1, edges2), weights=w)[0]
     return numer / denom
@@ -162,7 +163,7 @@ def average3d(cv1, cv2, cv3, func, weights, edges1, edges2, edges3):
     """
     numer = 0.0
     denom = 0.0
-    for x, y, z, f, w in zip(cv1, cv2, cv3, func, weights):
+    for x, y, z, f, w in zip_equal(cv1, cv2, cv3, func, weights):
         numer += np.histogramdd(
             (x, y, z), bins=(edges1, edges2, edges3), weights=f * w
         )[0]

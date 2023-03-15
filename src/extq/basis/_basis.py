@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.linalg
 import scipy.sparse
+from more_itertools import zip_equal
 
 __all__ = [
     "whiten",
@@ -44,7 +45,7 @@ def whiten(trajs, weights=None, rtol=None, with_mean=True, with_std=True):
             numer += x.T @ x
             denom += len(x)
     else:
-        for x, w in zip(trajs, weights):
+        for x, w in zip_equal(trajs, weights):
             numer += x.T @ scipy.sparse.diags(w) @ x
             denom += np.sum(w)
     cov = numer / denom

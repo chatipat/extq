@@ -1,8 +1,8 @@
 import numba as nb
 import numpy as np
+from more_itertools import zip_equal
 
-from ..stop import backward_stop
-from ..stop import forward_stop
+from ..stop import backward_stop, forward_stop
 
 __all__ = [
     "rate",
@@ -41,7 +41,7 @@ def rate(
     """
     assert lag > 0
     out = 0.0
-    for qp, qm, w, d, h in zip(
+    for qp, qm, w, d, h in zip_equal(
         forward_q, backward_q, weights, in_domain, rxn_coord
     ):
         n_frames = w.shape[0]
@@ -125,7 +125,9 @@ def current(
     """
     assert lag > 0
     out = []
-    for qp, qm, w, d, f in zip(forward_q, backward_q, weights, in_domain, cv):
+    for qp, qm, w, d, f in zip_equal(
+        forward_q, backward_q, weights, in_domain, cv
+    ):
         n_frames = w.shape[0]
         assert qp.shape == (n_frames,)
         assert qm.shape == (n_frames,)

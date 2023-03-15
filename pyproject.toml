@@ -25,7 +25,13 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering",
 ]
-dependencies = ["numba", "numpy", "scipy", "scikit-learn"]
+dependencies = [
+    "more-itertools",
+    "numba",
+    "numpy",
+    "scikit-learn",
+    "scipy",
+]
 
 [project.urls]
 homepage = "https://github.com/chatipat/extq"
