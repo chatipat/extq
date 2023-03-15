@@ -7,6 +7,7 @@ __all__ = [
     "whiten",
     "center",
     "add_constant_feature",
+    "remove_constant_feature",
 ]
 
 
@@ -114,3 +115,54 @@ def add_constant_feature(trajs):
         np.concatenate((x, np.ones((len(x), 1), dtype=x.dtype)), axis=-1)
         for x in trajs
     ]
+
+
+def remove_constant_feature(trajs, weights=None, tol=0.0):
+    """Remove the constant feature from the span of the features.
+
+    Parameters
+    ----------
+    trajs : list of (n_frames[i], n_features) array-like
+        Input features. This must be able to represent the constant
+        feature.
+    weights : list of (n_frames[i],) array-like, optional
+        Weight of each frame of the trajectories.
+        If None, assign uniform weights.
+    tol : float, optional
+        If the magnitude of the mean of a feature is less than this
+        value, assume that it is zero.
+
+    Returns
+    -------
+    list of (n_frames[i], n_features-1) ndarray
+        Features with the constant feature removed.
+
+    """
+    numer = 0.0
+    denom = 0.0
+    if weights is None:
+        for x in trajs:
+            numer += x.sum(axis=0)
+            denom += x.shape[0]
+    else:
+        for x, w in zip_equal(trajs, weights):
+            numer += w @ x
+            denom += np.sum(w)
+    means = np.ravel(numer) / denom
+    n_out = len(means) - 1
+
+    # order the features by the magnitudes of the means, and remove the
+    # mean of each feature by subtracting from it the scaled feature
+    # with the next greater magnitude of the mean
+
+    order = np.argsort(np.abs(means))
+    means = means[order]
+    factor = np.ones(n_out)
+    mask = means[:-1] >= tol
+    factor[mask] = -means[:-1][mask] / means[1:][mask]
+
+    data = np.concatenate([np.ones(n_out), factor])
+    row = np.concatenate([order[:-1], order[1:]])
+    col = np.concatenate([np.arange(n_out), np.arange(n_out)])
+    mat = scipy.sparse.csr_matrix((data, (row, col)), shape=(n_out + 1, n_out))
+    return [x @ mat for x in trajs]
