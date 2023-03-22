@@ -1,5 +1,4 @@
-
-from extq import main
+import extq
 
 
 def test_main():

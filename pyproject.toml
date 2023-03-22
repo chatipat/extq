@@ -1,7 +1,89 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "extq"
+version = "0.0.0"
+authors = [
+    {name = "Chatipat Lorpaiboon", email = "chatipat@uchicago.edu"},
+]
+description = "Dynamical analysis of trajectory data"
+readme = "README.rst"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "more-itertools",
+    "numba",
+    "numpy",
+    "scikit-learn",
+    "scipy",
+]
+
+[project.urls]
+homepage = "https://github.com/chatipat/extq"
+documentation = "https://extq.readthedocs.io"
+changelog = "https://extq.readthedocs.io/en/latest/changelog.html"
+tracker = "https://github.com/chatipat/extq/issues"
+
+[tool.hatch.envs.test]
+matrix = [{python = ["3.7", "3.8", "3.9", "3.10"]}]
+dependencies = ["coverage[toml]", "pytest", "pytest-cov"]
+[tool.hatch.envs.test.scripts]
+cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=src/extq --cov=tests {args}"
+no-cov = "cov --no-cov {args}"
+
+[tool.hatch.envs.coverage]
+detached = true
+dependencies = ["coverage[toml]"]
+[tool.hatch.envs.coverage.scripts]
+report = ["coverage report", "coverage html"]
+clean = "coverage erase"
+
+[tool.hatch.envs.lint]
+detached = true
+dependencies = ["black", "flake8", "isort"]
+[tool.hatch.envs.lint.scripts]
+style = ["black --check --diff {args:.}", "isort --check-only --diff {args:.}"]
+format = ["isort {args:.}", "black {args:.}", "style"]
+check = ["flake8 {args:.}", "style"]
+
+[tool.hatch.envs.docs]
+dependencies = ["sphinx", "sphinx-rtd-theme"]
+[tool.hatch.envs.docs.scripts]
+build = "sphinx-build -E -b html docs dist/docs"
+check = "sphinx-build -b linkcheck docs dist/docs"
+build-check = ["build", "check"]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+
+[tool.pytest.ini_options]
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+addopts = "-ra --tb=short --strict-markers --doctest-modules --doctest-glob=*.rst"
+testpaths = ["tests"]
+
+[tool.isort]
+profile = "black"
+line_length = 79
+skip_gitignore = true
+known_first_party = ["extq"]
+forced_separate = ["test_extq"]
 
 [tool.black]
 line-length = 79
-target-version = ['py37', 'py38', 'py39']
+target-version = ["py37", "py38", "py39", "py310"]

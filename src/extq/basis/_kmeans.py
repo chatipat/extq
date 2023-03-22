@@ -2,9 +2,9 @@
 
 import numpy as np
 import sklearn.cluster
+from more_itertools import zip_equal
 
-from ._labels import _labels_to_basis
-from ._labels import renumber_labels
+from ._labels import _labels_to_basis, renumber_labels
 
 __all__ = [
     "kmeans_labels",
@@ -229,11 +229,11 @@ def kmeans_domain_basis(cvs, in_domain, num, sparse=True, **kwargs):
         Basis of indicator functions.
 
     """
-    cvs_d = [v[d] for v, d in zip(cvs, in_domain)]
+    cvs_d = [v[d] for v, d in zip_equal(cvs, in_domain)]
     labels = kmeans_labels(cvs_d, num, **kwargs)
     num = _num(labels)
     basis = []
-    for indices_d, d in zip(labels, in_domain):
+    for indices_d, d in zip_equal(labels, in_domain):
         indices = np.empty(len(d), dtype=indices_d.dtype)
         indices[d] = indices_d
         basis.append(_labels_to_basis(indices, num, sparse=sparse, mask=d))
@@ -336,4 +336,4 @@ def _num(labels):
 
 def _stack(*cvs):
     """Stack sequences of collective variables along the last axis."""
-    return [np.stack(vs, axis=-1) for vs in zip(*cvs)]
+    return [np.stack(vs, axis=-1) for vs in zip_equal(*cvs)]
