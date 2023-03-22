@@ -2,6 +2,7 @@
 
 import numpy as np
 import scipy.sparse
+from more_itertools import zip_equal
 
 __all__ = [
     "labels_to_basis",

@@ -1,7 +1,7 @@
 import numpy as np
+from more_itertools import zip_equal
 
-from ..stop import backward_stop
-from ..stop import forward_stop
+from ..stop import backward_stop, forward_stop
 
 __all__ = [
     "rate_jstrahan",
@@ -33,7 +33,7 @@ def rate_jstrahan(forward_q, backward_q, weights, in_domain, lag):
     """
     numer = 0.0
     denom = lag * sum(np.sum(w) for w in weights)
-    for qp, qm, w, d in zip(forward_q, backward_q, weights, in_domain):
+    for qp, qm, w, d in zip_equal(forward_q, backward_q, weights, in_domain):
         assert np.all(w[-lag:] == 0.0)
         tp = np.minimum(np.arange(lag, len(w)), forward_stop(d)[:-lag])
         numer += np.sum(w[:-lag] * qm[:-lag] * qp[tp] * (qp[tp] - qp[:-lag]))
@@ -66,7 +66,9 @@ def current_jstrahan(forward_q, backward_q, weights, in_domain, cv, lag):
     """
     result = []
     denom = 2.0 * lag * sum(np.sum(w) for w in weights)
-    for qp, qm, w, d, f in zip(forward_q, backward_q, weights, in_domain, cv):
+    for qp, qm, w, d, f in zip_equal(
+        forward_q, backward_q, weights, in_domain, cv
+    ):
         assert np.all(w[-lag:] == 0.0)
         tp = np.minimum(np.arange(lag, len(w)), forward_stop(d)[:-lag])
         tm = np.maximum(np.arange(len(w) - lag), backward_stop(d)[lag:])
