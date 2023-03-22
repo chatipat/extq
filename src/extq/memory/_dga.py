@@ -3,6 +3,7 @@
 
 import numpy as np
 import scipy.sparse
+from more_itertools import zip_equal
 
 from .. import linalg
 from ..integral import integral_coeffs, integral_windows
@@ -166,7 +167,7 @@ def reweight_matrices(basis, weights, lag, mem=0, test_basis=None):
     a = {t: np.zeros((n_basis, n_basis)) for t in range(1, mem + 2)}
     b = {t: np.zeros(n_basis) for t in range(1, mem + 2)}
 
-    for x, y, w in zip(test_basis, basis, weights):
+    for x, y, w in zip_equal(test_basis, basis, weights):
         n_frames = len(w)
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
@@ -218,7 +219,7 @@ def reweight_transform(coef, basis, weights):
         Estimate of the projected invariant distribution.
 
     """
-    return [w * (y @ coef[:, 0] + 1.0) for y, w in zip(basis, weights)]
+    return [w * (y @ coef[:, 0] + 1.0) for y, w in zip_equal(basis, weights)]
 
 
 def reweight_intermediate(coef, basis, weights):
@@ -248,7 +249,7 @@ def reweight_intermediate(coef, basis, weights):
     c[0] = 1.0
     c[1] = -1.0
     out = []
-    for x, w in zip(basis, weights):
+    for x, w in zip_equal(basis, weights):
         n_frames = len(w)
 
         assert x.shape == (n_frames, n_basis)
@@ -532,7 +533,7 @@ def forward_feynman_kac_matrices(
     a = {t: np.zeros((n_basis, n_basis)) for t in range(1, mem + 2)}
     b = {t: np.zeros(n_basis) for t in range(1, mem + 2)}
 
-    for x, y, w, d, f, g in zip(
+    for x, y, w, d, f, g in zip_equal(
         test_basis, basis, weights, in_domain, function, guess
     ):
         n_frames = len(w)
@@ -595,7 +596,8 @@ def forward_feynman_kac_transform(coef, basis, in_domain, guess):
 
     """
     return [
-        d * (y @ coef[:, 0]) + g for y, d, g in zip(basis, in_domain, guess)
+        d * (y @ coef[:, 0]) + g
+        for y, d, g in zip_equal(basis, in_domain, guess)
     ]
 
 
@@ -630,7 +632,7 @@ def forward_feynman_kac_intermediate(coef, basis, in_domain, function, guess):
     c[0] = 1.0
     c[1] = -1.0
     out = []
-    for y, d, f, g in zip(basis, in_domain, function, guess):
+    for y, d, f, g in zip_equal(basis, in_domain, function, guess):
         n_frames = len(d)
         f = np.broadcast_to(f, n_frames - 1)
 
@@ -940,7 +942,7 @@ def backward_feynman_kac_matrices(
     a = {t: np.zeros((n_basis, n_basis)) for t in range(1, mem + 2)}
     b = {t: np.zeros((n_basis, mem + 2)) for t in range(1, mem + 2)}
 
-    for (_, _, u_w), x, y, w, d, f, g in zip(
+    for (_, _, u_w), x, y, w, d, f, g in zip_equal(
         w_output, test_basis, basis, weights, in_domain, function, guess
     ):
         n_frames = len(w)
@@ -1009,7 +1011,7 @@ def backward_feynman_kac_transform(
     """
     return [
         d * w * (y @ coef[:, 0]) + g * u_w[:, 0, 0]
-        for (_, _, u_w), y, w, d, g in zip(
+        for (_, _, u_w), y, w, d, g in zip_equal(
             w_output, basis, weights, in_domain, guess
         )
     ]
@@ -1051,7 +1053,7 @@ def backward_feynman_kac_intermediate(
     """
     n_basis, n_lags = coef.shape
     out = []
-    for (_, _, u_w), y, w, d, f, g in zip(
+    for (_, _, u_w), y, w, d, f, g in zip_equal(
         w_output, basis, weights, in_domain, function, guess
     ):
         n_frames = len(d)
@@ -1113,7 +1115,9 @@ def integral(b_output, f_output, values, obslag, lag, mem=0):
     dlag = lag // (mem + 1)
 
     out = 0.0
-    for (k_b, m_b, u_b), (k_f, m_f, u_f), v in zip(b_output, f_output, values):
+    for (k_b, m_b, u_b), (k_f, m_f, u_f), v in zip_equal(
+        b_output, f_output, values
+    ):
         if obslag == 0:
             k_v = m_b[:, :, None] * v[:, None, None] * m_f[:, None, :]
             k_v = 0.5 * (k_b @ k_v[1:] + k_v[:-1] @ k_f)
@@ -1164,7 +1168,7 @@ def pointwise_integral(b_output, f_output, obslag, lag, mem=0):
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
     out = []
-    for (k_b, m_b, u_b), (k_f, m_f, u_f) in zip(b_output, f_output):
+    for (k_b, m_b, u_b), (k_f, m_f, u_f) in zip_equal(b_output, f_output):
         nf, ni, nk = u_b.shape
         _, nj, nl = u_f.shape
         assert m_b.shape == (nf, ni)
