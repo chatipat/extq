@@ -86,8 +86,10 @@ def reweight(
     assert (
         return_projection or return_solution or return_coef or return_mem_coef
     )
-    a, b = reweight_matrices(basis, weights, lag, mem, test_basis=test_basis)
-    coef, mem_coef = _dga_mem(a, b)
+    a, b, c0 = reweight_matrices(
+        basis, weights, lag, mem, test_basis=test_basis
+    )
+    coef, mem_coef = _dga_mem(a, b, c0)
     out = []
     if return_projection:
         out.append(reweight_projection(basis, weights, coef))
@@ -128,10 +130,12 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
 
     Returns
     -------
-    a : (mem + 2, n_basis, n_basis) ndarray of float
+    a : (mem + 1, n_basis, n_basis) ndarray of float
         DGA matrices for the homogeneous term.
-    b : (mem + 2, n_basis) ndarray of float
+    b : (mem + 1, n_basis) ndarray of float
         DGA matrices for the nonhomogeneous term.
+    c0 : (n_basis, n_basis) ndarray of float
+        Matrix of inner products of basis functions.
 
     """
     if test_basis is None:
@@ -141,8 +145,9 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
     dlag = lag // (mem + 1)
     n_basis = basis[0].shape[1]
 
-    a = np.zeros((mem + 2, n_basis, n_basis))
-    b = np.zeros((mem + 2, n_basis))
+    a = np.zeros((mem + 1, n_basis, n_basis))
+    b = np.zeros((mem + 1, n_basis))
+    c0 = np.zeros((n_basis, n_basis))
 
     for x, y, w in zip_equal(test_basis, basis, weights):
         n_frames = len(w)
@@ -157,12 +162,13 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
         assert np.all(w[end:] == 0.0)
 
         wy = linalg.scale_rows(w[:end], y[:end])
-        for n in range(mem + 2):
-            xt = x[n * dlag : end + n * dlag].T
-            a[n] += _densify(xt @ wy)
-            b[n] += xt @ w[:end]
+        for n in range(mem + 1):
+            dx = (x[(n + 1) * dlag : end + (n + 1) * dlag] - x[:end]).T
+            a[n] += _densify(dx @ wy)
+            b[n] += dx @ w[:end]
+        c0 += x[:end].T @ wy
 
-    return a, b
+    return a, b, c0
 
 
 def reweight_projection(basis, weights, coef):
@@ -466,7 +472,7 @@ def forward_feynman_kac(
     assert (
         return_projection or return_solution or return_coef or return_mem_coef
     )
-    a, b = forward_feynman_kac_matrices(
+    a, b, c0 = forward_feynman_kac_matrices(
         basis,
         weights,
         in_domain,
@@ -476,7 +482,7 @@ def forward_feynman_kac(
         mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = _dga_mem(a, b)
+    coef, mem_coef = _dga_mem(a, b, c0)
     out = []
     if return_projection:
         out.append(forward_feynman_kac_projection(basis, guess, coef))
@@ -529,10 +535,12 @@ def forward_feynman_kac_matrices(
 
     Returns
     -------
-    a : (mem + 2, n_basis, n_basis) ndarray of float
+    a : (mem + 1, n_basis, n_basis) ndarray of float
         DGA matrices for the homogeneous term.
-    b : (mem + 2, n_basis) ndarray of float
+    b : (mem + 1, n_basis) ndarray of float
         DGA matrices for the nonhomogeneous term.
+    c0 : (n_basis, n_basis) ndarray of float
+        Matrix of inner products of basis functions.
 
     """
     if test_basis is None:
@@ -542,8 +550,9 @@ def forward_feynman_kac_matrices(
     dlag = lag // (mem + 1)
     n_basis = basis[0].shape[1]
 
-    a = np.zeros((mem + 2, n_basis, n_basis))
-    b = np.zeros((mem + 2, n_basis))
+    a = np.zeros((mem + 1, n_basis, n_basis))
+    b = np.zeros((mem + 1, n_basis))
+    c0 = np.zeros((n_basis, n_basis))
 
     for x, y, w, d, f, g in zip_equal(
         test_basis, basis, weights, in_domain, function, guess
@@ -567,12 +576,13 @@ def forward_feynman_kac_matrices(
         stop = forward_stop(d)[:end]
         intf = np.insert(np.cumsum(f), 0, 0.0)
         xw = linalg.scale_rows(w[:end], x[:end]).T
-        for n in range(mem + 2):
-            iy = np.minimum(ix + n * dlag, stop)
-            a[n] += _densify(xw @ y[iy])
-            b[n] += xw @ (g[iy] + (intf[iy] - intf[:end]))
+        for n in range(mem + 1):
+            iy = np.minimum(ix + (n + 1) * dlag, stop)
+            a[n] += _densify(xw @ (y[iy] - y[:end]))
+            b[n] += xw @ ((g[iy] - g[:end]) + (intf[iy] - intf[:end]))
+        c0 += _densify(xw @ y[:end])
 
-    return a, b
+    return a, b, c0
 
 
 def forward_feynman_kac_projection(basis, guess, coef):
@@ -886,7 +896,7 @@ def backward_feynman_kac(
     assert (
         return_projection or return_solution or return_coef or return_mem_coef
     )
-    a, b = backward_feynman_kac_matrices(
+    a, b, c0 = backward_feynman_kac_matrices(
         basis,
         weights,
         in_domain,
@@ -896,7 +906,7 @@ def backward_feynman_kac(
         mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = _dga_mem(a, b)
+    coef, mem_coef = _dga_mem(a, b, c0)
     out = []
     if return_projection:
         out.append(backward_feynman_kac_projection(basis, guess, coef))
@@ -956,10 +966,12 @@ def backward_feynman_kac_matrices(
 
     Returns
     -------
-    a : (mem + 2, n_basis, n_basis) ndarray of float
+    a : (mem + 1, n_basis, n_basis) ndarray of float
         DGA matrices for the homogeneous term.
-    b : (mem + 2, n_basis) ndarray of float
+    b : (mem + 1, n_basis) ndarray of float
         DGA matrices for the nonhomogeneous term.
+    c0 : (n_basis, n_basis) ndarray of float
+        Matrix of inner products of basis functions.
 
     """
     if test_basis is None:
@@ -969,8 +981,9 @@ def backward_feynman_kac_matrices(
     dlag = lag // (mem + 1)
     n_basis = basis[0].shape[1]
 
-    a = np.zeros((mem + 2, n_basis, n_basis))
-    b = np.zeros((mem + 2, n_basis))
+    a = np.zeros((mem + 1, n_basis, n_basis))
+    b = np.zeros((mem + 1, n_basis))
+    c0 = np.zeros((n_basis, n_basis))
 
     for x, y, w, d, f, g in zip_equal(
         test_basis, basis, weights, in_domain, function, guess
@@ -994,12 +1007,13 @@ def backward_feynman_kac_matrices(
         stop = backward_stop(d)[lag:]
         intf = np.insert(np.cumsum(f), 0, 0.0)
         xw = linalg.scale_rows(w[:end], x[lag:]).T
-        for n in range(mem + 2):
-            iy = np.maximum(ix - n * dlag, stop)
-            a[n] += _densify(xw @ y[iy])
-            b[n] += xw @ (g[iy] + (intf[lag:] - intf[iy]))
+        for n in range(mem + 1):
+            iy = np.maximum(ix - (n + 1) * dlag, stop)
+            a[n] += _densify(xw @ (y[iy] - y[lag:]))
+            b[n] += xw @ ((g[iy] - g[lag:]) + (intf[lag:] - intf[iy]))
+        c0 += xw @ y[lag:]
 
-    return a, b
+    return a, b, c0
 
 
 def backward_feynman_kac_projection(basis, guess, coef):
@@ -1099,27 +1113,45 @@ def _densify(a):
     return a
 
 
-def _dga_mem(a, b):
-    """Solve for DGA coefficients."""
-    mem = a.shape[0] - 2
+def _dga_mem(a, b, c0):
+    """
+    Solve DGA with memory for projection and memory-correction
+    coefficients.
+
+    Parameters
+    ----------
+    a : (mem + 1, n_basis, n_basis) ndarray of float
+        DGA matrices for the homogeneous term.
+    b : (mem + 1, n_basis) ndarray of float
+        DGA matrices for the nonhomogeneous term.
+    c0 : (n_basis, n_basis) ndarray of float
+        Matrix of inner products of basis functions.
+
+    Returns
+    -------
+    coef : (n_basis,) ndarray of float
+        Projection coefficients.
+    mem_coef : (mem, n_basis) ndarray of float
+        Memory-correction coefficients.
+
+    """
+    mem = a.shape[0] - 1
     n_basis = a.shape[1]
-    assert a.shape == (mem + 2, n_basis, n_basis)
-    assert b.shape == (mem + 2, n_basis)
+    assert a.shape == (mem + 1, n_basis, n_basis)
+    assert b.shape == (mem + 1, n_basis)
 
     b = b[..., None]
 
-    inv = linalg.inv(a[0])
+    inv = linalg.inv(c0)
     a = inv @ a
     b = inv @ b
-
-    am = a[1:] - a[0]
-    bm = b[1:] - b[0]
+    c = a[::-1] + np.identity(n_basis)
     for n in range(1, mem + 1):
-        am[n] -= np.sum(a[n:0:-1] @ am[:n], axis=0)
-        bm[n] -= np.sum(a[n:0:-1] @ bm[:n], axis=0)
+        a[n] -= np.sum(c[-n:] @ a[:n], axis=0)
+        b[n] -= np.sum(c[-n:] @ b[:n], axis=0)
 
-    bm = bm.reshape(bm.shape[:2])
+    b = b.reshape(b.shape[:2])
 
-    coef = linalg.solve(am[-1], -bm[-1])
-    mem_coef = am[:-1] @ coef + bm[:-1]
+    coef = linalg.solve(a[-1], -b[-1])
+    mem_coef = a[:-1] @ coef + b[:-1]
     return coef, mem_coef
