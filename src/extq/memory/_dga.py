@@ -1106,18 +1106,20 @@ def _dga_mem(a, b):
     assert a.shape == (mem + 2, n_basis, n_basis)
     assert b.shape == (mem + 2, n_basis)
 
+    b = b[..., None]
+
     inv = linalg.inv(a[0])
     a = inv @ a
-    b = inv @ b[..., None]
+    b = inv @ b
 
-    am = np.diff(a, axis=0)
-    bm = np.diff(b, axis=0)
+    am = a[1:] - a[0]
+    bm = b[1:] - b[0]
     for n in range(1, mem + 1):
         am[n] -= np.sum(a[n:0:-1] @ am[:n], axis=0)
         bm[n] -= np.sum(a[n:0:-1] @ bm[:n], axis=0)
 
-    a = np.cumsum(am, axis=0)
-    b = np.cumsum(bm, axis=0).reshape(bm.shape[:2])
-    coef = linalg.solve(a[-1], -b[-1])
-    mem_coef = a[:-1] @ coef + b[:-1]
+    bm = bm.reshape(bm.shape[:2])
+
+    coef = linalg.solve(am[-1], -bm[-1])
+    mem_coef = am[:-1] @ coef + bm[:-1]
     return coef, mem_coef
