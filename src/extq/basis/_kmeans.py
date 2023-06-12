@@ -4,9 +4,11 @@ import numpy as np
 import sklearn.cluster
 from more_itertools import zip_equal
 
-from ._labels import _labels_to_basis, renumber_labels
+from ._labels import labels_to_basis
+from ._voronoi import voronoi_labels
 
 __all__ = [
+    "kmeans_centers",
     "kmeans_labels",
     "kmeans1d_labels",
     "kmeans2d_labels",
@@ -15,11 +17,36 @@ __all__ = [
     "kmeans1d_basis",
     "kmeans2d_basis",
     "kmeans3d_basis",
-    "kmeans_domain_basis",
-    "kmeans1d_domain_basis",
-    "kmeans2d_domain_basis",
-    "kmeans3d_domain_basis",
 ]
+
+
+def kmeans_centers(cvs, num, in_domain=None, **kwargs):
+    """
+    Compute cluster centers using k-means.
+
+    Parameters
+    ----------
+    cvs : sequence of (n_frames[i], n_cvs) ndarray of float
+        Collective variables at each frame.
+    num : int
+        Maximum number of clusters.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. Clustering is performed
+        only on frames within the domain.
+
+    Returns
+    -------
+    (num,) ndarray of float
+        Cluster centers.
+
+    """
+    if in_domain is None:
+        data = np.concatenate(cvs)
+    else:
+        data = np.concatenate([v[d] for v, d in zip(cvs, in_domain)])
+    kmeans = sklearn.cluster.MiniBatchKMeans(n_clusters=num, **kwargs)
+    kmeans.fit(data)
+    return kmeans.cluster_centers_
 
 
 def kmeans_labels(cvs, num, **kwargs):
@@ -39,10 +66,9 @@ def kmeans_labels(cvs, num, **kwargs):
         Cluster index at each frame.
 
     """
-    kmeans = sklearn.cluster.MiniBatchKMeans(n_clusters=num, **kwargs)
-    kmeans.fit(np.concatenate(cvs))
-    indices = np.cumsum([len(v) for v in cvs])[:-1]
-    return renumber_labels(np.split(kmeans.labels_, indices))
+    centers = kmeans_centers(cvs, num, **kwargs)
+    labels = voronoi_labels(cvs, centers)
+    return labels
 
 
 def kmeans1d_labels(cv, num, **kwargs):
@@ -105,107 +131,7 @@ def kmeans3d_labels(cv1, cv2, cv3, num, **kwargs):
     return kmeans_labels(_stack(cv1, cv2, cv3), num, **kwargs)
 
 
-def kmeans_basis(cvs, num, sparse=True, **kwargs):
-    """
-    Construct a basis of indicator functions using k-means.
-
-    Parameters
-    ----------
-    cvs : sequence of (n_frames[i], n_cvs) ndarray of float
-        Collective variables at each frame.
-    num : int
-        Maximum number of clusters.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
-
-    Returns
-    -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
-
-    """
-    labels = kmeans_labels(cvs, num, **kwargs)
-    num = _num(labels)
-    basis = []
-    for indices in labels:
-        basis.append(_labels_to_basis(indices, num, sparse=sparse))
-    return basis
-
-
-def kmeans1d_basis(cv, num, sparse=True, **kwargs):
-    """
-    Construct a basis of indicator functions on a 1D collective variable
-    space using k-means.
-
-    Parameters
-    ----------
-    cv : sequence of (n_frames[i],) ndarray of float
-        Collective variable at each frame.
-    num : int
-        Maximum number of clusters.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
-
-    Returns
-    -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
-
-    """
-    return kmeans_basis(_stack(cv), num, sparse=sparse, **kwargs)
-
-
-def kmeans2d_basis(cv1, cv2, num, sparse=True, **kwargs):
-    """
-    Construct a basis of indicator functions on a 2D collective variable
-    space using k-means.
-
-    Parameters
-    ----------
-    cv1, cv2 : sequence of (n_frames[i],) ndarray of float
-        Collective variables at each frame.
-    num : int
-        Maximum number of clusters.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
-
-    Returns
-    -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
-
-    """
-    return kmeans_basis(_stack(cv1, cv2), num, sparse=sparse, **kwargs)
-
-
-def kmeans3d_basis(cv1, cv2, cv3, num, sparse=True, **kwargs):
-    """
-    Construct a basis of indicator functions on a 3D collective variable
-    space using k-means.
-
-    Parameters
-    ----------
-    cv1, cv2, cv3 : sequence of (n_frames[i],) ndarray of float
-        Collective variables at each frame.
-    num : int
-        Maximum number of clusters.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
-
-    Returns
-    -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
-
-    """
-    return kmeans_basis(_stack(cv1, cv2, cv3), num, sparse=sparse, **kwargs)
-
-
-def kmeans_domain_basis(cvs, in_domain, num, sparse=True, **kwargs):
+def kmeans_basis(cvs, num, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     using k-means.
@@ -214,14 +140,14 @@ def kmeans_domain_basis(cvs, in_domain, num, sparse=True, **kwargs):
     ----------
     cvs : sequence of (n_frames[i], n_cvs) ndarray of float
         Collective variables at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     num : int
         Maximum number of clusters.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -229,18 +155,12 @@ def kmeans_domain_basis(cvs, in_domain, num, sparse=True, **kwargs):
         Basis of indicator functions.
 
     """
-    cvs_d = [v[d] for v, d in zip_equal(cvs, in_domain)]
-    labels = kmeans_labels(cvs_d, num, **kwargs)
-    num = _num(labels)
-    basis = []
-    for indices_d, d in zip_equal(labels, in_domain):
-        indices = np.empty(len(d), dtype=indices_d.dtype)
-        indices[d] = indices_d
-        basis.append(_labels_to_basis(indices, num, sparse=sparse, mask=d))
-    return basis
+    centers = kmeans_centers(cvs, num, in_domain=in_domain, **kwargs)
+    labels = voronoi_labels(cvs, centers)
+    return labels_to_basis(labels, sparse=sparse, in_domain=in_domain)
 
 
-def kmeans1d_domain_basis(cv, in_domain, num, sparse=True, **kwargs):
+def kmeans1d_basis(cv, num, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     in a 1D collective variable space using k-means.
@@ -249,14 +169,14 @@ def kmeans1d_domain_basis(cv, in_domain, num, sparse=True, **kwargs):
     ----------
     cv : sequence of (n_frames[i],) ndarray of float
         Collective variable at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     num : int
         Maximum number of clusters.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -264,12 +184,12 @@ def kmeans1d_domain_basis(cv, in_domain, num, sparse=True, **kwargs):
         Basis of indicator functions.
 
     """
-    return kmeans_domain_basis(
-        _stack(cv), in_domain, num, sparse=sparse, **kwargs
+    return kmeans_basis(
+        _stack(cv), num, sparse=sparse, in_domain=in_domain, **kwargs
     )
 
 
-def kmeans2d_domain_basis(cv1, cv2, in_domain, num, sparse=True, **kwargs):
+def kmeans2d_basis(cv1, cv2, num, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     in a 2D collective variable space using k-means.
@@ -278,14 +198,14 @@ def kmeans2d_domain_basis(cv1, cv2, in_domain, num, sparse=True, **kwargs):
     ----------
     cv1, cv2 : sequence of (n_frames[i],) ndarray of float
         Collective variables at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     num : int
         Maximum number of clusters.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -293,14 +213,12 @@ def kmeans2d_domain_basis(cv1, cv2, in_domain, num, sparse=True, **kwargs):
         Basis of indicator functions.
 
     """
-    return kmeans_domain_basis(
-        _stack(cv1, cv2), in_domain, num, sparse=sparse, **kwargs
+    return kmeans_basis(
+        _stack(cv1, cv2), num, sparse=sparse, in_domain=in_domain, **kwargs
     )
 
 
-def kmeans3d_domain_basis(
-    cv1, cv2, cv3, in_domain, num, sparse=True, **kwargs
-):
+def kmeans3d_basis(cv1, cv2, cv3, num, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     in a 3D collective variable space using k-means.
@@ -309,14 +227,14 @@ def kmeans3d_domain_basis(
     ----------
     cv1, cv2, cv3 : sequence of (n_frames[i],) ndarray of float
         Collective variables at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     num : int
         Maximum number of clusters.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -324,14 +242,13 @@ def kmeans3d_domain_basis(
         Basis of indicator functions.
 
     """
-    return kmeans_domain_basis(
-        _stack(cv1, cv2, cv3), in_domain, num, sparse=sparse, **kwargs
+    return kmeans_basis(
+        _stack(cv1, cv2, cv3),
+        num,
+        sparse=sparse,
+        in_domain=in_domain,
+        **kwargs
     )
-
-
-def _num(labels):
-    """Find the number of clusters given labeled trajectories."""
-    return max(np.max(indices) for indices in labels if len(indices) > 0) + 1
 
 
 def _stack(*cvs):

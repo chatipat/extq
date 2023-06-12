@@ -3,7 +3,7 @@
 import numpy as np
 from more_itertools import zip_equal
 
-from ._labels import _labels_to_basis
+from ._labels import labels_to_basis
 
 __all__ = [
     "grid1d_labels",
@@ -12,9 +12,6 @@ __all__ = [
     "grid1d_basis",
     "grid2d_basis",
     "grid3d_basis",
-    "grid1d_domain_basis",
-    "grid2d_domain_basis",
-    "grid3d_domain_basis",
 ]
 
 
@@ -35,10 +32,7 @@ def grid1d_labels(cv, edges):
         Grid index at each frame.
 
     """
-    labels = []
-    for v in cv:
-        labels.append(_labels1(v, edges))
-    return labels
+    return grid_labels(_stack(cv), (edges,))
 
 
 def grid2d_labels(cv1, cv2, edges1, edges2):
@@ -58,10 +52,7 @@ def grid2d_labels(cv1, cv2, edges1, edges2):
         Grid index at each frame.
 
     """
-    labels = []
-    for v1, v2 in zip_equal(cv1, cv2):
-        labels.append(_labels2(v1, v2, edges1, edges2))
-    return labels
+    return grid_labels(_stack(cv1, cv2), (edges1, edges2))
 
 
 def grid3d_labels(cv1, cv2, cv3, edges1, edges2, edges3):
@@ -81,97 +72,30 @@ def grid3d_labels(cv1, cv2, cv3, edges1, edges2, edges3):
         Grid index at each frame.
 
     """
-    labels = []
-    for v1, v2, v3 in zip_equal(cv1, cv2, cv3):
-        labels.append(_labels3(v1, v2, v3, edges1, edges2, edges3))
-    return labels
+    return grid_labels(_stack(cv1, cv2, cv3), (edges1, edges2, edges3))
 
 
-def grid1d_basis(cv, edges, sparse=True):
+def grid_labels(cvs, edges):
     """
-    Construct a basis of indicator functions on a 1D grid.
+    Label each frame with the flat index on an n-dimensional grid.
 
     Parameters
     ----------
-    cv : sequence of (n_frames[i],) ndarray of float
-        Collective variable at each frame.
-    edges : 1D array-like of float
-        Bin edges for the collective variable.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
-
-    Returns
-    -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
-
-    """
-    num = len(edges) + 1
-    basis = []
-    for v in cv:
-        indices = _labels1(v, edges)
-        basis.append(_labels_to_basis(indices, num, sparse=sparse))
-    return basis
-
-
-def grid2d_basis(cv1, cv2, edges1, edges2, sparse=True):
-    """
-    Construct a basis of indicator functions on a 2D grid.
-
-    Parameters
-    ----------
-    cv1, cv2 : sequence of (n_frames[i],) ndarray of float
+    cvs : sequence of (n_frames[i], n_cvs) ndarray of float
         Collective variables at each frame.
-    edges1, edges2 : 1D array-like of float
+    edges : (n_cvs, n_edges[k]) array-like of float
         Bin edges for each collective variable.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
 
     Returns
     -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
+    list of (n_frames[i],) ndarray of int
+        Grid index at each frame.
 
     """
-    num = (len(edges1) + 1) * (len(edges2) + 1)
-    basis = []
-    for v1, v2 in zip_equal(cv1, cv2):
-        indices = _labels2(v1, v2, edges1, edges2)
-        basis.append(_labels_to_basis(indices, num, sparse=sparse))
-    return basis
+    return [_labels(vs, edges) for vs in cvs]
 
 
-def grid3d_basis(cv1, cv2, cv3, edges1, edges2, edges3, sparse=True):
-    """
-    Construct a basis of indicator functions on a 3D grid.
-
-    Parameters
-    ----------
-    cv1, cv2, cv3 : sequence of (n_frames[i],) ndarray of float
-        Collective variables at each frame.
-    edges1, edges2, edges3 : 1D array-like of float
-        Bin edges for each collective variable.
-    sparse : bool, optional
-        If True (default), return a list of sparse matrices instead of
-        a list of dense arrays.
-
-    Returns
-    -------
-    list of {ndarray, sparse matrix} of float
-        Basis of indicator functions.
-
-    """
-    num = (len(edges1) + 1) * (len(edges2) + 1) * (len(edges3) + 1)
-    basis = []
-    for v1, v2, v3 in zip_equal(cv1, cv2, cv3):
-        indices = _labels3(v1, v2, v3, edges1, edges2, edges3)
-        basis.append(_labels_to_basis(indices, num, sparse=sparse))
-    return basis
-
-
-def grid1d_domain_basis(cv, in_domain, edges, sparse=True):
+def grid1d_basis(cv, edges, sparse=True, in_domain=None):
     """
     Construct a basis of indicator functions on a 1D grid within a
     specified domain.
@@ -180,14 +104,14 @@ def grid1d_domain_basis(cv, in_domain, edges, sparse=True):
     ----------
     cv : sequence of (n_frames[i],) ndarray of float
         Collective variable at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     edges : 1D array-like of float
         Bin edges for the collective variable.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -196,14 +120,11 @@ def grid1d_domain_basis(cv, in_domain, edges, sparse=True):
 
     """
     num = len(edges) + 1
-    basis = []
-    for v, d in zip_equal(cv, in_domain):
-        indices = _labels1(v, edges)
-        basis.append(_labels_to_basis(indices, num, sparse=sparse, mask=d))
-    return basis
+    labels = grid1d_labels(cv, edges)
+    return labels_to_basis(labels, num, sparse=sparse, in_domain=in_domain)
 
 
-def grid2d_domain_basis(cv1, cv2, in_domain, edges1, edges2, sparse=True):
+def grid2d_basis(cv1, cv2, edges1, edges2, sparse=True, in_domain=None):
     """
     Construct a basis of indicator functions on a 2D grid within a
     specified domain.
@@ -212,14 +133,14 @@ def grid2d_domain_basis(cv1, cv2, in_domain, edges1, edges2, sparse=True):
     ----------
     cv1, cv2 : sequence of (n_frames[i],) ndarray of float
         Collective variables at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     edges1, edges2 : 1D array-like of float
         Bin edges for each collective variable.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -228,15 +149,12 @@ def grid2d_domain_basis(cv1, cv2, in_domain, edges1, edges2, sparse=True):
 
     """
     num = (len(edges1) + 1) * (len(edges2) + 1)
-    basis = []
-    for v1, v2, d in zip_equal(cv1, cv2, in_domain):
-        indices = _labels2(v1, v2, edges1, edges2)
-        basis.append(_labels_to_basis(indices, num, sparse=sparse, mask=d))
-    return basis
+    labels = grid2d_labels(cv1, cv2, edges1, edges2)
+    return labels_to_basis(labels, num, sparse=sparse, in_domain=in_domain)
 
 
-def grid3d_domain_basis(
-    cv1, cv2, cv3, in_domain, edges1, edges2, edges3, sparse=True
+def grid3d_basis(
+    cv1, cv2, cv3, edges1, edges2, edges3, sparse=True, in_domain=None
 ):
     """
     Construct a basis of indicator functions on a 3D grid within a
@@ -246,14 +164,14 @@ def grid3d_domain_basis(
     ----------
     cv1, cv2, cv3 : sequence of (n_frames[i],) ndarray of float
         Collective variables at each frame.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain. The basis is zero outside
-        of the domain.
     edges1, edges2, edges3 : 1D array-like of float
         Bin edges for each collective variable.
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
 
     Returns
     -------
@@ -262,33 +180,49 @@ def grid3d_domain_basis(
 
     """
     num = (len(edges1) + 1) * (len(edges2) + 1) * (len(edges3) + 1)
-    basis = []
-    for v1, v2, v3, d in zip_equal(cv1, cv2, cv3, in_domain):
-        indices = _labels3(v1, v2, v3, edges1, edges2, edges3)
-        basis.append(_labels_to_basis(indices, num, sparse=sparse, mask=d))
-    return basis
+    labels = grid3d_labels(cv1, cv2, cv3, edges1, edges2, edges3)
+    return labels_to_basis(labels, num, sparse=sparse, in_domain=in_domain)
 
 
-def _labels1(v, edges):
-    """Return the index on a 1D grid."""
-    return np.searchsorted(edges, v)
+def grid_basis(cvs, edges, sparse=True, in_domain=None):
+    """
+    Construct a basis of indicator functions on an n-dimensional grid
+    within a specified domain.
+
+    Parameters
+    ----------
+    cvs : sequence of (n_frames[i], n_cvs) ndarray of float
+        Collective variables at each frame.
+    edges : (n_cvs, n_edges[k]) array-like of float
+        Bin edges for each collective variable.
+    sparse : bool, optional
+        If True (default), return a list of sparse matrices instead of
+        a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain. The basis is zero outside
+        of the domain.
+
+    Returns
+    -------
+    list of {ndarray, sparse matrix} of float
+        Basis of indicator functions.
+
+    """
+    num = np.product([len(e) + 1 for e in edges])
+    labels = grid_labels(cvs, edges)
+    return labels_to_basis(labels, num, sparse=sparse, in_domain=in_domain)
 
 
-def _labels2(v1, v2, edges1, edges2):
-    """Return the flat index on a 2D grid."""
-    indices1 = np.searchsorted(edges1, v1)
-    indices2 = np.searchsorted(edges2, v2)
-    return np.ravel_multi_index(
-        (indices1, indices2), (len(edges1) + 1, len(edges2) + 1)
-    )
+def _labels(v_list, edges_list):
+    """Return the flat index on an n-dimensional grid."""
+    indices = []
+    shape = []
+    for v, edges in zip_equal(v_list, edges_list):
+        indices.append(np.searchsorted(edges, v))
+        shape.append(len(edges) + 1)
+    return np.ravel_multi_index(indices, shape)
 
 
-def _labels3(v1, v2, v3, edges1, edges2, edges3):
-    """Return the flat index on a 3D grid."""
-    indices1 = np.searchsorted(edges1, v1)
-    indices2 = np.searchsorted(edges2, v2)
-    indices3 = np.searchsorted(edges3, v3)
-    return np.ravel_multi_index(
-        (indices1, indices2, indices3),
-        (len(edges1) + 1, len(edges2) + 1, len(edges3) + 1),
-    )
+def _stack(*cvs):
+    """Stack sequences of collective variables along the last axis."""
+    return [np.stack(vs, axis=-1) for vs in zip(*cvs)]

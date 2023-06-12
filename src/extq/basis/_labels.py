@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-def labels_to_basis(labels, num=None, sparse=True):
+def labels_to_basis(labels, num=None, sparse=True, in_domain=None):
     """
     Construct a basis of indicator functions given labels.
 
@@ -26,6 +26,8 @@ def labels_to_basis(labels, num=None, sparse=True):
     sparse : bool, optional
         If True (default), return a list of sparse matrices instead of
         a list of dense arrays.
+    in_domain : sequence of (n_frames[i],) ndarray of bool, optional
+        Whether each frame is in the domain.
 
     Returns
     -------
@@ -34,11 +36,22 @@ def labels_to_basis(labels, num=None, sparse=True):
 
     """
     if num is None:
-        num = max(np.max(indices) for indices in labels) + 1
+        num = _num(labels)
     basis = []
-    for indices in labels:
-        basis.append(_labels_to_basis(indices, num, sparse=sparse))
+    if in_domain is None:
+        for indices in labels:
+            basis.append(_labels_to_basis(indices, num, sparse=sparse))
+    else:
+        for indices, mask in zip_equal(labels, in_domain):
+            basis.append(
+                _labels_to_basis(indices, num, sparse=sparse, mask=mask)
+            )
     return basis
+
+
+def _num(labels):
+    """Find the number of clusters given labeled trajectories."""
+    return max(np.max(indices) for indices in labels if len(indices) > 0) + 1
 
 
 def _labels_to_basis(indices, cols, sparse=True, mask=None):
