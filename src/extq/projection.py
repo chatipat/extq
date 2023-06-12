@@ -108,6 +108,8 @@ def average1d(cv, func, weights, edges):
     numer = 0.0
     denom = 0.0
     for x, f, w in zip_equal(cv, func, weights):
+        mask = w != 0.0
+        x, f, w = x[mask], f[mask], w[mask]
         numer += np.histogram(x, bins=edges, weights=f * w)[0]
         denom += np.histogram(x, bins=edges, weights=w)[0]
     return numer / denom
@@ -136,6 +138,8 @@ def average2d(cv1, cv2, func, weights, edges1, edges2):
     numer = 0.0
     denom = 0.0
     for x, y, f, w in zip_equal(cv1, cv2, func, weights):
+        mask = w != 0.0
+        x, y, f, w = x[mask], y[mask], f[mask], w[mask]
         numer += np.histogram2d(x, y, bins=(edges1, edges2), weights=f * w)[0]
         denom += np.histogram2d(x, y, bins=(edges1, edges2), weights=w)[0]
     return numer / denom
@@ -164,6 +168,8 @@ def average3d(cv1, cv2, cv3, func, weights, edges1, edges2, edges3):
     numer = 0.0
     denom = 0.0
     for x, y, z, f, w in zip_equal(cv1, cv2, cv3, func, weights):
+        mask = w != 0.0
+        x, y, z, f, w = x[mask], y[mask], z[mask], f[mask], w[mask]
         numer += np.histogramdd(
             (x, y, z), bins=(edges1, edges2, edges3), weights=f * w
         )[0]
