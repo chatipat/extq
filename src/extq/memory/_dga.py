@@ -34,8 +34,8 @@ def reweight(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -62,9 +62,9 @@ def reweight(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected invariant distribution.
+        If True, return the projected invariant distribution.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the invariant
+        If True (default), return a stochastic approximation of the invariant
         distribution.
     return_coef : bool, optional
         If True, return the projection coefficients.
@@ -259,8 +259,8 @@ def forward_committor(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -291,9 +291,9 @@ def forward_committor(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected committor.
+        If True, return the projected committor.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the committor.
+        If True (default), return a stochastic approximation of the committor.
     return_coef : bool, optional
         If True, return the projection coefficients.
     return_mem_coef : bool, optional
@@ -336,8 +336,8 @@ def forward_mfpt(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -369,9 +369,9 @@ def forward_mfpt(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected MFPT.
+        If True, return the projected MFPT.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the MFPT.
+        If True (default), return a stochastic approximation of the MFPT.
     return_coef : bool, optional
         If True, return the projection coefficients.
     return_mem_coef : bool, optional
@@ -415,8 +415,8 @@ def forward_feynman_kac(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -449,9 +449,9 @@ def forward_feynman_kac(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected solution.
+        If True, return the projected solution.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the solution.
+        If True (default), return a stochastic approximation of the solution.
     return_coef : bool, optional
         If True, return the projection coefficients.
     return_mem_coef : bool, optional
@@ -683,8 +683,8 @@ def backward_committor(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -715,9 +715,9 @@ def backward_committor(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected committor.
+        If True, return the projected committor.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the committor.
+        If True (default), return a stochastic approximation of the committor.
     return_coef : bool, optional
         If True, return the projection coefficients.
     return_mem_coef : bool, optional
@@ -760,8 +760,8 @@ def backward_mfpt(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -793,9 +793,9 @@ def backward_mfpt(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected MFPT.
+        If True, return the projected MFPT.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the MFPT.
+        If True (default), return a stochastic approximation of the MFPT.
     return_coef : bool, optional
         If True, return the projection coefficients.
     return_mem_coef : bool, optional
@@ -839,8 +839,8 @@ def backward_feynman_kac(
     lag,
     mem,
     test_basis=None,
-    return_projection=True,
-    return_solution=False,
+    return_projection=False,
+    return_solution=True,
     return_coef=False,
     return_mem_coef=False,
 ):
@@ -873,9 +873,9 @@ def backward_feynman_kac(
         Test basis against which to minimize the error. Must have the
         same dimension as `basis`. If `None`, use `basis`.
     return_projection : bool, optional
-        If True (default), return the projected solution.
+        If True, return the projected solution.
     return_solution : bool, optional
-        If True, return a stochastic approximation of the solution.
+        If True (default), return a stochastic approximation of the solution.
     return_coef : bool, optional
         If True, return the projection coefficients.
     return_mem_coef : bool, optional
