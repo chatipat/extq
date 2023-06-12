@@ -2,7 +2,7 @@ import numpy as np
 import scipy.signal
 
 
-def uniform_weights(trajs, maxlag):
+def uniform_weights(trajs, maxlag, normalize=True):
     """Make uniform weights.
 
     Parameters
@@ -13,12 +13,15 @@ def uniform_weights(trajs, maxlag):
         Number of frames at the end of each trajectory that are required
         to have zero weight. This is the maximum lag time the output
         weights can be used with by other methods.
+    normalize : bool, optional
+        If True (default), normalize the weights so that they sum to
+        one. If False, the nonzero weights are one.
 
     Returns
     -------
     list of (n_frames[i],) ndarray of float
         Weight at each frame of the trajectory. The weights of the first
-        n_frames[i]-maxlag trajectories are one.
+        n_frames[i]-maxlag trajectories are constant.
 
     """
     assert maxlag >= 0
@@ -28,6 +31,9 @@ def uniform_weights(trajs, maxlag):
         w = np.ones(n_frames)
         w[max(0, n_frames - maxlag) :] = 0.0
         weights.append(w)
+    if normalize:
+        denom = sum(np.sum(w) for w in weights)
+        weights = [w / denom for w in weights]
     return weights
 
 
