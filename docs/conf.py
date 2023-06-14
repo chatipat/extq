@@ -23,7 +23,7 @@ copyright = '{0}, {1}'.format(year, author)
 version = release = '0.0.0'
 
 pygments_style = 'trac'
-templates_path = ['.']
+templates_path = ['_templates']
 extlinks = {
     'issue': ('https://github.com/chatipat/extq/issues/%s', '#'),
     'pr': ('https://github.com/chatipat/extq/pull/%s', 'PR #'),
@@ -45,3 +45,7 @@ html_short_title = '%s-%s' % (project, version)
 napoleon_use_ivar = True
 napoleon_use_rtype = False
 napoleon_use_param = False
+
+autosummary_generate = True
+autosummary_ignore_module_all = False
+autosummary_imported_members = True
