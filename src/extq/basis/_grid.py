@@ -217,7 +217,7 @@ def _labels(v_list, edges_list):
     """Return the flat index on an n-dimensional grid."""
     indices = []
     shape = []
-    for v, edges in zip_equal(v_list, edges_list):
+    for v, edges in zip_equal(v_list.T, edges_list):
         indices.append(np.searchsorted(edges, v))
         shape.append(len(edges) + 1)
     return np.ravel_multi_index(indices, shape)
