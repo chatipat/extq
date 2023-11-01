@@ -83,7 +83,6 @@ def _extended_rate_helper(qp, qm, w, m, d, h, lag):
     a = np.zeros((nf - 1, 2, ni + 1, 2, ni + 1))
 
     for t in range(nf - 1):
-
         # before current time
         for j in range(ni):
             if d[j, t + 1]:
@@ -181,8 +180,9 @@ def extended_current(
         assert f.shape == (n_indices, n_frames)
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
         if n_frames <= lag:
-            continue
-        j = _extended_current_helper(qp, qm, w, m, d, f, lag)
+            j = np.zeros((n_indices, n_frames))
+        else:
+            j = _extended_current_helper(qp, qm, w, m, d, f, lag)
         out.append(j)
     if normalize:
         wsum = sum(np.sum(w) for w in weights)

@@ -136,10 +136,11 @@ def current(
         assert f.shape == (n_frames,)
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
         if n_frames <= lag:
-            continue
-        tp = forward_stop(d)
-        tm = backward_stop(d)
-        j = _current_helper(qp, qm, w, tp, tm, f, lag)
+            j = np.zeros(len(w))
+        else:
+            tp = forward_stop(d)
+            tm = backward_stop(d)
+            j = _current_helper(qp, qm, w, tp, tm, f, lag)
         out.append(j)
     if normalize:
         wsum = sum(np.sum(w) for w in weights)
