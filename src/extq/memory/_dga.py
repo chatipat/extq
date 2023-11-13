@@ -311,12 +311,11 @@ def forward_committor(
         Memory-correction coefficients.
 
     """
-    function = np.zeros(len(weights))
     return forward_feynman_kac(
         basis,
         weights,
         in_domain,
-        function,
+        0.0,
         guess,
         lag,
         mem,
@@ -389,12 +388,11 @@ def forward_mfpt(
         Memory-correction coefficients.
 
     """
-    function = np.ones(len(weights))
     return forward_feynman_kac(
         basis,
         weights,
         in_domain,
-        function,
+        1.0,
         guess,
         lag,
         mem,
@@ -545,6 +543,7 @@ def forward_feynman_kac_matrices(
     """
     if test_basis is None:
         test_basis = basis
+    function = _broadcast_integrand(function, guess)
 
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
@@ -558,7 +557,6 @@ def forward_feynman_kac_matrices(
         test_basis, basis, weights, in_domain, function, guess
     ):
         n_frames = len(w)
-        f = np.broadcast_to(f, n_frames - 1)
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
@@ -645,6 +643,8 @@ def forward_feynman_kac_solution(
         Estimate of the solution.
 
     """
+    function = _broadcast_integrand(function, guess)
+
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
     n_basis = basis[0].shape[1]
@@ -652,7 +652,6 @@ def forward_feynman_kac_solution(
     out = []
     for y, d, f, g in zip_equal(basis, in_domain, function, guess):
         n_frames = y.shape[0]
-        f = np.broadcast_to(f, n_frames - 1)
         assert y.shape == (n_frames, n_basis)
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
@@ -735,12 +734,11 @@ def backward_committor(
         Memory-correction coefficients.
 
     """
-    function = np.zeros(len(weights))
     return backward_feynman_kac(
         basis,
         weights,
         in_domain,
-        function,
+        0.0,
         guess,
         lag,
         mem,
@@ -813,12 +811,11 @@ def backward_mfpt(
         Memory-correction coefficients.
 
     """
-    function = np.ones(len(weights))
     return backward_feynman_kac(
         basis,
         weights,
         in_domain,
-        function,
+        1.0,
         guess,
         lag,
         mem,
@@ -976,6 +973,7 @@ def backward_feynman_kac_matrices(
     """
     if test_basis is None:
         test_basis = basis
+    function = _broadcast_integrand(function, guess)
 
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
@@ -989,7 +987,6 @@ def backward_feynman_kac_matrices(
         test_basis, basis, weights, in_domain, function, guess
     ):
         n_frames = len(w)
-        f = np.broadcast_to(f, n_frames - 1)
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
@@ -1076,6 +1073,8 @@ def backward_feynman_kac_solution(
         Estimate of the solution.
 
     """
+    function = _broadcast_integrand(function, guess)
+
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
     n_basis = basis[0].shape[1]
@@ -1083,7 +1082,6 @@ def backward_feynman_kac_solution(
     out = []
     for y, d, f, g in zip_equal(basis, in_domain, function, guess):
         n_frames = y.shape[0]
-        f = np.broadcast_to(f, n_frames - 1)
         assert y.shape == (n_frames, n_basis)
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
@@ -1155,3 +1153,9 @@ def _dga_mem(a, b, c0):
     coef = linalg.solve(a[-1], -b[-1])
     mem_coef = a[:-1] @ coef + b[:-1]
     return coef, mem_coef
+
+
+def _broadcast_integrand(f, trajs):
+    if not np.iterable(f):
+        f = [np.broadcast_to(f, traj.shape[0] - 1) for traj in trajs]
+    return f

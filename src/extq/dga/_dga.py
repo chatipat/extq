@@ -113,7 +113,7 @@ def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         basis,
         weights,
         in_domain,
-        np.zeros(len(weights)),
+        0.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -154,7 +154,7 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         basis,
         weights,
         in_domain,
-        np.ones(len(weights)),
+        1.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -197,6 +197,7 @@ def forward_feynman_kac(
     assert lag > 0
     if test_basis is None:
         test_basis = basis
+    function = _broadcast_integrand(function, guess)
     n_basis = None
     a = 0.0
     b = 0.0
@@ -205,7 +206,6 @@ def forward_feynman_kac(
     ):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
-        f = np.broadcast_to(f, n_frames - 1)
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
@@ -257,7 +257,7 @@ def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         basis,
         weights,
         in_domain,
-        np.zeros(len(weights)),
+        0.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -298,7 +298,7 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         basis,
         weights,
         in_domain,
-        np.ones(len(weights)),
+        1.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -341,6 +341,7 @@ def backward_feynman_kac(
     assert lag > 0
     if test_basis is None:
         test_basis = basis
+    function = _broadcast_integrand(function, guess)
     n_basis = None
     a = 0.0
     b = 0.0
@@ -349,7 +350,6 @@ def backward_feynman_kac(
     ):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
-        f = np.broadcast_to(f, n_frames - 1)
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
@@ -371,3 +371,9 @@ def backward_feynman_kac(
 
 def transform(coeffs, basis, guess):
     return [y @ coeffs + g for y, g in zip_equal(basis, guess)]
+
+
+def _broadcast_integrand(f, trajs):
+    if not np.iterable(f):
+        f = [np.broadcast_to(f, traj.shape[0] - 1) for traj in trajs]
+    return f

@@ -61,7 +61,7 @@ def forward_extended_committor(
         weights,
         transitions,
         in_domain,
-        np.zeros(len(weights)),
+        0.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -115,7 +115,7 @@ def forward_extended_mfpt(
         weights,
         transitions,
         in_domain,
-        np.ones(len(weights)),
+        1.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -170,6 +170,8 @@ def forward_extended_feynman_kac(
     assert lag > 0
     if test_basis is None:
         test_basis = basis
+    function = _broadcast_integrand(function, transitions)
+
     n_indices = None
     n_basis = None
     a = 0.0
@@ -180,7 +182,6 @@ def forward_extended_feynman_kac(
         n_frames = x[0].shape[0]
         n_indices = len(x) if n_indices is None else n_indices
         n_basis = x[0].shape[1] if n_basis is None else n_basis
-        f = np.broadcast_to(f, (n_indices, n_indices, n_frames - 1))
 
         assert len(x) == n_indices
         assert (xi.shape == (n_frames, n_basis) for xi in x)
@@ -284,7 +285,7 @@ def backward_extended_committor(
         weights,
         transitions,
         in_domain,
-        np.zeros(len(weights)),
+        0.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -338,7 +339,7 @@ def backward_extended_mfpt(
         weights,
         transitions,
         in_domain,
-        np.ones(len(weights)),
+        1.0,
         guess,
         lag,
         test_basis=test_basis,
@@ -393,6 +394,8 @@ def backward_extended_feynman_kac(
     assert lag > 0
     if test_basis is None:
         test_basis = basis
+    function = _broadcast_integrand(function, transitions)
+
     n_indices = None
     n_basis = None
     a = 0.0
@@ -403,7 +406,6 @@ def backward_extended_feynman_kac(
         n_frames = x[0].shape[0]
         n_indices = len(x) if n_indices is None else n_indices
         n_basis = x[0].shape[1] if n_basis is None else n_basis
-        f = np.broadcast_to(f, (n_indices, n_indices, n_frames - 1))
 
         assert len(x) == n_indices
         assert (xi.shape == (n_frames, n_basis) for xi in x)
@@ -466,3 +468,9 @@ def transform(coeffs, basis, guess):
         np.array([yi @ coeffs + gi for yi, gi in zip_equal(y, g)])
         for y, g in zip_equal(basis, guess)
     ]
+
+
+def _broadcast_integrand(f, transitions):
+    if not np.iterable(f):
+        f = [np.broadcast_to(f, m.shape) for m in transitions]
+    return f
