@@ -2,7 +2,6 @@
 
 
 import numpy as np
-import scipy.sparse
 from more_itertools import zip_equal
 
 from .. import linalg
@@ -164,9 +163,9 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
         wy = linalg.scale_rows(w[:end], y[:end])
         for n in range(mem + 1):
             dx = (x[(n + 1) * dlag : end + (n + 1) * dlag] - x[:end]).T
-            a[n] += _densify(dx @ wy)
+            a[n] += dx @ wy
             b[n] += dx @ w[:end]
-        c0 += x[:end].T @ wy
+        c0[:] += x[:end].T @ wy
 
     return a, b, c0
 
@@ -576,9 +575,9 @@ def forward_feynman_kac_matrices(
         xw = linalg.scale_rows(w[:end], x[:end]).T
         for n in range(mem + 1):
             iy = np.minimum(ix + (n + 1) * dlag, stop)
-            a[n] += _densify(xw @ (y[iy] - y[:end]))
+            a[n] += xw @ (y[iy] - y[:end])
             b[n] += xw @ ((g[iy] - g[:end]) + (intf[iy] - intf[:end]))
-        c0 += _densify(xw @ y[:end])
+        c0[:] += xw @ y[:end]
 
     return a, b, c0
 
@@ -1006,9 +1005,9 @@ def backward_feynman_kac_matrices(
         xw = linalg.scale_rows(w[:end], x[lag:]).T
         for n in range(mem + 1):
             iy = np.maximum(ix - (n + 1) * dlag, stop)
-            a[n] += _densify(xw @ (y[iy] - y[lag:]))
+            a[n] += xw @ (y[iy] - y[lag:])
             b[n] += xw @ ((g[iy] - g[lag:]) + (intf[lag:] - intf[iy]))
-        c0 += xw @ y[lag:]
+        c0[:] += xw @ y[lag:]
 
     return a, b, c0
 
@@ -1102,13 +1101,6 @@ def backward_feynman_kac_solution(
         u = np.concatenate([pad, u[stop] + r])
         out.append(u)
     return out
-
-
-def _densify(a):
-    """Convert the input to a dense array."""
-    if scipy.sparse.issparse(a):
-        a = a.toarray()
-    return a
 
 
 def _dga_mem(a, b, c0):
