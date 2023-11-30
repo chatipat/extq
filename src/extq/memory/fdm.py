@@ -3,7 +3,7 @@ import numpy as np
 from .. import linalg
 from ..fdm import augment_generator
 from ..fdm.dga import _to_flat, feynman_kac_kernel
-from ._dga import _dga_mem
+from ._dga import solve
 
 __all__ = [
     "reweight",
@@ -43,7 +43,7 @@ def reweight(
     a, b, c0 = reweight_matrices(
         generator, basis, weights, lag, mem, test_basis=test_basis
     )
-    coef, mem_coef = _dga_mem(a, b, c0)
+    coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
         out.append(reweight_projection(basis, weights, coef))
@@ -190,7 +190,7 @@ def forward_feynman_kac(
         mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = _dga_mem(a, b, c0)
+    coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
         out.append(forward_feynman_kac_projection(basis, guess, coef))
@@ -368,7 +368,7 @@ def backward_feynman_kac(
         mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = _dga_mem(a, b, c0)
+    coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
         out.append(backward_feynman_kac_projection(basis, guess, coef))

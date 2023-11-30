@@ -24,6 +24,7 @@ __all__ = [
     "backward_feynman_kac_matrices",
     "backward_feynman_kac_projection",
     "backward_feynman_kac_solution",
+    "solve",
 ]
 
 
@@ -88,7 +89,7 @@ def reweight(
     a, b, c0 = reweight_matrices(
         basis, weights, lag, mem, test_basis=test_basis
     )
-    coef, mem_coef = _dga_mem(a, b, c0)
+    coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
         out.append(reweight_projection(basis, weights, coef))
@@ -479,7 +480,7 @@ def forward_feynman_kac(
         mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = _dga_mem(a, b, c0)
+    coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
         out.append(forward_feynman_kac_projection(basis, guess, coef))
@@ -902,7 +903,7 @@ def backward_feynman_kac(
         mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = _dga_mem(a, b, c0)
+    coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
         out.append(backward_feynman_kac_projection(basis, guess, coef))
@@ -1103,7 +1104,7 @@ def backward_feynman_kac_solution(
     return out
 
 
-def _dga_mem(a, b, c0):
+def solve(a, b, c0):
     """
     Solve DGA with memory for projection and memory-correction
     coefficients.
