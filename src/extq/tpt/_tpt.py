@@ -53,7 +53,9 @@ def rate(
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
         if n_frames <= lag:
             continue
-        out += _rate_helper(qp, qm, w, d, h, lag)
+        tp = forward_stop(d)
+        tm = backward_stop(d)
+        out += _rate_helper(qp, qm, w, d, tp, tm, h, lag)
     if normalize:
         wsum = sum(np.sum(w) for w in weights)
         out /= wsum
@@ -61,10 +63,8 @@ def rate(
 
 
 @nb.njit
-def _rate_helper(qp, qm, w, d, h, lag):
+def _rate_helper(qp, qm, w, d, tp, tm, h, lag):
     n = len(d)
-    tp = forward_stop(d)
-    tm = backward_stop(d)
 
     total = 0.0
 

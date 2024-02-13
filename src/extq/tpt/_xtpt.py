@@ -1,8 +1,7 @@
-import numba as nb
 import numpy as np
 from more_itertools import zip_equal
 
-from ..moving_semigroup import moving_semigroup
+from ..integral import integral_coeffs, integral_windows
 
 __all__ = [
     "extended_rate",
@@ -67,62 +66,17 @@ def extended_rate(
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
         if n_frames <= lag:
             continue
-        out += _extended_rate_helper(qp, qm, w, m, d, h, lag)
+        u = _extended_committor_outer_kernel(qp, qm, w, lag)
+        kl = _extended_backward_committor_kernel(qm, m, d)
+        kr = _extended_forward_committor_kernel(qp, m, d)
+        obs = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+        obs[:-1, :-1] = m * (h[None, :, 1:] - h[:, None, :-1])
+        c = _integral_windows(kl, kr, obs, lag)
+        out += np.sum(c * u) / lag
     if normalize:
         wsum = sum(np.sum(w) for w in weights)
         out /= wsum
     return out
-
-
-@nb.njit
-def _extended_rate_helper(qp, qm, w, m, d, h, lag):
-    nf = len(w)
-    ni = len(m)
-
-    # temporary array
-    a = np.zeros((nf - 1, 2, ni + 1, 2, ni + 1))
-
-    for t in range(nf - 1):
-        # before current time
-        for j in range(ni):
-            if d[j, t + 1]:
-                for i in range(ni):
-                    a[t, 0, i, 0, j] = m[i, j, t]
-            else:
-                a[t, 0, ni, 0, j] = qm[j, t + 1]  # boundary conditions
-        a[t, 0, ni, 0, ni] = 1.0
-
-        # at current time
-        for i in range(ni):
-            for j in range(ni):
-                a[t, 0, i, 1, j] = m[i, j, t] * (h[j, t + 1] - h[i, t])
-
-        # after current time
-        for i in range(ni):
-            if d[i, t]:
-                for j in range(ni):
-                    a[t, 1, i, 1, j] = m[i, j, t]
-            else:
-                a[t, 1, i, 1, ni] = qp[i, t]  # boundary conditions
-        a[t, 1, ni, 1, ni] = 1.0
-
-    a = a.reshape(nf - 1, 2 * (ni + 1), 2 * (ni + 1))
-    a = moving_semigroup(a, lag, np.dot)
-    a = a.reshape(nf - lag, 2, (ni + 1), 2, (ni + 1))
-    a = a[:, 0, :, 1, :]
-
-    # tally contributions to the reaction rate
-    result = 0.0
-    for t in range(nf - lag):
-        for i in range(ni):
-            for j in range(ni):
-                result += w[t] * qm[i, t] * a[t, i, j] * qp[j, t + lag]
-        for i in range(ni):
-            result += w[t] * qm[i, t] * a[t, i, ni]
-        for j in range(ni):
-            result += w[t] * a[t, ni, j] * qp[j, t + lag]
-        result += w[t] * a[t, ni, ni]
-    return result / lag
 
 
 def extended_current(
@@ -179,10 +133,12 @@ def extended_current(
         assert d.shape == (n_indices, n_frames)
         assert f.shape == (n_indices, n_frames)
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
-            j = np.zeros((n_indices, n_frames))
-        else:
-            j = _extended_current_helper(qp, qm, w, m, d, f, lag)
+        j = np.zeros((n_indices, n_frames))
+        if n_frames > lag:
+            sw = _step_weights(qp, qm, w, m, d, lag)
+            c = sw * (f[None, :, 1:] - f[:, None, :-1]) / lag
+            j[:, :-1] += 0.5 * np.sum(c, axis=1)
+            j[:, 1:] += 0.5 * np.sum(c, axis=0)
         out.append(j)
     if normalize:
         wsum = sum(np.sum(w) for w in weights)
@@ -191,69 +147,54 @@ def extended_current(
     return out
 
 
-@nb.njit
-def _extended_current_helper(qp, qm, w, m, d, f, lag):
-    nf = len(w)
-    ni = len(m)
+def _step_weights(qp, qm, w, m, d, lag):
+    n_indices, n_frames = d.shape
+    u = _extended_committor_outer_kernel(qp, qm, w, lag)
+    kl = _extended_backward_committor_kernel(qm, m, d)
+    kr = _extended_forward_committor_kernel(qp, m, d)
+    c = _integral_coeffs(u, kl, kr, lag)
+    return c[:-1, :-1] * m
 
-    # temporary array
-    a = np.zeros((nf + lag - 2, 2, ni + 1, 2, ni + 1))
 
-    # start at the current time and go to time tau
-    for t in range(nf - 2):
-        for i in range(ni):
-            if d[i, t + 1]:
-                for j in range(ni):
-                    a[t, 0, i, 0, j] = m[i, j, t + 1]
-            else:
-                a[t, 0, i, 0, ni] = qp[i, t + 1]  # boundary conditions
-        a[t, 0, ni, 0, ni] = 1.0
+def _integral_windows(kl, kr, obs, lag):
+    kl = np.moveaxis(kl, -1, 0)
+    kr = np.moveaxis(kr, -1, 0)
+    obs = np.moveaxis(obs, -1, 0)
+    c = integral_windows(kl, kr, obs, 1, lag)
+    c = np.moveaxis(c, 0, -1)
+    return c
 
-    # loop time tau to time zero
-    for t in range(lag - 1, nf - 1):
-        for i in range(ni):
-            for j in range(ni):
-                a[t, 0, i, 1, j] = (
-                    w[t - lag + 1] * qp[i, t + 1] * qm[j, t - lag + 1]
-                )
-        for i in range(ni):
-            a[t, 0, i, 1, ni] = w[t - lag + 1] * qp[i, t + 1]
-        for j in range(ni):
-            a[t, 0, ni, 1, j] = w[t - lag + 1] * qm[j, t - lag + 1]
-        a[t, 0, ni, 1, ni] = w[t - lag + 1]
 
-    # start at time zero and go to the current time
-    for t in range(lag, nf + lag - 2):
-        for j in range(ni):
-            if d[j, t - lag + 1]:
-                for i in range(ni):
-                    a[t, 1, i, 1, j] = m[i, j, t - lag]
-            else:
-                a[t, 1, ni, 1, j] = qm[j, t - lag + 1]  # boundary conditions
-        a[t, 1, ni, 1, ni] = 1.0
+def _integral_coeffs(u, kl, kr, lag):
+    u = np.moveaxis(u, -1, 0)
+    kl = np.moveaxis(kl, -1, 0)
+    kr = np.moveaxis(kr, -1, 0)
+    c = integral_coeffs(u, kl, kr, 1, lag)
+    c = np.moveaxis(c, 0, -1)
+    return c
 
-    # note that the indices are effectively transposed here:
-    # m[t, j, i] has i as the past and j as the future
-    a = a.reshape(nf + lag - 2, 2 * (ni + 1), 2 * (ni + 1))
-    a = moving_semigroup(a, lag, np.dot)
-    a = a.reshape(nf - 1, 2, (ni + 1), 2, (ni + 1))
-    a = a[:, 0, :, 1, :]
 
-    # apply transition at current time
-    coeffs = np.zeros((nf - 1, ni, ni))
-    for t in range(nf - 1):
-        for i in range(ni):
-            for j in range(ni):
-                coeffs[t, i, j] = a[t, j, i] * m[i, j, t]
+def _extended_forward_committor_kernel(qp, m, d):
+    n_indices, n_frames = d.shape
+    k = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+    k[:-1, :-1] = np.where(d[:, None, :-1], m, 0)
+    k[:-1, -1] = np.where(d[:, :-1], 0, qp[:, :-1])
+    k[-1, -1] = 1
+    return k
 
-    # tally contributions to the pointwise reactive current
-    result = np.zeros((ni, nf))
-    for i in range(ni):
-        for j in range(ni):
-            for t in range(nf - 1):
-                # apply collective variable at current time
-                c = coeffs[t, i, j] * (f[j, t + 1] - f[i, t]) / lag
-                # split contribution symmetrically
-                result[i, t] += 0.5 * c  # past
-                result[j, t + 1] += 0.5 * c  # future
-    return result
+
+def _extended_backward_committor_kernel(qm, m, d):
+    n_indices, n_frames = d.shape
+    k = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+    k[:-1, :-1] = np.where(d[None, :, 1:], m, 0)
+    k[-1, :-1] = np.where(d[:, 1:], 0, qm[:, 1:])
+    k[-1, -1] = 1
+    return k
+
+
+def _extended_committor_outer_kernel(qp, qm, w, lag):
+    (n_frames,) = w.shape
+    xqp = np.concatenate([qp, np.ones((1, n_frames))], axis=0)
+    xqm = np.concatenate([qm, np.ones((1, n_frames))], axis=0)
+    u = w[:-lag] * xqm[:, None, :-lag] * xqp[None, :, lag:]
+    return u

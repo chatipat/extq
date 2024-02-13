@@ -1,4 +1,3 @@
-import numba as nb
 import numpy as np
 from more_itertools import zip_equal
 
@@ -176,7 +175,7 @@ def forward_extended_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, m, d, f, g in zip_equal(
+    for x, y, w, k, d, f, g in zip_equal(
         test_basis, basis, weights, transitions, in_domain, function, guess
     ):
         n_frames = x[0].shape[0]
@@ -188,7 +187,7 @@ def forward_extended_feynman_kac(
         assert len(y) == n_indices
         assert (yi.shape == (n_frames, n_basis) for yi in y)
         assert w.shape == (n_frames,)
-        assert m.shape == (n_indices, n_indices, n_frames - 1)
+        assert k.shape == (n_indices, n_indices, n_frames - 1)
         assert d.shape == (n_indices, n_frames)
         assert f.shape == (n_indices, n_indices, n_frames - 1)
         assert g.shape == (n_indices, n_frames)
@@ -197,8 +196,11 @@ def forward_extended_feynman_kac(
         if n_frames <= lag:
             continue
 
-        m = _forward_transitions_helper(m, d, f, g, lag)
-        m = np.moveaxis(m, 0, -1)
+        m = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+        m[:-1, :-1] = np.where(d[:, None, :-1], k, 0)
+        m[:-1, -1] = np.where(d[:, :-1], np.sum(k * f, axis=1), g[:, :-1])
+        m[-1, -1] = 1
+        m = np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0), lag), 0, -1)
 
         for i in range(n_indices):
             wx = linalg.scale_rows(w[:-lag], x[i][:-lag])
@@ -219,24 +221,6 @@ def forward_extended_feynman_kac(
 
     coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
-
-
-@nb.njit
-def _forward_transitions_helper(m, d, f, g, lag):
-    n_indices = d.shape[0]
-    n_frames = d.shape[1]
-    r = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
-    for n in range(n_frames - 1):
-        for i in range(n_indices):
-            if d[i, n]:
-                for j in range(n_indices):
-                    r[n, i, j] = m[i, j, n]
-                    r[n, i, -1] += m[i, j, n] * f[i, j, n]  # integral
-            else:
-                r[n, i, -1] = g[i, n]  # boundary conditions
-        r[n, -1, -1] = 1.0
-    r = moving_matmul(r, lag)
-    return r
 
 
 def backward_extended_committor(
@@ -400,7 +384,7 @@ def backward_extended_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, m, d, f, g in zip_equal(
+    for x, y, w, k, d, f, g in zip_equal(
         test_basis, basis, weights, transitions, in_domain, function, guess
     ):
         n_frames = x[0].shape[0]
@@ -412,7 +396,7 @@ def backward_extended_feynman_kac(
         assert len(y) == n_indices
         assert (yi.shape == (n_frames, n_basis) for yi in y)
         assert w.shape == (n_frames,)
-        assert m.shape == (n_indices, n_indices, n_frames - 1)
+        assert k.shape == (n_indices, n_indices, n_frames - 1)
         assert d.shape == (n_indices, n_frames)
         assert f.shape == (n_indices, n_indices, n_frames - 1)
         assert g.shape == (n_indices, n_frames)
@@ -421,8 +405,11 @@ def backward_extended_feynman_kac(
         if n_frames <= lag:
             continue
 
-        m = _backward_transitions_helper(m, d, f, g, lag)
-        m = np.moveaxis(m, 0, -1)
+        m = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+        m[:-1, :-1] = np.where(d[None, :, 1:], k, 0)
+        m[-1, :-1] = np.where(d[:, 1:], np.sum(k * f, axis=0), g[:, 1:])
+        m[-1, -1] = 1
+        m = np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0), lag), 0, -1)
 
         for i in range(n_indices):
             wx = linalg.scale_rows(w[:-lag], x[i][lag:])
@@ -443,24 +430,6 @@ def backward_extended_feynman_kac(
 
     coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
-
-
-@nb.njit
-def _backward_transitions_helper(m, d, f, g, lag):
-    n_indices = d.shape[0]
-    n_frames = d.shape[1]
-    r = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
-    for n in range(n_frames - 1):
-        for j in range(n_indices):
-            if d[j, n + 1]:
-                for i in range(n_indices):
-                    r[n, i, j] = m[i, j, n]
-                    r[n, -1, j] += m[i, j, n] * f[i, j, n]  # integral
-            else:
-                r[n, -1, j] = g[j, n + 1]  # boundary conditions
-        r[n, -1, -1] = 1.0
-    r = moving_matmul(r, lag)
-    return r
 
 
 def transform(coeffs, basis, guess):
