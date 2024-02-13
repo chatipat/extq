@@ -1,7 +1,7 @@
 import numpy as np
 from more_itertools import zip_equal
 
-from ..integral import integral_coeffs, integral_windows
+from .integral import integral_coeffs, integral_windows
 
 __all__ = [
     "extended_rate",

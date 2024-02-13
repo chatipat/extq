@@ -1,9 +1,9 @@
 import numpy as np
 from more_itertools import zip_equal
 
-from .. import linalg
-from ..stop import backward_stop, forward_stop
-from ..utils import uniform_weights
+from . import linalg
+from .stop import backward_stop, forward_stop
+from .utils import uniform_weights
 
 __all__ = [
     "reweight",

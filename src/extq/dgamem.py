@@ -1,11 +1,10 @@
 """DGA with memory estimators for statistics."""
 
-
 import numpy as np
 from more_itertools import zip_equal
 
-from .. import linalg
-from ..stop import backward_stop, forward_stop
+from . import linalg
+from .stop import backward_stop, forward_stop
 
 __all__ = [
     "reweight",

@@ -1,8 +1,7 @@
 import numpy as np
 
-from .. import linalg
-from ._utils import augment_generator
-from ._utils import build_kernel
+from . import linalg
+from .fdm_utils import augment_generator, build_kernel
 
 __all__ = [
     "reweight",

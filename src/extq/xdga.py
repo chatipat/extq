@@ -1,8 +1,8 @@
 import numpy as np
 from more_itertools import zip_equal
 
-from .. import linalg
-from ..moving_semigroup import moving_matmul
+from . import linalg
+from .moving_semigroup import moving_matmul
 
 __all__ = [
     "forward_extended_committor",
