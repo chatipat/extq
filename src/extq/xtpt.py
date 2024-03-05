@@ -5,6 +5,7 @@ from .integral import integral_coeffs, integral_windows
 
 __all__ = [
     "extended_rate",
+    "extended_density",
     "extended_current",
 ]
 
@@ -79,6 +80,64 @@ def extended_rate(
     return out
 
 
+def extended_density(
+    forward_q, backward_q, weights, transitions, in_domain, lag, normalize=True
+):
+    """Estimate the reactive density with extended committors.
+
+    Parameters
+    ----------
+    forward_q : list of (n_indices, n_frames[i]) ndarray of float
+        Forward extended committor for each frame.
+    backward_q : list of (n_indices, n_frames[i]) ndarray of float
+        Backward extended committor for each frame.
+    weights : list of (n_frames[i],) ndarray of float
+        Change of measure to the invariant distribution for each frame.
+    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+        Possible transitions of the index process between adjacent
+        frames.
+    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+        For each value of the index process, whether each frame of the
+        trajectories is in the domain.
+    lag : int
+        Lag time in units of frames.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
+
+    Returns
+    -------
+    list of (n_indices, n_frames[i]) ndarray of float
+        Estimated reactive density at each frame.
+
+    """
+    assert lag > 0
+    n_indices = None
+    out = []
+    for qp, qm, w, m, d in zip_equal(
+        forward_q, backward_q, weights, transitions, in_domain
+    ):
+        n_frames = w.shape[0]
+        n_indices = m.shape[0] if n_indices is None else n_indices
+        assert qp.shape == (n_indices, n_frames)
+        assert qm.shape == (n_indices, n_frames)
+        assert w.shape == (n_frames,)
+        assert m.shape == (n_indices, n_indices, n_frames - 1)
+        assert d.shape == (n_indices, n_frames)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        p = np.zeros((n_indices, n_frames))
+        if n_frames > lag:
+            sw = _step_weights(qp, qm, w, m, d, lag)
+            c = 0.5 * sw / lag
+            p[:, :-1] += np.sum(c, axis=1)
+            p[:, 1:] += np.sum(c, axis=0)
+        out.append(p)
+    if normalize:
+        wsum = sum(np.sum(w) for w in weights)
+        for p in out:
+            p /= wsum
+    return out
+
+
 def extended_current(
     forward_q,
     backward_q,
@@ -114,7 +173,7 @@ def extended_current(
 
     Returns
     -------
-    float
+    list of (n_indices, n_frames[i]) ndarray of float
         Estimated reactive current at each frame.
 
     """

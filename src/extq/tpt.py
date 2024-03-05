@@ -6,6 +6,7 @@ from .stop import backward_stop, forward_stop
 
 __all__ = [
     "rate",
+    "density",
     "current",
     "rate_jstrahan",
     "current_jstrahan",
@@ -97,6 +98,68 @@ def _rate_helper(qp, qm, w, d, tp, tm, h, lag):
     return total / lag
 
 
+def density(forward_q, backward_q, weights, in_domain, lag, normalize=True):
+    """Estimate the reactive density at each frame.
+
+    Parameters
+    ----------
+    forward_q : list of (n_frames[i],) ndarray of float
+        Forward committor for each frame.
+    backward_q : list of (n_frames[i],) ndarray of float
+        Backward committor for each frame.
+    weights : list of (n_frames[i],) ndarray of float
+        Reweighting factor to the invariant distribution for each frame.
+    in_domain : list of (n_frames[i],) ndarray of bool
+        Whether each frame of the trajectories is in the domain.
+    lag : int
+        Lag time in units of frames.
+    normalize : bool, optional
+        If True (default), normalize `weights` to one.
+
+    Returns
+    -------
+    list of (n_frames[i],) ndarray of float
+        Estimated reactive density at each frame.
+
+    """
+    assert lag > 0
+    out = []
+    for qp, qm, w, d in zip_equal(forward_q, backward_q, weights, in_domain):
+        n_frames = w.shape[0]
+        assert qp.shape == (n_frames,)
+        assert qm.shape == (n_frames,)
+        assert w.shape == (n_frames,)
+        assert d.shape == (n_frames,)
+        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
+        if n_frames <= lag:
+            p = np.zeros(len(w))
+        else:
+            tp = forward_stop(d)
+            tm = backward_stop(d)
+            p = _density_helper(qp, qm, w, tp, tm, lag)
+        out.append(p)
+    if normalize:
+        wsum = sum(np.sum(w) for w in weights)
+        for p in out:
+            p /= wsum
+    return out
+
+
+@nb.njit
+def _density_helper(qp, qm, w, tp, tm, lag):
+    result = np.zeros(len(w))
+    for start in range(len(w) - lag):
+        end = start + lag
+        for i in range(start, end):
+            j = i + 1
+            ti = max(tm[i], start)
+            tj = min(tp[j], end)
+            c = w[start] * qm[ti] * qp[tj] / lag
+            result[i] += 0.5 * c
+            result[j] += 0.5 * c
+    return result
+
+
 def current(
     forward_q, backward_q, weights, in_domain, cv, lag, normalize=True
 ):
@@ -121,7 +184,7 @@ def current(
 
     Returns
     -------
-    float
+    list of (n_frames[i],) ndarray of float
         Estimated reactive current at each frame.
 
     """
