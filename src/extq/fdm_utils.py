@@ -48,7 +48,8 @@ def augment_generator(generator, spatial, temporal):
         or (joint_temporal @ joint_spatial != joint_temporal).sum()
     ):
         warnings.warn(
-            "zero lag time augmented transition matrix not an identity element"
+            "zero lag time augmented transition matrix not an identity element",
+            stacklevel=1,
         )
     return joint_spatial, joint_temporal
 

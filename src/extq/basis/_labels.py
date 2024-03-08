@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-def labels_to_basis(labels, num=None, sparse=True, in_domain=None):
+def labels_to_basis(labels, num=None, *, sparse=True, in_domain=None):
     """
     Construct a basis of indicator functions given labels.
 
@@ -54,7 +54,7 @@ def _num(labels):
     return max(np.max(indices) for indices in labels if len(indices) > 0) + 1
 
 
-def _labels_to_basis(indices, cols, sparse=True, mask=None):
+def _labels_to_basis(indices, cols, *, sparse=True, mask=None):
     """
     Construct a basis of indicator functions given labels for a single
     trajectory.

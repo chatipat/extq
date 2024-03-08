@@ -1,9 +1,23 @@
-from . import baoab
-from . import cross
-from . import doublewell
-from . import euler
-from . import gillespie
-from . import mullerbrown
-from . import symmetricdoublewell
-from . import threehole
-from . import triplewell
+from . import (
+    baoab,
+    cross,
+    doublewell,
+    euler,
+    gillespie,
+    mullerbrown,
+    symmetricdoublewell,
+    threehole,
+    triplewell,
+)
+
+__all__ = [
+    "baoab",
+    "cross",
+    "doublewell",
+    "euler",
+    "gillespie",
+    "mullerbrown",
+    "symmetricdoublewell",
+    "threehole",
+    "triplewell",
+]

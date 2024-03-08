@@ -9,7 +9,13 @@ __all__ = [
 
 
 def rate(
-    generator, forward_q, backward_q, weights, rxn_coords=None, normalize=True
+    generator,
+    forward_q,
+    backward_q,
+    weights,
+    rxn_coords=None,
+    *,
+    normalize=True,
 ):
     """Compute the TPT rate.
 
@@ -56,7 +62,7 @@ def rate(
     return out
 
 
-def current(generator, forward_q, backward_q, weights, cv, normalize=True):
+def current(generator, forward_q, backward_q, weights, cv, *, normalize=True):
     """Compute the reactive current at each point.
 
     Parameters
@@ -98,7 +104,7 @@ def current(generator, forward_q, backward_q, weights, cv, normalize=True):
     return out.reshape(shape)
 
 
-def integral(generator, forward_q, backward_q, weights, normalize=True):
+def integral(generator, forward_q, backward_q, weights, *, normalize=True):
     """Integrate a TPT objective function over the reaction ensemble.
 
     Parameter
@@ -135,7 +141,7 @@ def integral(generator, forward_q, backward_q, weights, normalize=True):
 
 
 def pointwise_integral(
-    generator, forward_q, backward_q, weights, normalize=True
+    generator, forward_q, backward_q, weights, *, normalize=True
 ):
     """Calculate the contribution of each point to a TPT integral.
 

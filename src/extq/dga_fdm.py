@@ -568,7 +568,7 @@ def _to_flat(bases, functions):
 
     # broadcast and flatten arrays
     out_bases = tuple(
-        np.broadcast_to(basis, out_shape + (nbasis,)).reshape((-1, nbasis))
+        np.broadcast_to(basis, (*out_shape, nbasis)).reshape((-1, nbasis))
         for basis, nbasis in zip(bases, nbases)
     )
     out_functions = tuple(

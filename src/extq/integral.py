@@ -3,7 +3,7 @@ import numpy as np
 from .moving_semigroup import moving_matmul
 
 
-def integral_coeffs(u, kl, kr, obslag, lag, normalize=False):
+def integral_coeffs(u, kl, kr, obslag, lag, *, normalize=False):
     """
     Compute pointwise coefficients for integral-type statistics.
 
@@ -52,7 +52,7 @@ def integral_coeffs(u, kl, kr, obslag, lag, normalize=False):
     return out
 
 
-def integral_windows(kl, kr, obs, obslag, lag, normalize=False):
+def integral_windows(kl, kr, obs, obslag, lag, *, normalize=False):
     """
     Compute integral-type statistics over each window.
 

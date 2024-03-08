@@ -24,14 +24,14 @@ def force(x, y):
 def _potential_term(A, a, b, c, x0, y0, x, y):
     dx = x - x0
     dy = y - y0
-    return A * np.exp(a * dx ** 2 + b * dx * dy + c * dy ** 2)
+    return A * np.exp(a * dx**2 + b * dx * dy + c * dy**2)
 
 
 @nb.njit
 def _force_term(A, a, b, c, x0, y0, x, y):
     dx = x - x0
     dy = y - y0
-    u = A * np.exp(a * dx ** 2 + b * dx * dy + c * dy ** 2)
+    u = A * np.exp(a * dx**2 + b * dx * dy + c * dy**2)
     fx = -u * (2.0 * a * dx + b * dy)
     fy = -u * (b * dx + 2.0 * c * dy)
     return fx, fy

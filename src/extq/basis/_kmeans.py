@@ -20,7 +20,7 @@ __all__ = [
 ]
 
 
-def kmeans_centers(cvs, num, in_domain=None, **kwargs):
+def kmeans_centers(cvs, num, *, in_domain=None, **kwargs):
     """
     Compute cluster centers using k-means.
 
@@ -131,7 +131,7 @@ def kmeans3d_labels(cv1, cv2, cv3, num, **kwargs):
     return kmeans_labels(_stack(cv1, cv2, cv3), num, **kwargs)
 
 
-def kmeans_basis(cvs, num, sparse=True, in_domain=None, **kwargs):
+def kmeans_basis(cvs, num, *, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     using k-means.
@@ -160,7 +160,7 @@ def kmeans_basis(cvs, num, sparse=True, in_domain=None, **kwargs):
     return labels_to_basis(labels, sparse=sparse, in_domain=in_domain)
 
 
-def kmeans1d_basis(cv, num, sparse=True, in_domain=None, **kwargs):
+def kmeans1d_basis(cv, num, *, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     in a 1D collective variable space using k-means.
@@ -189,7 +189,7 @@ def kmeans1d_basis(cv, num, sparse=True, in_domain=None, **kwargs):
     )
 
 
-def kmeans2d_basis(cv1, cv2, num, sparse=True, in_domain=None, **kwargs):
+def kmeans2d_basis(cv1, cv2, num, *, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     in a 2D collective variable space using k-means.
@@ -218,7 +218,9 @@ def kmeans2d_basis(cv1, cv2, num, sparse=True, in_domain=None, **kwargs):
     )
 
 
-def kmeans3d_basis(cv1, cv2, cv3, num, sparse=True, in_domain=None, **kwargs):
+def kmeans3d_basis(
+    cv1, cv2, cv3, num, *, sparse=True, in_domain=None, **kwargs
+):
     """
     Construct a basis of indicator functions within a specified domain
     in a 3D collective variable space using k-means.
@@ -247,7 +249,7 @@ def kmeans3d_basis(cv1, cv2, cv3, num, sparse=True, in_domain=None, **kwargs):
         num,
         sparse=sparse,
         in_domain=in_domain,
-        **kwargs
+        **kwargs,
     )
 
 

@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-def whiten(trajs, weights=None, rtol=None, with_mean=True, with_std=True):
+def whiten(trajs, weights=None, *, rtol=None, with_mean=True, with_std=True):
     """Whiten the data using PCA.
 
     Parameters
@@ -117,7 +117,7 @@ def add_constant_feature(trajs):
     ]
 
 
-def remove_constant_feature(trajs, weights=None, tol=0.0):
+def remove_constant_feature(trajs, weights=None, *, tol=0.0):
     """Remove the constant feature from the span of the features.
 
     Parameters

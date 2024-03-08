@@ -15,7 +15,7 @@ def swa(data, start, end, f, *args):
 
     [1] Basin, D.; Klaedtke, F.; Zălinescu, E.
     "Greedily Computing Associative Aggregations on Sliding Windows."
-    *Information Processing Letters* **2015**, *115* (2), 186–192.
+    *Information Processing Letters* **2015**, *115* (2), 186-192.
 
     Parameters
     ----------

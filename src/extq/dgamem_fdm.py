@@ -31,6 +31,7 @@ def reweight(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -115,6 +116,7 @@ def forward_committor(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -130,10 +132,10 @@ def forward_committor(
         lag,
         mem,
         test_basis,
-        return_projection,
-        return_solution,
-        return_coef,
-        return_mem_coef,
+        return_projection=return_projection,
+        return_solution=return_solution,
+        return_coef=return_coef,
+        return_mem_coef=return_mem_coef,
     )
 
 
@@ -146,6 +148,7 @@ def forward_mfpt(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -161,10 +164,10 @@ def forward_mfpt(
         lag,
         mem,
         test_basis,
-        return_projection,
-        return_solution,
-        return_coef,
-        return_mem_coef,
+        return_projection=return_projection,
+        return_solution=return_solution,
+        return_coef=return_coef,
+        return_mem_coef=return_mem_coef,
     )
 
 
@@ -178,6 +181,7 @@ def forward_feynman_kac(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -302,6 +306,7 @@ def backward_committor(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -317,10 +322,10 @@ def backward_committor(
         lag,
         mem,
         test_basis,
-        return_projection,
-        return_solution,
-        return_coef,
-        return_mem_coef,
+        return_projection=return_projection,
+        return_solution=return_solution,
+        return_coef=return_coef,
+        return_mem_coef=return_mem_coef,
     )
 
 
@@ -333,6 +338,7 @@ def backward_mfpt(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -348,10 +354,10 @@ def backward_mfpt(
         lag,
         mem,
         test_basis,
-        return_projection,
-        return_solution,
-        return_coef,
-        return_mem_coef,
+        return_projection=return_projection,
+        return_solution=return_solution,
+        return_coef=return_coef,
+        return_mem_coef=return_mem_coef,
     )
 
 
@@ -365,6 +371,7 @@ def backward_feynman_kac(
     lag,
     mem,
     test_basis=None,
+    *,
     return_projection=False,
     return_solution=True,
     return_coef=False,
@@ -609,7 +616,7 @@ def _to_flat(bases, functions):
 
     # broadcast and flatten arrays
     out_bases = tuple(
-        np.broadcast_to(basis, out_shape + (nbasis,)).reshape((-1, nbasis))
+        np.broadcast_to(basis, (out_shape, *nbasis)).reshape((-1, nbasis))
         for basis, nbasis in zip(bases, nbases)
     )
     out_functions = tuple(
