@@ -3,11 +3,15 @@ import scipy.linalg
 import scipy.sparse
 from more_itertools import zip_equal
 
+from .. import linalg
+
 __all__ = [
     "whiten",
     "center",
     "add_constant_feature",
     "remove_constant_feature",
+    "concatenate_bases",
+    "scale_basis",
 ]
 
 
@@ -166,3 +170,67 @@ def remove_constant_feature(trajs, weights=None, *, tol=0.0):
     col = np.concatenate([np.arange(n_out), np.arange(n_out)])
     mat = scipy.sparse.csr_matrix((data, (row, col)), shape=(n_out + 1, n_out))
     return [x @ mat for x in trajs]
+
+
+def concatenate_bases(*bases):
+    """Concatenate bases along the basis function dimension.
+
+    Parameters
+    ----------
+    *bases : list of (n_frames[i], n_features[k]) {ndarray, sparray}
+        Input features.
+
+    Returns
+    -------
+    list of (n_frames[i], sum(n_features)) {ndarray, sparray}
+        Concatenated features.
+
+    """
+    lengths = _lengths(bases[0])
+
+    if not all(np.array_equal(_lengths(basis), lengths) for basis in bases):
+        msg = "Bases must have matching trajectory lengths."
+        raise ValueError(msg)
+
+    sparse = [scipy.sparse.issparse(y) for basis in bases for y in basis]
+    if all(sparse):  # sparse basis
+        # concatenate trajectories in each basis for efficiency
+        flat_bases = [scipy.sparse.vstack(basis) for basis in bases]
+        # concatenate along basis dimension
+        flat_out = scipy.sparse.hstack(flat_bases, format="csr")
+        # split into individual trajectories
+        offsets = np.concatenate([[0], np.cumsum(lengths)])
+        out = [
+            flat_out[start:end]
+            for start, end in zip(offsets[:-1], offsets[1:])
+        ]
+    elif not any(sparse):  # dense basis
+        out = [np.concatenate(ys, axis=-1) for ys in zip(*bases)]
+    else:
+        msg = "Bases must either be all sparse or all dense."
+        raise ValueError(msg)
+    return out
+
+
+def scale_basis(scale, basis):
+    """Multiply each basis function by a given function.
+
+    Parameters
+    ----------
+    scale : list of (n_frames[i],) ndarray
+        Function by which to multiply each basis function.
+    basis : list of (n_frames[i], n_features) {ndarray, sparray}
+        Input features.
+
+    Returns
+    -------
+    list of (n_frames[i], n_features) {ndarray, sparray}
+        Scaled features.
+
+    """
+    return [linalg.scale_rows(s, y) for s, y in zip_equal(scale, basis)]
+
+
+def _lengths(trajs):
+    """Return the length of each trajectory."""
+    return np.array([traj.shape[0] for traj in trajs])
