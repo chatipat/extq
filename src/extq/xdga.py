@@ -196,7 +196,8 @@ def forward_extended_feynman_kac(
         if n_frames <= lag:
             continue
 
-        m = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+        m = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
+        m = np.moveaxis(m, 0, -1)
         m[:-1, :-1] = np.where(d[:, None, :-1], k, 0)
         m[:-1, -1] = np.where(d[:, :-1], np.sum(k * f, axis=1), g[:, :-1])
         m[-1, -1] = 1
@@ -405,7 +406,8 @@ def backward_extended_feynman_kac(
         if n_frames <= lag:
             continue
 
-        m = np.zeros((n_indices + 1, n_indices + 1, n_frames - 1))
+        m = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
+        m = np.moveaxis(m, 0, -1)
         m[:-1, :-1] = np.where(d[None, :, 1:], k, 0)
         m[-1, :-1] = np.where(d[:, 1:], np.sum(k * f, axis=0), g[:, 1:])
         m[-1, -1] = 1
