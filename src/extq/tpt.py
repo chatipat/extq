@@ -3,6 +3,7 @@ import numpy as np
 from more_itertools import zip_equal
 
 from .stop import backward_stop, forward_stop
+from .utils import normalize_weights
 
 __all__ = [
     "rate",
@@ -14,7 +15,14 @@ __all__ = [
 
 
 def rate(
-    forward_q, backward_q, weights, in_domain, rxn_coord, lag, normalize=True
+    forward_q,
+    backward_q,
+    weights,
+    in_domain,
+    rxn_coord,
+    lag,
+    *,
+    normalize=True,
 ):
     """Estimate the TPT rate.
 
@@ -43,6 +51,8 @@ def rate(
 
     """
     assert lag > 0
+    if normalize:
+        weights = normalize_weights(weights)
     out = 0.0
     for qp, qm, w, d, h in zip_equal(
         forward_q, backward_q, weights, in_domain, rxn_coord
@@ -59,9 +69,6 @@ def rate(
         tp = forward_stop(d)
         tm = backward_stop(d)
         out += _rate_helper(qp, qm, w, d, tp, tm, h, lag)
-    if normalize:
-        wsum = sum(np.sum(w) for w in weights)
-        out /= wsum
     return out
 
 
@@ -98,7 +105,7 @@ def _rate_helper(qp, qm, w, d, tp, tm, h, lag):
     return total / lag
 
 
-def density(forward_q, backward_q, weights, in_domain, lag, normalize=True):
+def density(forward_q, backward_q, weights, in_domain, lag, *, normalize=True):
     """Estimate the reactive density at each frame.
 
     Parameters
@@ -123,6 +130,8 @@ def density(forward_q, backward_q, weights, in_domain, lag, normalize=True):
 
     """
     assert lag > 0
+    if normalize:
+        weights = normalize_weights(weights)
     out = []
     for qp, qm, w, d in zip_equal(forward_q, backward_q, weights, in_domain):
         n_frames = w.shape[0]
@@ -131,37 +140,19 @@ def density(forward_q, backward_q, weights, in_domain, lag, normalize=True):
         assert w.shape == (n_frames,)
         assert d.shape == (n_frames,)
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
-            p = np.zeros(len(w))
-        else:
+        p = np.zeros(len(w))
+        if n_frames > lag:
             tp = forward_stop(d)
             tm = backward_stop(d)
-            p = _density_helper(qp, qm, w, tp, tm, lag)
+            sw = _step_weights(qp, qm, w, tp, tm, lag)
+            p[:-1] += 0.5 * sw
+            p[1:] += 0.5 * sw
         out.append(p)
-    if normalize:
-        wsum = sum(np.sum(w) for w in weights)
-        for p in out:
-            p /= wsum
     return out
 
 
-@nb.njit
-def _density_helper(qp, qm, w, tp, tm, lag):
-    result = np.zeros(len(w))
-    for start in range(len(w) - lag):
-        end = start + lag
-        for i in range(start, end):
-            j = i + 1
-            ti = max(tm[i], start)
-            tj = min(tp[j], end)
-            c = w[start] * qm[ti] * qp[tj] / lag
-            result[i] += 0.5 * c
-            result[j] += 0.5 * c
-    return result
-
-
 def current(
-    forward_q, backward_q, weights, in_domain, cv, lag, normalize=True
+    forward_q, backward_q, weights, in_domain, cv, lag, *, normalize=True
 ):
     """Estimate the reactive current at each frame.
 
@@ -189,6 +180,8 @@ def current(
 
     """
     assert lag > 0
+    if normalize:
+        weights = normalize_weights(weights)
     out = []
     for qp, qm, w, d, f in zip_equal(
         forward_q, backward_q, weights, in_domain, cv
@@ -200,33 +193,30 @@ def current(
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames,)
         assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
-            j = np.zeros(len(w))
-        else:
+        j = np.zeros(len(w))
+        if n_frames > lag:
             tp = forward_stop(d)
             tm = backward_stop(d)
-            j = _current_helper(qp, qm, w, tp, tm, f, lag)
+            sw = _step_weights(qp, qm, w, tp, tm, lag)
+            c = sw * np.diff(f)
+            j[:-1] += 0.5 * c
+            j[1:] += 0.5 * c
         out.append(j)
-    if normalize:
-        wsum = sum(np.sum(w) for w in weights)
-        for j in out:
-            j /= wsum
     return out
 
 
 @nb.njit
-def _current_helper(qp, qm, w, tp, tm, f, lag):
-    result = np.zeros(len(w))
-    for start in range(len(w) - lag):
+def _step_weights(qp, qm, w, tp, tm, lag):
+    out = np.zeros(len(w) - 1)
+    for start in range(len(w) - lag):  # loop over sliding windows
         end = start + lag
-        for i in range(start, end):
+        for i in range(start, end):  # loop over steps in each window
             j = i + 1
             ti = max(tm[i], start)
             tj = min(tp[j], end)
-            c = w[start] * qm[ti] * qp[tj] * (f[j] - f[i]) / lag
-            result[i] += 0.5 * c
-            result[j] += 0.5 * c
-    return result
+            c = w[start] * qm[ti] * qp[tj] / lag
+            out[i] += c
+    return out
 
 
 def rate_jstrahan(forward_q, backward_q, weights, in_domain, lag):

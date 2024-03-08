@@ -2,6 +2,7 @@ import numpy as np
 from more_itertools import zip_equal
 
 from .integral import integral_coeffs, integral_windows
+from .utils import normalize_weights
 
 __all__ = [
     "extended_rate",
@@ -18,6 +19,7 @@ def extended_rate(
     in_domain,
     rxn_coord,
     lag,
+    *,
     normalize=True,
 ):
     """Estimate the TPT rate with extended committors.
@@ -51,6 +53,8 @@ def extended_rate(
 
     """
     assert lag > 0
+    if normalize:
+        weights = normalize_weights(weights)
     n_indices = None
     out = 0.0
     for qp, qm, w, m, d, h in zip_equal(
@@ -74,14 +78,18 @@ def extended_rate(
         obs[:-1, :-1] = m * (h[None, :, 1:] - h[:, None, :-1])
         c = _integral_windows(kl, kr, obs, lag)
         out += np.sum(c * u) / lag
-    if normalize:
-        wsum = sum(np.sum(w) for w in weights)
-        out /= wsum
     return out
 
 
 def extended_density(
-    forward_q, backward_q, weights, transitions, in_domain, lag, normalize=True
+    forward_q,
+    backward_q,
+    weights,
+    transitions,
+    in_domain,
+    lag,
+    *,
+    normalize=True,
 ):
     """Estimate the reactive density with extended committors.
 
@@ -111,6 +119,8 @@ def extended_density(
 
     """
     assert lag > 0
+    if normalize:
+        weights = normalize_weights(weights)
     n_indices = None
     out = []
     for qp, qm, w, m, d in zip_equal(
@@ -131,10 +141,6 @@ def extended_density(
             p[:, :-1] += np.sum(c, axis=1)
             p[:, 1:] += np.sum(c, axis=0)
         out.append(p)
-    if normalize:
-        wsum = sum(np.sum(w) for w in weights)
-        for p in out:
-            p /= wsum
     return out
 
 
@@ -146,6 +152,7 @@ def extended_current(
     in_domain,
     cv,
     lag,
+    *,
     normalize=True,
 ):
     """Estimate the reactive current with extended committors.
@@ -178,6 +185,8 @@ def extended_current(
 
     """
     assert lag > 0
+    if normalize:
+        weights = normalize_weights(weights)
     n_indices = None
     out = []
     for qp, qm, w, m, d, f in zip_equal(
@@ -199,10 +208,6 @@ def extended_current(
             j[:, :-1] += 0.5 * np.sum(c, axis=1)
             j[:, 1:] += 0.5 * np.sum(c, axis=0)
         out.append(j)
-    if normalize:
-        wsum = sum(np.sum(w) for w in weights)
-        for j in out:
-            j /= wsum
     return out
 
 

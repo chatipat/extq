@@ -2,7 +2,7 @@ import numpy as np
 import scipy.signal
 
 
-def uniform_weights(trajs, maxlag, normalize=True):
+def uniform_weights(trajs, maxlag, *, normalize=True):
     """Make uniform weights.
 
     Parameters
@@ -32,8 +32,7 @@ def uniform_weights(trajs, maxlag, normalize=True):
         w[max(0, n_frames - maxlag) :] = 0.0
         weights.append(w)
     if normalize:
-        denom = sum(np.sum(w) for w in weights)
-        weights = [w / denom for w in weights]
+        weights = normalize_weights(weights)
     return weights
 
 
@@ -102,3 +101,22 @@ def distribute_weights(weights, lag, maxlag):
             new_w[: n_frames - lag] = temp
         result.append(new_w)
     return result
+
+
+def normalize_weights(weights):
+    """
+    Normalize input weights to sum to one.
+
+    Parameters
+    ----------
+    weights : sequence of (n_frames[i],) ndarray of float
+        Input weights.
+
+    Returns
+    -------
+    list of (n_frames[i],) ndarray of float
+        Normalized weights.
+
+    """
+    scale = 1.0 / np.sum([np.sum(w) for w in weights])
+    return [scale * w for w in weights]

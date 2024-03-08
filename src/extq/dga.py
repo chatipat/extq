@@ -3,7 +3,7 @@ from more_itertools import zip_equal
 
 from . import linalg
 from .stop import backward_stop, forward_stop
-from .utils import uniform_weights
+from .utils import normalize_weights, uniform_weights
 
 __all__ = [
     "reweight",
@@ -17,7 +17,7 @@ __all__ = [
 
 
 def reweight(
-    basis, lag, maxlag=None, guess=None, test_basis=None, normalize=True
+    basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=True
 ):
     """Estimate the change of measure to the invariant distribution.
 
@@ -75,9 +75,7 @@ def reweight(
     coeffs = linalg.solve(a, b)
     out = [w * (y @ coeffs + 1.0) for y, w in zip_equal(basis, guess)]
     if normalize:
-        wsum = sum(np.sum(w) for w in out)
-        for w in out:
-            w /= wsum
+        out = normalize_weights(out)
     return out
 
 
