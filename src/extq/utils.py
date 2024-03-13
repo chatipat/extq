@@ -1,5 +1,16 @@
 import numpy as np
 import scipy.signal
+from more_itertools import pairwise
+
+__all__ = [
+    "uniform_weights",
+    "shift_weights",
+    "distribute_weights",
+    "normalize_weights",
+    "lengths",
+    "flatten",
+    "unflatten",
+]
 
 
 def uniform_weights(trajs, maxlag, *, normalize=True):
@@ -26,8 +37,7 @@ def uniform_weights(trajs, maxlag, *, normalize=True):
     """
     assert maxlag >= 0
     weights = []
-    for traj in trajs:
-        n_frames = np.shape(traj)[0]
+    for n_frames in lengths(trajs):
         w = np.ones(n_frames)
         w[max(0, n_frames - maxlag) :] = 0.0
         weights.append(w)
@@ -120,3 +130,62 @@ def normalize_weights(weights):
     """
     scale = 1.0 / np.sum([np.sum(w) for w in weights])
     return [scale * w for w in weights]
+
+
+def lengths(trajs):
+    """
+    Return the length of each trajectory.
+
+    Parameters
+    ----------
+    trajs : list of (n_frames[i], ...) array-like
+        List of trajectories.
+
+    Returns
+    -------
+    lengths : (n_trajs,) ndarray of int
+        Length of each trajectory.
+
+    """
+    return np.array([np.shape(traj)[0] for traj in trajs])
+
+
+def flatten(trajs):
+    """
+    Concatenate trajectories.
+
+    Parameters
+    ----------
+    trajs : list of (n_frames[i], *data_shape) {ndarray, sparse matrix}
+        List of trajectories.
+
+    Returns
+    -------
+    flat : (sum(n_frames), *data_shape) {ndarray, sparse matrix}
+        Concatenated trajectory.
+
+    """
+    if any(scipy.sparse.issparse(traj) for traj in trajs):
+        return scipy.sparse.vstack(trajs)
+    else:
+        return np.concatenate(trajs)
+
+
+def unflatten(flat, lengths):
+    """
+    Split a trajectory given resulting lengths.
+
+    Parameters
+    ----------
+    flat : (sum(n_frames), *data_shape) {ndarray, sparse matrix}
+        Concatenated trajectory.
+
+    Returns
+    -------
+    trajs : list of (n_frames[i], *data_shape) {ndarray, sparse matrix}
+        List of trajectories.
+
+    """
+    assert flat.shape[0] == np.sum(lengths)
+    offsets = np.concatenate([[0], np.cumsum(lengths)])
+    return [flat[start:end] for start, end in pairwise(offsets)]

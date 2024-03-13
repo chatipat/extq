@@ -3,7 +3,7 @@ import scipy.linalg
 import scipy.sparse
 from more_itertools import zip_equal
 
-from .. import linalg
+from .. import linalg, utils
 
 __all__ = [
     "whiten",
@@ -186,24 +186,21 @@ def concatenate_bases(*bases):
         Concatenated features.
 
     """
-    lengths = _lengths(bases[0])
+    lengths = utils.lengths(bases[0])
 
-    if not all(np.array_equal(_lengths(basis), lengths) for basis in bases):
-        msg = "Bases must have matching trajectory lengths."
-        raise ValueError(msg)
+    for basis in bases:
+        if not np.array_equal(utils.lengths(basis), lengths):
+            msg = "Bases must have matching trajectory lengths."
+            raise ValueError(msg)
 
     sparse = [scipy.sparse.issparse(y) for basis in bases for y in basis]
     if all(sparse):  # sparse basis
         # concatenate trajectories in each basis for efficiency
-        flat_bases = [scipy.sparse.vstack(basis) for basis in bases]
+        flat_bases = [utils.flatten(basis) for basis in bases]
         # concatenate along basis dimension
         flat_out = scipy.sparse.hstack(flat_bases, format="csr")
         # split into individual trajectories
-        offsets = np.concatenate([[0], np.cumsum(lengths)])
-        out = [
-            flat_out[start:end]
-            for start, end in zip(offsets[:-1], offsets[1:])
-        ]
+        out = utils.unflatten(flat_out, lengths)
     elif not any(sparse):  # dense basis
         out = [np.concatenate(ys, axis=-1) for ys in zip(*bases)]
     else:
@@ -229,8 +226,3 @@ def scale_basis(scale, basis):
 
     """
     return [linalg.scale_rows(s, y) for s, y in zip_equal(scale, basis)]
-
-
-def _lengths(trajs):
-    """Return the length of each trajectory."""
-    return np.array([traj.shape[0] for traj in trajs])
