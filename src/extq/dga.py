@@ -2,6 +2,7 @@ import numpy as np
 from more_itertools import zip_equal
 
 from . import linalg
+from ._utils import sum_windows
 from .stop import backward_stop, forward_stop
 from .utils import normalize_weights, uniform_weights
 
@@ -223,11 +224,9 @@ def forward_feynman_kac(
         iy = np.minimum(ix + lag, forward_stop(d)[ix])  # final time
         assert iy[-1] < n_frames  # all times < n_frames
 
-        intf = np.concatenate([np.zeros(1), np.cumsum(f)])
-        integral = intf[iy] - intf[ix]
         wx = linalg.scale_rows(w[iw], x[ix])
         a += wx.T @ (y[iy] - y[ix])
-        b -= wx.T @ (g[iy] - g[ix] + integral)
+        b -= wx.T @ (g[iy] - g[ix] + sum_windows(f, ix, iy))
     coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
@@ -371,11 +370,9 @@ def backward_feynman_kac(
         assert ix[-1] < n_frames  # all times < n_frames
         iy = np.maximum(ix - lag, backward_stop(d)[ix])  # final time
 
-        intf = np.concatenate([np.zeros(1), np.cumsum(f)])
-        integral = intf[ix] - intf[iy]
         wx = linalg.scale_rows(w[iw], x[ix])
         a += wx.T @ (y[iy] - y[ix])
-        b -= wx.T @ (g[iy] - g[ix] + integral)
+        b -= wx.T @ (g[iy] - g[ix] + sum_windows(f, iy, ix))
     coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 

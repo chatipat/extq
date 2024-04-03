@@ -4,6 +4,7 @@ import numpy as np
 from more_itertools import zip_equal
 
 from . import linalg
+from ._utils import sum_windows
 from .stop import backward_stop, forward_stop
 
 __all__ = [
@@ -574,13 +575,12 @@ def forward_feynman_kac_matrices(
         ix = iw  # initial time
         stop = forward_stop(d)[ix]
 
-        intf = np.insert(np.cumsum(f), 0, 0.0)
         xw = linalg.scale_rows(w[iw], x[ix]).T
         for n in range(mem + 1):
             iy = np.minimum(ix + (n + 1) * dlag, stop)  # final time
             assert iy[-1] < n_frames  # all times < n_frames
             a[n] += xw @ (y[iy] - y[ix])
-            b[n] += xw @ ((g[iy] - g[ix]) + (intf[iy] - intf[ix]))
+            b[n] += xw @ ((g[iy] - g[ix]) + sum_windows(f, ix, iy))
         c0[:] += xw @ y[ix]
 
     return a, b, c0
@@ -1007,12 +1007,11 @@ def backward_feynman_kac_matrices(
         assert ix[-1] < n_frames  # all times < n_frames
         stop = backward_stop(d)[ix]
 
-        intf = np.insert(np.cumsum(f), 0, 0.0)
         xw = linalg.scale_rows(w[iw], x[ix]).T
         for n in range(mem + 1):
             iy = np.maximum(ix - (n + 1) * dlag, stop)  # final time
             a[n] += xw @ (y[iy] - y[ix])
-            b[n] += xw @ ((g[iy] - g[ix]) + (intf[ix] - intf[iy]))
+            b[n] += xw @ ((g[iy] - g[ix]) + sum_windows(f, iy, ix))
         c0[:] += xw @ y[ix]
 
     return a, b, c0
