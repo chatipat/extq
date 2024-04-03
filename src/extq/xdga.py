@@ -192,9 +192,13 @@ def forward_extended_feynman_kac(
         assert f.shape == (n_indices, n_indices, n_frames - 1)
         assert g.shape == (n_indices, n_frames)
 
-        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
+        ix = iw  # initial time
+        iy = ix + lag  # final time
+        assert iy[-1] < n_frames  # all frames < n_frames
+        ik = ix  # kernel index
 
         m = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
         m = np.moveaxis(m, 0, -1)
@@ -204,18 +208,18 @@ def forward_extended_feynman_kac(
         m = np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0), lag), 0, -1)
 
         for i in range(n_indices):
-            wx = linalg.scale_rows(w[:-lag], x[i][:-lag])
+            wx = linalg.scale_rows(w[iw], x[i][ix])
 
             yi = 0.0
             gi = 0.0
 
             for j in range(n_indices):
-                yi += linalg.scale_rows(m[i, j], y[j][lag:])
-                gi += linalg.scale_rows(m[i, j], g[j][lag:])
-            gi += m[i, -1]  # integral and boundary conditions
+                yi += linalg.scale_rows(m[i, j][ik], y[j][iy])
+                gi += linalg.scale_rows(m[i, j][ik], g[j][iy])
+            gi += m[i, -1][ik]  # integral and boundary conditions
 
-            yi -= y[i][:-lag]
-            gi -= g[i][:-lag]
+            yi -= y[i][ix]
+            gi -= g[i][ix]
 
             a += wx.T @ yi
             b -= wx.T @ gi
@@ -402,9 +406,13 @@ def backward_extended_feynman_kac(
         assert f.shape == (n_indices, n_indices, n_frames - 1)
         assert g.shape == (n_indices, n_frames)
 
-        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
+        ix = iw + lag  # initial time
+        assert ix[-1] < n_frames  # all frames < n_frames
+        iy = ix - lag  # final time
+        ik = iy  # kernel index
 
         m = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
         m = np.moveaxis(m, 0, -1)
@@ -414,18 +422,18 @@ def backward_extended_feynman_kac(
         m = np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0), lag), 0, -1)
 
         for i in range(n_indices):
-            wx = linalg.scale_rows(w[:-lag], x[i][lag:])
+            wx = linalg.scale_rows(w[iw], x[i][ix])
 
             yi = 0.0
             gi = 0.0
 
             for j in range(n_indices):
-                yi += linalg.scale_rows(m[j, i], y[j][:-lag])
-                gi += linalg.scale_rows(m[j, i], g[j][:-lag])
-            gi += m[-1, i]  # integral and boundary conditions
+                yi += linalg.scale_rows(m[j, i][ik], y[j][iy])
+                gi += linalg.scale_rows(m[j, i][ik], g[j][iy])
+            gi += m[-1, i][ik]  # integral and boundary conditions
 
-            yi -= y[i][lag:]
-            gi -= g[i][lag:]
+            yi -= y[i][ix]
+            gi -= g[i][ix]
 
             a += wx.T @ yi
             b -= wx.T @ gi

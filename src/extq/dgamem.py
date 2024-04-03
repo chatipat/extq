@@ -155,18 +155,19 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
 
-        if n_frames <= lag:
-            assert np.all(w == 0.0)
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
-        end = n_frames - lag
-        assert np.all(w[end:] == 0.0)
+        ix = iw  # initial time
 
-        wy = linalg.scale_rows(w[:end], y[:end])
+        wy = linalg.scale_rows(w[iw], y[ix])
         for n in range(mem + 1):
-            dx = (x[(n + 1) * dlag : end + (n + 1) * dlag] - x[:end]).T
+            iy = ix + (n + 1) * dlag  # final time
+            assert iy[-1] < n_frames  # all times < n_frames
+            dx = (x[iy] - x[ix]).T
             a[n] += dx @ wy
-            b[n] += dx @ w[:end]
-        c0[:] += x[:end].T @ wy
+            b[n] += dx @ w[iw]
+        c0[:] += x[ix].T @ wy
 
     return a, b, c0
 
@@ -567,21 +568,20 @@ def forward_feynman_kac_matrices(
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
 
-        if n_frames <= lag:
-            assert np.all(w == 0.0)
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
-        end = n_frames - lag
-        assert np.all(w[end:] == 0.0)
+        ix = iw  # initial time
+        stop = forward_stop(d)[ix]
 
-        ix = np.arange(end)
-        stop = forward_stop(d)[:end]
         intf = np.insert(np.cumsum(f), 0, 0.0)
-        xw = linalg.scale_rows(w[:end], x[:end]).T
+        xw = linalg.scale_rows(w[iw], x[ix]).T
         for n in range(mem + 1):
-            iy = np.minimum(ix + (n + 1) * dlag, stop)
-            a[n] += xw @ (y[iy] - y[:end])
-            b[n] += xw @ ((g[iy] - g[:end]) + (intf[iy] - intf[:end]))
-        c0[:] += xw @ y[:end]
+            iy = np.minimum(ix + (n + 1) * dlag, stop)  # final time
+            assert iy[-1] < n_frames  # all times < n_frames
+            a[n] += xw @ (y[iy] - y[ix])
+            b[n] += xw @ ((g[iy] - g[ix]) + (intf[iy] - intf[ix]))
+        c0[:] += xw @ y[ix]
 
     return a, b, c0
 
@@ -1000,21 +1000,20 @@ def backward_feynman_kac_matrices(
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
 
-        if n_frames <= lag:
-            assert np.all(w == 0.0)
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
-        end = n_frames - lag
-        assert np.all(w[end:] == 0.0)
+        ix = iw + lag  # initial time
+        assert ix[-1] < n_frames  # all times < n_frames
+        stop = backward_stop(d)[ix]
 
-        ix = np.arange(lag, n_frames)
-        stop = backward_stop(d)[lag:]
         intf = np.insert(np.cumsum(f), 0, 0.0)
-        xw = linalg.scale_rows(w[:end], x[lag:]).T
+        xw = linalg.scale_rows(w[iw], x[ix]).T
         for n in range(mem + 1):
-            iy = np.maximum(ix - (n + 1) * dlag, stop)
-            a[n] += xw @ (y[iy] - y[lag:])
-            b[n] += xw @ ((g[iy] - g[lag:]) + (intf[lag:] - intf[iy]))
-        c0[:] += xw @ y[lag:]
+            iy = np.maximum(ix - (n + 1) * dlag, stop)  # final time
+            a[n] += xw @ (y[iy] - y[ix])
+            b[n] += xw @ ((g[iy] - g[ix]) + (intf[ix] - intf[iy]))
+        c0[:] += xw @ y[ix]
 
     return a, b, c0
 

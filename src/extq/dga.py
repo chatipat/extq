@@ -66,11 +66,16 @@ def reweight(
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
-        assert np.all(w[max(0, n_frames - maxlag) :] == 0.0)
-        if n_frames <= maxlag:
+
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
-        wdx = linalg.scale_rows(w[:-lag], x[lag:] - x[:-lag])
-        a += wdx.T @ y[:-lag]
+        ix = iw  # initial time
+        iy = ix + lag  # final time
+        assert iy[-1] < n_frames  # all times < n_frames
+
+        wdx = linalg.scale_rows(w[iw], x[iy] - x[ix])
+        a += wdx.T @ y[iw]
         b -= np.ravel(wdx.sum(axis=0))
     coeffs = linalg.solve(a, b)
     out = [w * (y @ coeffs + 1.0) for y, w in zip_equal(basis, guess)]
@@ -210,15 +215,19 @@ def forward_feynman_kac(
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
-        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
+
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
-        iy = np.minimum(np.arange(lag, n_frames), forward_stop(d)[:-lag])
+        ix = iw  # initial time
+        iy = np.minimum(ix + lag, forward_stop(d)[ix])  # final time
+        assert iy[-1] < n_frames  # all times < n_frames
+
         intf = np.concatenate([np.zeros(1), np.cumsum(f)])
-        integral = intf[iy] - intf[:-lag]
-        wx = linalg.scale_rows(w[:-lag], x[:-lag])
-        a += wx.T @ (y[iy] - y[:-lag])
-        b -= wx.T @ (g[iy] - g[:-lag] + integral)
+        integral = intf[iy] - intf[ix]
+        wx = linalg.scale_rows(w[iw], x[ix])
+        a += wx.T @ (y[iy] - y[ix])
+        b -= wx.T @ (g[iy] - g[ix] + integral)
     coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
@@ -354,15 +363,19 @@ def backward_feynman_kac(
         assert d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
-        assert np.all(w[max(0, n_frames - lag) :] == 0.0)
-        if n_frames <= lag:
+
+        iw = np.flatnonzero(w)  # start of window
+        if len(iw) == 0:
             continue
-        iy = np.maximum(np.arange(n_frames - lag), backward_stop(d)[lag:])
+        ix = iw + lag  # initial time
+        assert ix[-1] < n_frames  # all times < n_frames
+        iy = np.maximum(ix - lag, backward_stop(d)[ix])  # final time
+
         intf = np.concatenate([np.zeros(1), np.cumsum(f)])
-        integral = intf[lag:] - intf[iy]
-        wx = linalg.scale_rows(w[:-lag], x[lag:])
-        a += wx.T @ (y[iy] - y[lag:])
-        b -= wx.T @ (g[iy] - g[lag:] + integral)
+        integral = intf[ix] - intf[iy]
+        wx = linalg.scale_rows(w[iw], x[ix])
+        a += wx.T @ (y[iy] - y[ix])
+        b -= wx.T @ (g[iy] - g[ix] + integral)
     coeffs = linalg.solve(a, b)
     return transform(coeffs, basis, guess)
 
