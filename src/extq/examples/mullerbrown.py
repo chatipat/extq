@@ -4,19 +4,23 @@ import numpy as np
 
 @nb.njit
 def potential(x, y):
-    u1 = _potential_term(-200.0, -1.0, 0.0, -10.0, 1.0, 0.0, x, y)
-    u2 = _potential_term(-100.0, -1.0, 0.0, -10.0, 0.0, 0.5, x, y)
-    u3 = _potential_term(-170.0, -6.5, 11.0, -6.5, -0.5, 1.5, x, y)
-    u4 = _potential_term(15.0, 0.7, 0.6, 0.7, -1.0, 1.0, x, y)
+    # fmt: off
+    u1 = _potential_term(-200.0, -1.0,  0.0, -10.0,  1.0, 0.0, x, y)
+    u2 = _potential_term(-100.0, -1.0,  0.0, -10.0,  0.0, 0.5, x, y)
+    u3 = _potential_term(-170.0, -6.5, 11.0,  -6.5, -0.5, 1.5, x, y)
+    u4 = _potential_term(  15.0,  0.7,  0.6,   0.7, -1.0, 1.0, x, y)
+    # fmt: on
     return u1 + u2 + u3 + u4
 
 
 @nb.njit
 def force(x, y):
-    fx1, fy1 = _force_term(-200.0, -1.0, 0.0, -10.0, 1.0, 0.0, x, y)
-    fx2, fy2 = _force_term(-100.0, -1.0, 0.0, -10.0, 0.0, 0.5, x, y)
-    fx3, fy3 = _force_term(-170.0, -6.5, 11.0, -6.5, -0.5, 1.5, x, y)
-    fx4, fy4 = _force_term(15.0, 0.7, 0.6, 0.7, -1.0, 1.0, x, y)
+    # fmt: off
+    fx1, fy1 = _force_term(-200.0, -1.0,  0.0, -10.0,  1.0, 0.0, x, y)
+    fx2, fy2 = _force_term(-100.0, -1.0,  0.0, -10.0,  0.0, 0.5, x, y)
+    fx3, fy3 = _force_term(-170.0, -6.5, 11.0,  -6.5, -0.5, 1.5, x, y)
+    fx4, fy4 = _force_term(  15.0,  0.7,  0.6,   0.7, -1.0, 1.0, x, y)
+    # fmt: on
     return fx1 + fx2 + fx3 + fx4, fy1 + fy2 + fy3 + fy4
 
 
