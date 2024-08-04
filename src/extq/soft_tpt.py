@@ -1,6 +1,7 @@
 import numpy as np
 from more_itertools import zip_equal
 
+from .integral import integral_coeffs
 from .moving_semigroup import moving_matmul
 from .utils import normalize_weights
 
@@ -112,3 +113,88 @@ def _rate_kernel_jump(h):
     kernel_jump01 = kernel_jump[:, :2, 2:]
     kernel_jump01[:, 0, 0] = np.diff(h)
     return kernel_jump
+
+
+def soft_current(
+    forward_q,
+    backward_q,
+    weights,
+    stop_rate,
+    forward_boundary,
+    backward_boundary,
+    cv,
+    lag,
+    *,
+    dt=1.0,
+    normalize=True,
+):
+    assert lag > 0
+    assert dt > 0
+
+    if normalize:
+        weights = normalize_weights(weights)
+
+    out = []
+    for qp, qm, w, v, rp, rm, f in zip_equal(
+        forward_q,
+        backward_q,
+        weights,
+        stop_rate,
+        forward_boundary,
+        backward_boundary,
+        cv,
+    ):
+        n_frames = len(w)
+        assert qp.shape == (n_frames,)
+        assert qm.shape == (n_frames,)
+        assert w.shape == (n_frames,)
+        assert v.shape == (n_frames,)
+        assert rp.shape == (n_frames,)
+        assert rm.shape == (n_frames,)
+        assert f.shape == (n_frames,)
+
+        # make sure frames beyond end of trajectory aren't needed
+        assert not np.any(w[-lag:])
+        if n_frames <= lag:  # no windows with nonzero weight
+            out.append(np.zeros(n_frames))
+            continue
+
+        # windows start/end at the center of each frame,
+        # so take half of frame t and half of frame t+1
+
+        vdt_half = v * (dt / 2)
+        p_cont = np.exp(-vdt_half)
+        p_stop = -np.expm1(-vdt_half)
+
+        # backward committor kernel
+        km_half = np.zeros((n_frames, 2, 2))
+        km_half[:, 0, 0] = p_cont
+        km_half[:, 1, 0] = p_stop * rm
+        km_half[:, 1, 1] = 1
+        km = km_half[:-1] @ km_half[1:]
+
+        # forward committor kernel
+        kp_half = np.zeros((n_frames, 2, 2))
+        kp_half[:, 0, 0] = p_cont
+        kp_half[:, 0, 1] = p_stop * rp
+        kp_half[:, 1, 1] = 1
+        kp = kp_half[:-1] @ kp_half[1:]
+
+        # committor outer product
+        q_outer = np.zeros((n_frames - lag, 2, 2))
+        q_outer[:, 0, 0] = w[:-lag] * qm[:-lag] * qp[lag:]
+        q_outer[:, 0, 1] = w[:-lag] * qm[:-lag]
+        q_outer[:, 1, 0] = w[:-lag] * qp[lag:]
+        q_outer[:, 1, 1] = w[:-lag]
+
+        coef = integral_coeffs(q_outer, km, kp, 1, lag)
+        coef = np.einsum("tij,tik,tlj->tkl", coef, km_half[:-1], kp_half[1:])
+        coef = coef[:, 0, 0] * np.diff(f)
+
+        j = np.zeros(n_frames)
+        j[:-1] += coef
+        j[1:] += coef
+        j /= 2 * lag * dt
+        out.append(j)
+
+    return out
