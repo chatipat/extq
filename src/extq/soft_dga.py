@@ -2,6 +2,10 @@ import numpy as np
 from more_itertools import zip_equal
 
 from . import linalg
+from ._soft_utils import (
+    soft_backward_committor_kernel,
+    soft_forward_committor_kernel,
+)
 from .moving_semigroup import moving_matmul
 
 
@@ -52,13 +56,10 @@ def soft_forward_committor(
         # currently, windows start/end at the center of the time steps
         # a better choice is to integrate the start/end time over the
         # time steps, but this is much more complicated to implement
-        k_half = _forward_committor_kernel(v, r, dt / 2)
-        if lag == 1:
-            k = k_half[ix] @ k_half[iy]
-        else:
-            k = _forward_committor_kernel(v, r, dt)
-            k = moving_matmul(k, lag - 1)[1:-1]
-            k = k_half[ix] @ k[iw] @ k_half[iy]
+        k_half = soft_forward_committor_kernel(v, r, dt / 2)
+        k = k_half[:-1] @ k_half[1:]
+        k = moving_matmul(k, lag)
+        k = k[iw]
 
         wx = linalg.scale_rows(w[iw], x[ix])
         a += wx.T @ (linalg.scale_rows(k[:, 0, 0], y[iy]) - y[ix])
@@ -66,27 +67,6 @@ def soft_forward_committor(
     coef = -linalg.solve(a, b)
     q = [y @ coef + g for y, g in zip_equal(basis, guess)]
     return q
-
-
-def _forward_committor_kernel(v, r, dt):
-    n = len(v)
-
-    assert v.shape == (n,)
-    assert r.shape == (n,)
-    assert dt >= 0
-
-    if dt == 0:
-        # treat dt as a positive infinitesimal
-        vdt = np.where(np.isfinite(v), 0, v)
-    else:
-        vdt = v * dt
-
-    kernel = np.zeros((n, 2, 2))
-    kernel[:, 0, 0] = np.exp(-vdt)
-    kernel[:, 0, 1] = -np.expm1(-vdt) * r
-    kernel[:, 1, 1] = 1
-
-    return kernel
 
 
 def soft_backward_committor(
@@ -136,13 +116,10 @@ def soft_backward_committor(
         # currently, windows start/end at the center of the time steps
         # a better choice is to integrate the start/end time over the
         # time steps, but this is much more complicated to implement
-        k_half = _backward_committor_kernel(v, r, dt / 2)
-        if lag == 1:
-            k = k_half[iy] @ k_half[ix]
-        else:
-            k = _backward_committor_kernel(v, r, dt)
-            k = moving_matmul(k, lag - 1)[1:-1]
-            k = k_half[iy] @ k[iw] @ k_half[ix]
+        k_half = soft_backward_committor_kernel(v, r, dt / 2)
+        k = k_half[:-1] @ k_half[1:]
+        k = moving_matmul(k, lag)
+        k = k[iw]
 
         wx = linalg.scale_rows(w[iw], x[ix])
         a += wx.T @ (linalg.scale_rows(k[:, 0, 0], y[iy]) - y[ix])
@@ -150,24 +127,3 @@ def soft_backward_committor(
     coef = -linalg.solve(a, b)
     q = [y @ coef + g for y, g in zip_equal(basis, guess)]
     return q
-
-
-def _backward_committor_kernel(v, r, dt):
-    n = len(v)
-
-    assert v.shape == (n,)
-    assert r.shape == (n,)
-    assert dt >= 0
-
-    if dt == 0:
-        # treat dt as a positive infinitesimal
-        vdt = np.where(np.isfinite(v), 0, v)
-    else:
-        vdt = v * dt
-
-    kernel = np.zeros((n, 2, 2))
-    kernel[:, 0, 0] = np.exp(-vdt)
-    kernel[:, 1, 0] = -np.expm1(-vdt) * r
-    kernel[:, 1, 1] = 1
-
-    return kernel

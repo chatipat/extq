@@ -1,8 +1,12 @@
 import numpy as np
 from more_itertools import zip_equal
 
-from .integral import integral_coeffs
-from .moving_semigroup import moving_matmul
+from ._soft_utils import (
+    soft_backward_committor_kernel,
+    soft_forward_committor_kernel,
+    soft_tpt_kernel,
+)
+from .integral import integral_coeffs, integral_windows
 from .utils import normalize_weights
 
 
@@ -49,16 +53,36 @@ def soft_rate(
         if n_frames <= lag:  # no windows with nonzero weight
             continue
 
-        k_half = _rate_kernel(v, rp, rm, h, dt / 2)
-        k_jump = _rate_kernel_jump(h)
+        # changes in h within each frame
+        obs = np.zeros((n_frames, 2, 2))
+        obs[:, 0, 0] = 0  # interior fragments (h -> h)
+        obs[:, 0, 1] = 1 - h  # ending fragments (h -> 1)
+        obs[:, 1, 0] = h  # starting fragments (0 -> h)
+        obs[:, 1, 1] = 1  # complete transition paths (0 -> 1)
+
+        # integrate within frame t for time dt/2,
+        # assuming values are constant
+        km_half = soft_backward_committor_kernel(v, rm, dt / 2)
+        kp_half = soft_forward_committor_kernel(v, rp, dt / 2)
+        kt_half = soft_tpt_kernel(v, rp, rm, dt / 2) * obs
+
+        # integrate jump from frame t to frame t+1 (infinitesimal time)
+        ks = np.zeros((n_frames - 1, 2, 2))
+        ks[:, 0, 0] = np.diff(h)
+
         # windows start/end at the center of each frame
-        k = k_half[:-1] @ k_jump @ k_half[1:]
-        k = moving_matmul(k)
-        k = k[:, :2, 2:]
+        km = km_half[:-1] @ km_half[1:]
+        kp = kp_half[:-1] @ kp_half[1:]
+        k = (
+            km_half[:-1] @ ks @ kp_half[1:]
+            + km_half[:-1] @ kt_half[1:]
+            + kt_half[:-1] @ kp_half[1:]
+        )
+        k = integral_windows(km, kp, k, 1, lag)
 
         # expected number of transition paths for each window
         p = (
-            qm[:-lag] * k[:, 0, 0] * qp[lag:]  #  interior fragments
+            qm[:-lag] * k[:, 0, 0] * qp[lag:]  # interior fragments
             + qm[:-lag] * k[:, 0, 1]  # ending fragments
             + k[:, 1, 0] * qp[lag:]  # starting fragments
             + k[:, 1, 1]  # complete transition paths
@@ -66,53 +90,6 @@ def soft_rate(
 
         out += np.sum(w[:-lag] * p) / (lag * dt)
     return out
-
-
-def _rate_kernel(v, rp, rm, h, dt):
-    n = len(v)
-
-    assert v.shape == (n,)
-    assert rp.shape == (n,)
-    assert rm.shape == (n,)
-    assert h.shape == (n,)
-    assert dt >= 0
-
-    if dt == 0:
-        # treat dt as a positive infinitesimal
-        vdt = np.where(np.isfinite(v), 0, v)
-    else:
-        vdt = v * dt
-
-    p_cont = np.exp(-vdt)
-    p_stop = -np.expm1(-vdt)
-
-    # integrate frame t for time dt, assuming values are constant
-    kernel = np.zeros((n, 4, 4))
-
-    kernel00 = kernel[:, :2, :2]
-    kernel00[:, 0, 0] = p_cont
-    kernel00[:, 1, 0] = p_stop * rm
-    kernel00[:, 1, 1] = 1
-
-    kernel01 = kernel[:, :2, 2:]
-    kernel01[:, 1, 0] = p_stop * (h - 0) * rm
-    kernel01[:, 0, 1] = p_stop * (1 - h) * rp
-    kernel01[:, 1, 1] = (vdt - p_stop) * rm * rp
-
-    kernel11 = kernel[:, 2:, 2:]
-    kernel11[:, 0, 0] = p_cont
-    kernel11[:, 0, 1] = p_stop * rp
-    kernel11[:, 1, 1] = 1
-
-    return kernel
-
-
-def _rate_kernel_jump(h):
-    # integrate jump from frame t to frame t+1 (infinitesimal time)
-    kernel_jump = np.zeros((len(h) - 1, 4, 4))
-    kernel_jump01 = kernel_jump[:, :2, 2:]
-    kernel_jump01[:, 0, 0] = np.diff(h)
-    return kernel_jump
 
 
 def soft_density(
@@ -159,22 +136,12 @@ def soft_density(
         # windows start/end at the center of each frame,
         # so take half of frame t and half of frame t+1
 
-        vdt_half = v * (dt / 2)
-        p_cont = np.exp(-vdt_half)
-        p_stop = -np.expm1(-vdt_half)
-
         # backward committor kernel
-        km_half = np.zeros((n_frames, 2, 2))
-        km_half[:, 0, 0] = p_cont
-        km_half[:, 1, 0] = p_stop * rm
-        km_half[:, 1, 1] = 1
+        km_half = soft_backward_committor_kernel(v, rm, dt / 2)
         km = km_half[:-1] @ km_half[1:]
 
         # forward committor kernel
-        kp_half = np.zeros((n_frames, 2, 2))
-        kp_half[:, 0, 0] = p_cont
-        kp_half[:, 0, 1] = p_stop * rp
-        kp_half[:, 1, 1] = 1
+        kp_half = soft_forward_committor_kernel(v, rp, dt / 2)
         kp = kp_half[:-1] @ kp_half[1:]
 
         # committor outer product
@@ -185,11 +152,7 @@ def soft_density(
         q_outer[:, 1, 1] = w[:-lag]
 
         # reactive density kernel
-        k_half = np.zeros((n_frames, 2, 2))
-        k_half[:, 0, 0] = p_cont
-        k_half[:, 0, 1] = p_stop * rp
-        k_half[:, 1, 0] = p_stop * rm
-        k_half[:, 1, 1] = (vdt_half - p_stop) * rm * rp
+        k_half = soft_tpt_kernel(v, rp, rm, dt / 2)
 
         coef = integral_coeffs(q_outer, km, kp, 1, lag)
 
@@ -249,22 +212,12 @@ def soft_current(
         # windows start/end at the center of each frame,
         # so take half of frame t and half of frame t+1
 
-        vdt_half = v * (dt / 2)
-        p_cont = np.exp(-vdt_half)
-        p_stop = -np.expm1(-vdt_half)
-
         # backward committor kernel
-        km_half = np.zeros((n_frames, 2, 2))
-        km_half[:, 0, 0] = p_cont
-        km_half[:, 1, 0] = p_stop * rm
-        km_half[:, 1, 1] = 1
+        km_half = soft_backward_committor_kernel(v, rm, dt / 2)
         km = km_half[:-1] @ km_half[1:]
 
         # forward committor kernel
-        kp_half = np.zeros((n_frames, 2, 2))
-        kp_half[:, 0, 0] = p_cont
-        kp_half[:, 0, 1] = p_stop * rp
-        kp_half[:, 1, 1] = 1
+        kp_half = soft_forward_committor_kernel(v, rp, dt / 2)
         kp = kp_half[:-1] @ kp_half[1:]
 
         # committor outer product
