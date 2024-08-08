@@ -152,6 +152,7 @@ def forecast_step2(
 
     """
     assert initial.shape[0] == trajs_p.shape[0]
+    n_trajs_p = trajs_p.shape[0]
     lag_p = trajs_p.shape[1] - 1
 
     stop = []
@@ -163,9 +164,9 @@ def forecast_step2(
 
     x = basis_fn(initial)
     y0 = basis_fn_p(trajs_p[:, 0])
-    y1 = basis_fn(trajs_p[:, stop])
+    y1 = basis_fn(trajs_p[np.arange(n_trajs_p), stop])
     g0 = guess_fn_p(trajs_p[:, 0])
-    g1 = guess_fn_p(trajs_p[:, stop])
+    g1 = guess_fn_p(trajs_p[np.arange(n_trajs_p), stop])
 
     a = x.T @ (y1 - y0)
     b = x.T @ (g1 - g0 + r)
