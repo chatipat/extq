@@ -51,7 +51,7 @@ def count_transition_paths(in_domain, reactant, product):
 
     """
     assert in_domain.shape == reactant.shape == product.shape
-    (t,) = np.nonzero(in_domain)
+    (t,) = np.nonzero(np.logical_not(in_domain))
     return np.sum(reactant[t[:-1]] * product[t[1:]])
 
 
@@ -80,7 +80,7 @@ def count_transition_paths_windows(in_domain, reactant, product, start, end):
     """
     assert in_domain.shape == reactant.shape == product.shape
     assert start.shape == end.shape
-    (t,) = np.nonzero(in_domain)
+    (t,) = np.nonzero(np.logical_not(in_domain))
 
     # whether each segment t[i],...,t[i+1] is a transition path
     is_transition_path = reactant[t[:-1]] * product[t[1:]]
