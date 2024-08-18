@@ -27,23 +27,22 @@ def forward_extended_committor(
 
     Parameters
     ----------
-    basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+    basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float
         Basis for estimating the extended committor. Must be zero
-        outside of the domain. The outer list is over trajectories;
-        the inner list is over indices.
-    weights : list of (n_frames[i],) ndarray of float
+        outside of the domain.
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    guess : list of (n_indices, n_frames[i]) ndarray of float
+    guess : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
+    test_basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
@@ -51,7 +50,7 @@ def forward_extended_committor(
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimated forward extended committor at each frame.
 
     """
@@ -80,24 +79,23 @@ def forward_extended_mfpt(
 
     Parameters
     ----------
-    basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+    basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float
         Basis for estimating the mean first passage time . Must be zero
-        outside of the domain. The outer list is over trajectories;
-        the inner list is over indices.
-    weights : list of (n_frames[i],) ndarray of float
+        outside of the domain.
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    guess : list of (n_indices, n_frames[i]) ndarray of float
+    guess : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Guess for the mean first passage time . Must obey boundary
         conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
+    test_basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
@@ -105,7 +103,7 @@ def forward_extended_mfpt(
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimated forward mean first passage time at each frame.
 
     """
@@ -135,33 +133,32 @@ def forward_extended_feynman_kac(
 
     Parameters
     ----------
-    basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+    basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float
         Basis for estimating the solution to the Feynman-Kac formula.
-        Must be zero outside of the domain. The outer list is over
-        trajectories; the inner list is over indices.
-    weights : list of (n_frames[i],) ndarray of float
+        Must be zero outside of the domain.
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    function : list of (n_indices, n_frames[i]-1) ndarray of float
+    function : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Function to integrate. Note that this is defined over
         transitions, not frames.
-    guess : list of (n_indices, n_frames[i]) ndarray of float
+    guess : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Guess for the solution. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
+    test_basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimate of the solution of the forward Feynman-Kac formulat at
         each frame.
 
@@ -176,7 +173,13 @@ def forward_extended_feynman_kac(
     a = 0.0
     b = 0.0
     for x, y, w, k, d, f, g in zip_equal(
-        test_basis, basis, weights, transitions, in_domain, function, guess
+        _adapt_basis(test_basis),
+        _adapt_basis(basis),
+        weights,
+        _adapt_steps(transitions),
+        _adapt_frames(in_domain),
+        _adapt_steps(function),
+        _adapt_frames(guess),
     ):
         n_frames = x[0].shape[0]
         n_indices = len(x) if n_indices is None else n_indices
@@ -241,23 +244,22 @@ def backward_extended_committor(
 
     Parameters
     ----------
-    basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+    basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float
         Basis for estimating the extended committor. Must be zero
-        outside of the domain. The outer list is over trajectories;
-        the inner list is over indices.
-    weights : list of (n_frames[i],) ndarray of float
+        outside of the domain.
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    guess : list of (n_indices, n_frames[i]) ndarray of float
+    guess : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Guess for the extended committor. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
+    test_basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
@@ -265,7 +267,7 @@ def backward_extended_committor(
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimated backward extended committor at each frame.
 
     """
@@ -294,24 +296,23 @@ def backward_extended_mfpt(
 
     Parameters
     ----------
-    basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+    basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float
         Basis for estimating the mean first passage time . Must be zero
-        outside of the domain. The outer list is over trajectories;
-        the inner list is over indices.
-    weights : list of (n_frames[i],) ndarray of float
+        outside of the domain.
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    guess : list of (n_indices, n_frames[i]) ndarray of float
+    guess : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Guess for the mean first passage time . Must obey boundary
         conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
+    test_basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
@@ -319,7 +320,7 @@ def backward_extended_mfpt(
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimated backward mean first passage time at each frame.
 
     """
@@ -349,34 +350,33 @@ def backward_extended_feynman_kac(
 
     Parameters
     ----------
-    basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float
+    basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float
         Basis for estimating the solution to the Feynman-Kac formula.
-        Must be zero outside of the domain. The outer list is over
-        trajectories; the inner list is over indices.
-    weights : list of (n_frames[i],) ndarray of float
+        Must be zero outside of the domain.
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    function : list of (n_indices, n_frames[i]-1) ndarray of float
-        Function to integrate. Note that this is defined over
-        transitions, not frames.
-    guess : list of (n_indices, n_frames[i]) ndarray of float
+    function : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
+        Function to integrate. Note that this is defined over steps, not
+        frames.
+    guess : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Guess for the solution. Must obey boundary conditions.
     lag : int
         DGA lag time in units of frames.
-    test_basis : list of list of (n_frames[i], n_basis) ndarray or sparse matrix of float, optional
+    test_basis : (n_indices, n_trajs) array_like of (n_frames[traj], n_basis) {ndarray, sparray} of float, optional
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
-        Estimate of the solution of the backward Feynman-Kac formulat at
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
+        Estimate of the solution of the backward Feynman-Kac formula at
         each frame.
 
     """
@@ -390,7 +390,13 @@ def backward_extended_feynman_kac(
     a = 0.0
     b = 0.0
     for x, y, w, k, d, f, g in zip_equal(
-        test_basis, basis, weights, transitions, in_domain, function, guess
+        _adapt_basis(test_basis),
+        _adapt_basis(basis),
+        weights,
+        _adapt_steps(transitions),
+        _adapt_frames(in_domain),
+        _adapt_steps(function),
+        _adapt_frames(guess),
     ):
         n_frames = x[0].shape[0]
         n_indices = len(x) if n_indices is None else n_indices
@@ -444,12 +450,50 @@ def backward_extended_feynman_kac(
 
 def transform(coeffs, basis, guess):
     return [
-        np.array([yi @ coeffs + gi for yi, gi in zip_equal(y, g)])
-        for y, g in zip_equal(basis, guess)
+        [yi @ coeffs + gi for yi, gi in zip_equal(basis_i, guess_i)]
+        for basis_i, guess_i in zip_equal(basis, guess)
     ]
 
 
 def _broadcast_integrand(f, transitions):
     if not np.iterable(f):
-        f = [np.broadcast_to(f, m.shape) for m in transitions]
+        f = [
+            [
+                [np.broadcast_to(f, kij) for kij in transitions_ij]
+                for transitions_ij in transitions_i
+            ]
+            for transitions_i in transitions
+        ]
     return f
+
+
+def _adapt_basis(a):
+    return np.moveaxis(_objarray(a, 2), 1, 0).tolist()
+
+
+def _adapt_frames(a):
+    return map(np.array, np.moveaxis(_objarray(a, 2), 1, 0).tolist())
+
+
+def _adapt_steps(a):
+    return map(np.array, np.moveaxis(_objarray(a, 3), 2, 0).tolist())
+
+
+def _objarray(a, ndim):
+    shape = _shape(a, ndim)
+    out = np.full(shape, None)
+    for index in np.ndindex(shape):
+        x = a
+        for i in index:
+            x = x[i]
+        out[index] = x
+    return out
+
+
+def _shape(a, ndim):
+    assert ndim >= 0
+    if ndim == 0:
+        return ()
+    shapes = [_shape(ai, ndim - 1) for ai in a]
+    assert all(shape == shapes[0] for shape in shapes)
+    return (len(a), *shapes[0])

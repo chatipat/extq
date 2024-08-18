@@ -26,19 +26,19 @@ def extended_rate(
 
     Parameters
     ----------
-    forward_q : list of (n_indices, n_frames[i]) ndarray of float
+    forward_q : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Forward extended committor for each frame.
-    backward_q : list of (n_indices, n_frames[i]) ndarray of float
+    backward_q : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Backward extended committor for each frame.
-    weights : list of (n_frames[i],) ndarray of float
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    rxn_coord : list of (n_indices, n_frames[i]) ndarray of float
+    rxn_coord : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Reaction coordinate at each frame. Must obey boundary
         conditions.
     lag : int
@@ -58,7 +58,12 @@ def extended_rate(
     n_indices = None
     out = 0.0
     for qp, qm, w, m, d, h in zip_equal(
-        forward_q, backward_q, weights, transitions, in_domain, rxn_coord
+        _adapt_frames(forward_q),
+        _adapt_frames(backward_q),
+        _adapt_frames(weights),
+        _adapt_steps(transitions),
+        _adapt_frames(in_domain),
+        _adapt_frames(rxn_coord),
     ):
         n_frames = w.shape[0]
         n_indices = m.shape[0] if n_indices is None else n_indices
@@ -95,16 +100,16 @@ def extended_density(
 
     Parameters
     ----------
-    forward_q : list of (n_indices, n_frames[i]) ndarray of float
+    forward_q : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Forward extended committor for each frame.
-    backward_q : list of (n_indices, n_frames[i]) ndarray of float
+    backward_q : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Backward extended committor for each frame.
-    weights : list of (n_frames[i],) ndarray of float
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
     lag : int
@@ -114,7 +119,7 @@ def extended_density(
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimated reactive density at each frame.
 
     """
@@ -124,7 +129,11 @@ def extended_density(
     n_indices = None
     out = []
     for qp, qm, w, m, d in zip_equal(
-        forward_q, backward_q, weights, transitions, in_domain
+        _adapt_frames(forward_q),
+        _adapt_frames(backward_q),
+        _adapt_frames(weights),
+        _adapt_steps(transitions),
+        _adapt_frames(in_domain),
     ):
         n_frames = w.shape[0]
         n_indices = m.shape[0] if n_indices is None else n_indices
@@ -159,19 +168,19 @@ def extended_current(
 
     Parameters
     ----------
-    forward_q : list of (n_indices, n_frames[i]) ndarray of float
+    forward_q : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Forward extended committor for each frame.
-    backward_q : list of (n_indices, n_frames[i]) ndarray of float
+    backward_q : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Backward extended committor for each frame.
-    weights : list of (n_frames[i],) ndarray of float
+    weights : (n_trajs,) array_like of (n_frames[traj],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-    transitions : list of (n_indices, n_indices, n_frames[i]-1) ndarray
+    transitions : (n_indices, n_indices, n_trajs) array_like of (n_frames[traj] - 1,) ndarray of float
         Possible transitions of the index process between adjacent
         frames.
-    in_domain : list of (n_indices, n_frames[i]) ndarray of bool
+    in_domain : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of bool
         For each value of the index process, whether each frame of the
         trajectories is in the domain.
-    cv : list of (n_indices, n_frames[i]) narray of float
+    cv : (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Collective variable at each frame.
     lag : int
         Lag time in units of frames.
@@ -180,7 +189,7 @@ def extended_current(
 
     Returns
     -------
-    list of (n_indices, n_frames[i]) ndarray of float
+    (n_indices, n_trajs) array_like of (n_frames[traj],) ndarray of float
         Estimated reactive current at each frame.
 
     """
@@ -190,7 +199,12 @@ def extended_current(
     n_indices = None
     out = []
     for qp, qm, w, m, d, f in zip_equal(
-        forward_q, backward_q, weights, transitions, in_domain, cv
+        _adapt_frames(forward_q),
+        _adapt_frames(backward_q),
+        _adapt_frames(weights),
+        _adapt_steps(transitions),
+        _adapt_frames(in_domain),
+        _adapt_frames(cv),
     ):
         n_frames = w.shape[0]
         n_indices = m.shape[0] if n_indices is None else n_indices
@@ -262,3 +276,31 @@ def _extended_committor_outer_kernel(qp, qm, w, lag):
     xqm = np.concatenate([qm, np.ones((1, n_frames))], axis=0)
     u = w[:-lag] * xqm[:, None, :-lag] * xqp[None, :, lag:]
     return u
+
+
+def _adapt_frames(a):
+    return map(np.array, np.moveaxis(_objarray(a, 2), 1, 0).tolist())
+
+
+def _adapt_steps(a):
+    return map(np.array, np.moveaxis(_objarray(a, 3), 2, 0).tolist())
+
+
+def _objarray(a, ndim):
+    shape = _shape(a, ndim)
+    out = np.full(shape, None)
+    for index in np.ndindex(shape):
+        x = a
+        for i in index:
+            x = x[i]
+        out[index] = x
+    return out
+
+
+def _shape(a, ndim):
+    assert ndim >= 0
+    if ndim == 0:
+        return ()
+    shapes = [_shape(ai, ndim - 1) for ai in a]
+    assert all(shape == shapes[0] for shape in shapes)
+    return (len(a), *shapes[0])
