@@ -183,9 +183,9 @@ def forward_extended_feynman_kac(
         n_basis = x[0].shape[1] if n_basis is None else n_basis
 
         assert len(x) == n_indices
-        assert (xi.shape == (n_frames, n_basis) for xi in x)
+        assert all(xi.shape == (n_frames, n_basis) for xi in x)
         assert len(y) == n_indices
-        assert (yi.shape == (n_frames, n_basis) for yi in y)
+        assert all(yi.shape == (n_frames, n_basis) for yi in y)
         assert w.shape == (n_frames,)
         assert k.shape == (n_indices, n_indices, n_frames - 1)
         assert d.shape == (n_indices, n_frames)
@@ -397,9 +397,9 @@ def backward_extended_feynman_kac(
         n_basis = x[0].shape[1] if n_basis is None else n_basis
 
         assert len(x) == n_indices
-        assert (xi.shape == (n_frames, n_basis) for xi in x)
+        assert all(xi.shape == (n_frames, n_basis) for xi in x)
         assert len(y) == n_indices
-        assert (yi.shape == (n_frames, n_basis) for yi in y)
+        assert all(yi.shape == (n_frames, n_basis) for yi in y)
         assert w.shape == (n_frames,)
         assert k.shape == (n_indices, n_indices, n_frames - 1)
         assert d.shape == (n_indices, n_frames)
