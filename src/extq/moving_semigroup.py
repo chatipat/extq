@@ -2,10 +2,73 @@ import numba as nb
 import numpy as np
 
 
-@nb.njit
-def moving_semigroup(a, k, f, *args):
+def moving_semigroup(a, k, f):
     """
     Calculate a moving window of an associative binary operation.
+
+    Parameters
+    ----------
+    a : (m, ...) ndarray
+        Input time series.
+    k : int
+        Size of the moving window.
+    f : callable
+        Associative binary operation taking two input arguments and
+        one output argument. This must be vectorized.
+
+    Returns
+    -------
+    (m - k + 1, ...) ndarray
+        Output time series. Each output point is the result of
+        `k` sequential input points reduced using the operation.
+
+    """
+    assert k >= 1
+
+    m = ((a.shape[0] + 1) // (k + 1)) * (k + 1) - 1
+    n = a.shape[0] - k + 1
+    assert n >= 0
+
+    # backward accumulation
+    # b[i] = a[i] @ ... @ a[k-1]
+    b = np.zeros((m, *a.shape[1:]))
+    for i in range(k - 1, -1, -1):
+        # b[k :: k + 1] = identity
+        if i == k - 1:
+            b[i :: k + 1] = a[i : m : k + 1]
+        else:
+            f(a[i : m : k + 1], b[i + 1 :: k + 1], b[i :: k + 1])
+
+    # forward accumulation
+    # c[i] = a[k] @ ... @ a[i + k - 1]
+    c = np.zeros((n, *a.shape[1:]))
+    for i in range(1, k + 1):
+        # c[0 :: k + 1] = identity
+        if i == 1:
+            c[i :: k + 1] = a[i + k - 1 :: k + 1]
+        else:
+            f(c[i - 1 : n - 1 : k + 1], a[i + k - 1 :: k + 1], c[i :: k + 1])
+
+    # combine accumulations
+    # out[i] = b[i] @ c[i] = a[i] @ ... @ a[i + k - 1]
+    out = np.zeros((n, *a.shape[1:]))
+    for i in range(k + 1):
+        if i == 0:
+            out[i :: k + 1] = b[i : n : k + 1]  # c[i :: k + 1] = identity
+        elif i == k:
+            out[i :: k + 1] = c[i :: k + 1]  # b[i : n : k + 1] = identity
+        else:
+            f(b[i : n : k + 1], c[i :: k + 1], out[i :: k + 1])
+
+    return out
+
+
+@nb.njit
+def moving_semigroup_numba(a, k, f, *args):
+    """
+    Calculate a moving window of an associative binary operation.
+
+    This function is complied with numba.
 
     Note that this function modifies the input array in-place.
 
@@ -89,7 +152,7 @@ def moving_matmul(a, k):
 
     """
     assert a.ndim == 3 and a.shape[1] == a.shape[2]
-    return moving_semigroup(a, k, _choose_mm(a.shape[1]))
+    return moving_semigroup_numba(a, k, _choose_mm(a.shape[1]))
 
 
 def _choose_mm(n):
