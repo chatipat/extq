@@ -31,7 +31,7 @@ def moving_semigroup(a, k, f):
 
     # backward accumulation
     # b[i] = a[i] @ ... @ a[k-1]
-    b = np.zeros((m, *a.shape[1:]))
+    b = np.zeros((m, *a.shape[1:]), dtype=a.dtype)
     for i in range(k - 1, -1, -1):
         # b[k :: k + 1] = identity
         if i == k - 1:
@@ -41,7 +41,7 @@ def moving_semigroup(a, k, f):
 
     # forward accumulation
     # c[i] = a[k] @ ... @ a[i + k - 1]
-    c = np.zeros((n, *a.shape[1:]))
+    c = np.zeros((n, *a.shape[1:]), dtype=a.dtype)
     for i in range(1, k + 1):
         # c[0 :: k + 1] = identity
         if i == 1:
@@ -51,7 +51,7 @@ def moving_semigroup(a, k, f):
 
     # combine accumulations
     # out[i] = b[i] @ c[i] = a[i] @ ... @ a[i + k - 1]
-    out = np.zeros((n, *a.shape[1:]))
+    out = np.zeros((n, *a.shape[1:]), dtype=a.dtype)
     for i in range(k + 1):
         if i == 0:
             out[i :: k + 1] = b[i : n : k + 1]  # c[i :: k + 1] = identity
