@@ -80,33 +80,38 @@ def count_transition_paths_windows(in_domain, reactant, product, start, end):
     """
     assert in_domain.shape == reactant.shape == product.shape
     assert start.shape == end.shape
+    assert np.all(0 <= start) and np.all(start <= end) and np.all(end <= len(in_domain))
+
+    # partition trajectory into segments
+    # segment i starts at t[i] and ends at t[i+1] (inclusive)
+    # last frame of segment i is first frame of segment i+1
+    # t.shape == (n_segments+1,)
     (t,) = np.nonzero(np.logical_not(in_domain))
-
-    # whether each segment t[i],...,t[i+1] is a transition path
-    is_transition_path = reactant[t[:-1]] * product[t[1:]]
-
-    # number of initial times of transition paths before edge
-    count_initial = np.zeros(len(in_domain), dtype=is_transition_path.dtype)
-    count_initial[t[:-1]] = is_transition_path
-    count_initial = np.concatenate([[0], np.cumsum(count_initial)])
-
-    # number of final times of transition paths before edge
-    count_final = np.zeros(len(in_domain), dtype=is_transition_path.dtype)
-    count_final[t[1:]] = is_transition_path
-    count_final = np.concatenate([[0], np.cumsum(count_final)])
-
-    out = count_final[end] - count_initial[start]
-
-    # when window k is wholly within transition path i,
-    # out[k] is transition_paths[i] less than the correct answer
-    # because of double subtraction
     t = np.concatenate([[-1], t, [len(in_domain)]])
-    is_transition_path = np.concatenate([[0], is_transition_path, [0]])
-    # idx = segment index of each edge
-    idx = np.repeat(np.arange(len(is_transition_path)), np.diff(t))
+
+    # w[i] is the probability that segment i is a transition path
+    # w.shape == (n_segments,)
+    w = np.concatenate([[0], reactant[t[1:-2]] * product[t[2:-1]], [0]])
+
+    # find segment containing each start/end edge
+    idx = np.repeat(np.arange(len(w)), np.diff(t))
     idx_start = idx[start]
     idx_end = idx[end]
-    mask = idx_start == idx_end  # window is wholly within transition path
-    out[mask] += is_transition_path[idx_start[mask]]
+
+    # sum segments between start[i] and end[i],
+    # excluding the ones containing start[i] and end[i]
+    # out[i] = sum(w[idx_start[i]+1:idx_end[i]])
+
+    # c[i] = sum(w[:i])
+    c = np.concatenate([[0], np.cumsum(w)])
+
+    assert np.all(idx_end - idx_start >= 0)
+
+    out = c[idx_end] - c[idx_start + 1]
+
+    # correct for double subtraction
+    # if start and end are both in the same segment,
+    # this segment is excluded twice
+    out[idx_end == idx_start] = 0
 
     return out
