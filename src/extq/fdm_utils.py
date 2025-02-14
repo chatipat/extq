@@ -189,7 +189,7 @@ def moveaxis_kernel(spatial, temporal, shape, source, destination):
     return spatial, temporal
 
 
-def spbroadcast(input_shape, output_shape, dtype=np.float_):
+def spbroadcast(input_shape, output_shape, dtype=float):
     """Returns a matrix for broadcasting flattened dimensions.
 
     Parameters
@@ -210,8 +210,8 @@ def spbroadcast(input_shape, output_shape, dtype=np.float_):
         flattened output dimensions.
 
     """
-    input_size = np.product(input_shape)
-    output_size = np.product(output_shape)
+    input_size = np.prod(input_shape)
+    output_size = np.prod(output_shape)
     data = np.ones(output_size, dtype=dtype)
     rows = np.broadcast_to(
         np.arange(input_size).reshape(input_shape), output_shape
@@ -222,7 +222,7 @@ def spbroadcast(input_shape, output_shape, dtype=np.float_):
     )
 
 
-def spmoveaxis(shape, source, destination, dtype=np.float_):
+def spmoveaxis(shape, source, destination, dtype=float):
     """Returns a matrix for permuting flattened dimensions.
 
     Parameters
@@ -243,7 +243,7 @@ def spmoveaxis(shape, source, destination, dtype=np.float_):
         Matrix to permute the flattened dimensions.
 
     """
-    size = np.product(shape)
+    size = np.prod(shape)
     data = np.ones(size, dtype=dtype)
     rows = np.moveaxis(
         np.arange(size).reshape(shape), source, destination
