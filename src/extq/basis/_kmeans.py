@@ -2,7 +2,6 @@
 
 import numpy as np
 import sklearn.cluster
-from more_itertools import zip_equal
 
 from ._labels import labels_to_basis
 from ._voronoi import voronoi_labels
@@ -255,4 +254,4 @@ def kmeans3d_basis(
 
 def _stack(*cvs):
     """Stack sequences of collective variables along the last axis."""
-    return [np.stack(vs, axis=-1) for vs in zip_equal(*cvs)]
+    return [np.stack(vs, axis=-1) for vs in zip(*cvs, strict=True)]

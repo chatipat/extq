@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Dynamical analysis of trajectory data"
 readme = "README.rst"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -19,18 +19,17 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "more-itertools",
     "numba",
-    "numpy",
+    "numpy>=1.23",
     "scikit-learn",
-    "scipy",
+    "scipy>=1.12",
 ]
 
 [project.urls]
@@ -40,7 +39,7 @@ changelog = "https://extq.readthedocs.io/en/latest/changelog.html"
 tracker = "https://github.com/chatipat/extq/issues"
 
 [tool.hatch.envs.test]
-matrix = [{python = ["3.7", "3.8", "3.9", "3.10"]}]
+matrix = [{python = ["3.10", "3.11", "3.12"]}]
 dependencies = ["coverage[toml]", "pytest", "pytest-cov"]
 [tool.hatch.envs.test.scripts]
 cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=src/extq --cov=tests {args}"
@@ -86,4 +85,4 @@ forced_separate = ["test_extq"]
 
 [tool.black]
 line-length = 79
-target-version = ["py37", "py38", "py39", "py310"]
+target-version = ["py310", "py311", "py312"]

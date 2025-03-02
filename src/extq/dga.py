@@ -1,5 +1,4 @@
 import numpy as np
-from more_itertools import zip_equal
 
 from . import linalg
 from ._utils import sum_windows
@@ -61,7 +60,7 @@ def reweight(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w in zip_equal(test_basis, basis, guess):
+    for x, y, w in zip(test_basis, basis, guess, strict=True):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
         assert x.shape == (n_frames, n_basis)
@@ -79,7 +78,7 @@ def reweight(
         a += wdx.T @ y[iw]
         b -= np.ravel(wdx.sum(axis=0))
     coeffs = linalg.solve(a, b)
-    out = [w * (y @ coeffs + 1.0) for y, w in zip_equal(basis, guess)]
+    out = [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess, strict=True)]
     if normalize:
         out = normalize_weights(out)
     return out
@@ -205,8 +204,8 @@ def forward_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, d, f, g in zip_equal(
-        test_basis, basis, weights, in_domain, function, guess
+    for x, y, w, d, f, g in zip(
+        test_basis, basis, weights, in_domain, function, guess, strict=True
     ):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
@@ -351,8 +350,8 @@ def backward_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, d, f, g in zip_equal(
-        test_basis, basis, weights, in_domain, function, guess
+    for x, y, w, d, f, g in zip(
+        test_basis, basis, weights, in_domain, function, guess, strict=True
     ):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
@@ -378,7 +377,7 @@ def backward_feynman_kac(
 
 
 def transform(coeffs, basis, guess):
-    return [y @ coeffs + g for y, g in zip_equal(basis, guess)]
+    return [y @ coeffs + g for y, g in zip(basis, guess, strict=True)]
 
 
 def _broadcast_integrand(f, trajs):

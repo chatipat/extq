@@ -1,5 +1,4 @@
 import numpy as np
-from more_itertools import zip_equal
 
 from .integral import integral_coeffs, integral_windows
 from .utils import normalize_weights
@@ -57,13 +56,14 @@ def extended_rate(
         weights = normalize_weights(weights)
     n_indices = None
     out = 0.0
-    for qp, qm, w, m, d, h in zip_equal(
+    for qp, qm, w, m, d, h in zip(
         _adapt_frames(forward_q),
         _adapt_frames(backward_q),
         _adapt_frames(weights),
         _adapt_steps(transitions),
         _adapt_frames(in_domain),
         _adapt_frames(rxn_coord),
+        strict=True,
     ):
         n_frames = w.shape[0]
         n_indices = m.shape[0] if n_indices is None else n_indices
@@ -128,12 +128,13 @@ def extended_density(
         weights = normalize_weights(weights)
     n_indices = None
     out = []
-    for qp, qm, w, m, d in zip_equal(
+    for qp, qm, w, m, d in zip(
         _adapt_frames(forward_q),
         _adapt_frames(backward_q),
         _adapt_frames(weights),
         _adapt_steps(transitions),
         _adapt_frames(in_domain),
+        strict=True,
     ):
         n_frames = w.shape[0]
         n_indices = m.shape[0] if n_indices is None else n_indices
@@ -198,13 +199,14 @@ def extended_current(
         weights = normalize_weights(weights)
     n_indices = None
     out = []
-    for qp, qm, w, m, d, f in zip_equal(
+    for qp, qm, w, m, d, f in zip(
         _adapt_frames(forward_q),
         _adapt_frames(backward_q),
         _adapt_frames(weights),
         _adapt_steps(transitions),
         _adapt_frames(in_domain),
         _adapt_frames(cv),
+        strict=True,
     ):
         n_frames = w.shape[0]
         n_indices = m.shape[0] if n_indices is None else n_indices

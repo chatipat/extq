@@ -1,5 +1,4 @@
 import numpy as np
-from more_itertools import zip_equal
 
 from ._soft_utils import (
     soft_backward_committor_kernel,
@@ -30,7 +29,7 @@ def soft_rate(
         weights = normalize_weights(weights)
 
     out = 0.0
-    for qp, qm, w, v, rp, rm, h in zip_equal(
+    for qp, qm, w, v, rp, rm, h in zip(
         forward_q,
         backward_q,
         weights,
@@ -38,6 +37,7 @@ def soft_rate(
         forward_boundary,
         backward_boundary,
         rxn_coord,
+        strict=True,
     ):
         n_frames = len(w)
         assert qp.shape == (n_frames,)
@@ -111,13 +111,14 @@ def soft_density(
         weights = normalize_weights(weights)
 
     out = []
-    for qp, qm, w, v, rp, rm in zip_equal(
+    for qp, qm, w, v, rp, rm in zip(
         forward_q,
         backward_q,
         weights,
         stop_rate,
         forward_boundary,
         backward_boundary,
+        strict=True,
     ):
         n_frames = len(w)
         assert qp.shape == (n_frames,)
@@ -185,7 +186,7 @@ def soft_current(
         weights = normalize_weights(weights)
 
     out = []
-    for qp, qm, w, v, rp, rm, f in zip_equal(
+    for qp, qm, w, v, rp, rm, f in zip(
         forward_q,
         backward_q,
         weights,
@@ -193,6 +194,7 @@ def soft_current(
         forward_boundary,
         backward_boundary,
         cv,
+        strict=True,
     ):
         n_frames = len(w)
         assert qp.shape == (n_frames,)

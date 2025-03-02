@@ -1,5 +1,4 @@
 import numpy as np
-from more_itertools import zip_equal
 
 from . import linalg
 from .moving_semigroup import moving_matmul
@@ -172,7 +171,7 @@ def forward_extended_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, k, d, f, g in zip_equal(
+    for x, y, w, k, d, f, g in zip(
         _adapt_basis(test_basis),
         _adapt_basis(basis),
         weights,
@@ -180,6 +179,7 @@ def forward_extended_feynman_kac(
         _adapt_frames(in_domain),
         _adapt_steps(function),
         _adapt_frames(guess),
+        strict=True,
     ):
         n_frames = x[0].shape[0]
         n_indices = len(x) if n_indices is None else n_indices
@@ -389,7 +389,7 @@ def backward_extended_feynman_kac(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w, k, d, f, g in zip_equal(
+    for x, y, w, k, d, f, g in zip(
         _adapt_basis(test_basis),
         _adapt_basis(basis),
         weights,
@@ -397,6 +397,7 @@ def backward_extended_feynman_kac(
         _adapt_frames(in_domain),
         _adapt_steps(function),
         _adapt_frames(guess),
+        strict=True,
     ):
         n_frames = x[0].shape[0]
         n_indices = len(x) if n_indices is None else n_indices
@@ -450,8 +451,8 @@ def backward_extended_feynman_kac(
 
 def transform(coeffs, basis, guess):
     return [
-        [yi @ coeffs + gi for yi, gi in zip_equal(basis_i, guess_i)]
-        for basis_i, guess_i in zip_equal(basis, guess)
+        [yi @ coeffs + gi for yi, gi in zip(basis_i, guess_i, strict=True)]
+        for basis_i, guess_i in zip(basis, guess, strict=True)
     ]
 
 

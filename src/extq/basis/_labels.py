@@ -2,7 +2,6 @@
 
 import numpy as np
 import scipy.sparse
-from more_itertools import zip_equal
 
 __all__ = [
     "labels_to_basis",
@@ -42,7 +41,7 @@ def labels_to_basis(labels, num=None, *, sparse=True, in_domain=None):
         for indices in labels:
             basis.append(_labels_to_basis(indices, num, sparse=sparse))
     else:
-        for indices, mask in zip_equal(labels, in_domain):
+        for indices, mask in zip(labels, in_domain, strict=True):
             basis.append(
                 _labels_to_basis(indices, num, sparse=sparse, mask=mask)
             )

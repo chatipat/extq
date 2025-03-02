@@ -1,6 +1,7 @@
+from itertools import pairwise
+
 import numpy as np
 import scipy.signal
-from more_itertools import pairwise
 
 __all__ = [
     "uniform_weights",

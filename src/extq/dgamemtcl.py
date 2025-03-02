@@ -1,7 +1,6 @@
 """DGA with time-convolutionless memory estimators for statistics."""
 
 import numpy as np
-from more_itertools import zip_equal
 
 from . import linalg, utils
 from ._utils import sum_windows
@@ -156,7 +155,7 @@ def _stationary_distribution_matrices(
     n_basis = None
     a = 0.0
     b = 0.0
-    for x, y, w in zip_equal(test_basis, basis, guess):
+    for x, y, w in zip(test_basis, basis, guess, strict=True):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
         assert x.shape == (n_frames, n_basis)
@@ -197,8 +196,8 @@ def _forecast_matrices(
     a = 0.0
     b = 0.0
 
-    for x, y, w, d, f, g in zip_equal(
-        test_basis, basis, weights, in_domain, function, guess
+    for x, y, w, d, f, g in zip(
+        test_basis, basis, weights, in_domain, function, guess, strict=True
     ):
         n_frames = len(w)
         assert x.shape == y.shape == (n_frames, n_basis)
@@ -241,8 +240,8 @@ def _aftcast_matrices(
     a = 0.0
     b = 0.0
 
-    for x, y, w, d, f, g in zip_equal(
-        test_basis, basis, weights, in_domain, function, guess
+    for x, y, w, d, f, g in zip(
+        test_basis, basis, weights, in_domain, function, guess, strict=True
     ):
         n_frames = len(w)
         assert x.shape == y.shape == (n_frames, n_basis)
@@ -285,7 +284,7 @@ def _time_lagged_forecast(values, in_domain, function, lag):
     assert lag >= 0
 
     out = []
-    for u0, d, f in zip_equal(values, in_domain, function):
+    for u0, d, f in zip(values, in_domain, function, strict=True):
         n_frames = len(u0)
         assert u0.shape == d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
@@ -313,7 +312,7 @@ def _time_lagged_aftcast(values, in_domain, function, lag):
     assert lag >= 0
 
     out = []
-    for u0, d, f in zip_equal(values, in_domain, function):
+    for u0, d, f in zip(values, in_domain, function, strict=True):
         n_frames = len(u0)
         assert u0.shape == d.shape == (n_frames,)
         assert f.shape == (n_frames - 1,)
@@ -346,7 +345,7 @@ def _affine_projection_coef_distribution(
     a = 0.0
     b = 0.0
 
-    for x, y, w, u in zip_equal(test_basis, basis, origin, values):
+    for x, y, w, u in zip(test_basis, basis, origin, values, strict=True):
         n_frames = len(w)
         assert x.shape == y.shape == (n_frames, n_basis)
         assert w.shape == u.shape == (n_frames,)
@@ -368,7 +367,9 @@ def _affine_projection_coef(
     a = 0.0
     b = 0.0
 
-    for x, y, w, g, u in zip_equal(test_basis, basis, weights, origin, values):
+    for x, y, w, g, u in zip(
+        test_basis, basis, weights, origin, values, strict=True
+    ):
         n_frames = len(w)
         assert x.shape == y.shape == (n_frames, n_basis)
         assert w.shape == g.shape == u.shape == (n_frames,)
@@ -385,11 +386,11 @@ def _affine_projection_coef(
 
 
 def _transform_distribution(coef, basis, guess):
-    return [w * (y @ coef + 1.0) for y, w in zip_equal(basis, guess)]
+    return [w * (y @ coef + 1.0) for y, w in zip(basis, guess, strict=True)]
 
 
 def _transform(coef, basis, guess):
-    return [y @ coef + g for y, g in zip_equal(basis, guess)]
+    return [y @ coef + g for y, g in zip(basis, guess, strict=True)]
 
 
 def _broadcast_integrand(f, trajs):

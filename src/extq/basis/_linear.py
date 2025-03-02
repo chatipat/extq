@@ -2,7 +2,6 @@
 
 import numpy as np
 import scipy as sp
-from more_itertools import zip_equal
 
 
 def linear_basis(cv, nodes):
@@ -22,7 +21,7 @@ def linear_basis(cv, nodes):
 def bilinear_basis(cv1, cv2, nodes1, nodes2):
     n_basis = len(nodes1) * len(nodes2)
     out = []
-    for v1, v2 in zip_equal(cv1, cv2):
+    for v1, v2 in zip(cv1, cv2, strict=True):
         data, row, col = _bilinear(v1, v2, nodes1, nodes2)
         out.append(
             sp.sparse.csr_matrix(
@@ -36,7 +35,7 @@ def bilinear_basis(cv1, cv2, nodes1, nodes2):
 def trilinear_basis(cv1, cv2, cv3, nodes1, nodes2, nodes3):
     n_basis = len(nodes1) * len(nodes2) * len(nodes3)
     out = []
-    for v1, v2, v3 in zip_equal(cv1, cv2, cv3):
+    for v1, v2, v3 in zip(cv1, cv2, cv3, strict=True):
         data, row, col = _bilinear(v1, v2, v3, nodes1, nodes2, nodes3)
         out.append(
             sp.sparse.csr_matrix(

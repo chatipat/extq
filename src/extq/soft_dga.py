@@ -1,5 +1,4 @@
 import numpy as np
-from more_itertools import zip_equal
 
 from . import linalg
 from ._soft_utils import (
@@ -30,8 +29,8 @@ def soft_forward_committor(
     a = 0.0
     b = 0.0
 
-    for x, y, w, v, r, g in zip_equal(
-        test_basis, basis, weights, stop_rate, boundary, guess
+    for x, y, w, v, r, g in zip(
+        test_basis, basis, weights, stop_rate, boundary, guess, strict=True
     ):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
@@ -65,7 +64,7 @@ def soft_forward_committor(
         a += wx.T @ (linalg.scale_rows(k[:, 0, 0], y[iy]) - y[ix])
         b += wx.T @ (g[iy] - g[ix] + k[:, 0, 1])
     coef = -linalg.solve(a, b)
-    q = [y @ coef + g for y, g in zip_equal(basis, guess)]
+    q = [y @ coef + g for y, g in zip(basis, guess, strict=True)]
     return q
 
 
@@ -90,8 +89,8 @@ def soft_backward_committor(
     a = 0.0
     b = 0.0
 
-    for x, y, w, v, r, g in zip_equal(
-        test_basis, basis, weights, stop_rate, boundary, guess
+    for x, y, w, v, r, g in zip(
+        test_basis, basis, weights, stop_rate, boundary, guess, strict=True
     ):
         n_frames = x.shape[0]
         n_basis = x.shape[1] if n_basis is None else n_basis
@@ -125,5 +124,5 @@ def soft_backward_committor(
         a += wx.T @ (linalg.scale_rows(k[:, 0, 0], y[iy]) - y[ix])
         b += wx.T @ (g[iy] - g[ix] + k[:, 1, 0])
     coef = -linalg.solve(a, b)
-    q = [y @ coef + g for y, g in zip_equal(basis, guess)]
+    q = [y @ coef + g for y, g in zip(basis, guess, strict=True)]
     return q

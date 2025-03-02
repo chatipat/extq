@@ -1,7 +1,6 @@
 """DGA with memory estimators for statistics."""
 
 import numpy as np
-from more_itertools import zip_equal
 
 from . import linalg
 from ._utils import sum_windows
@@ -150,7 +149,7 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
     b = np.zeros((mem + 1, n_basis))
     c0 = np.zeros((n_basis, n_basis))
 
-    for x, y, w in zip_equal(test_basis, basis, weights):
+    for x, y, w in zip(test_basis, basis, weights, strict=True):
         n_frames = len(w)
         assert x.shape == (n_frames, n_basis)
         assert y.shape == (n_frames, n_basis)
@@ -193,7 +192,7 @@ def reweight_projection(basis, weights, coef):
         Estimate of the projected invariant distribution.
 
     """
-    return [w * (y @ coef + 1.0) for y, w in zip_equal(basis, weights)]
+    return [w * (y @ coef + 1.0) for y, w in zip(basis, weights, strict=True)]
 
 
 def reweight_solution(basis, weights, lag, mem, coef, mem_coef):
@@ -232,7 +231,7 @@ def reweight_solution(basis, weights, lag, mem, coef, mem_coef):
     n_basis = basis[0].shape[1]
 
     out = []
-    for y, w in zip_equal(basis, weights):
+    for y, w in zip(basis, weights, strict=True):
         n_frames = y.shape[0]
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
@@ -558,8 +557,8 @@ def forward_feynman_kac_matrices(
     b = np.zeros((mem + 1, n_basis))
     c0 = np.zeros((n_basis, n_basis))
 
-    for x, y, w, d, f, g in zip_equal(
-        test_basis, basis, weights, in_domain, function, guess
+    for x, y, w, d, f, g in zip(
+        test_basis, basis, weights, in_domain, function, guess, strict=True
     ):
         n_frames = len(w)
         assert x.shape == (n_frames, n_basis)
@@ -606,7 +605,7 @@ def forward_feynman_kac_projection(basis, guess, coef):
         Estimate of the projected solution.
 
     """
-    return [y @ coef + g for y, g in zip_equal(basis, guess)]
+    return [y @ coef + g for y, g in zip(basis, guess, strict=True)]
 
 
 def forward_feynman_kac_solution(
@@ -653,7 +652,7 @@ def forward_feynman_kac_solution(
     n_basis = basis[0].shape[1]
 
     out = []
-    for y, d, f, g in zip_equal(basis, in_domain, function, guess):
+    for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
         n_frames = y.shape[0]
         assert y.shape == (n_frames, n_basis)
         assert d.shape == (n_frames,)
@@ -989,8 +988,8 @@ def backward_feynman_kac_matrices(
     b = np.zeros((mem + 1, n_basis))
     c0 = np.zeros((n_basis, n_basis))
 
-    for x, y, w, d, f, g in zip_equal(
-        test_basis, basis, weights, in_domain, function, guess
+    for x, y, w, d, f, g in zip(
+        test_basis, basis, weights, in_domain, function, guess, strict=True
     ):
         n_frames = len(w)
         assert x.shape == (n_frames, n_basis)
@@ -1037,7 +1036,7 @@ def backward_feynman_kac_projection(basis, guess, coef):
         Estimate of the projected solution.
 
     """
-    return [y @ coef + g for y, g in zip_equal(basis, guess)]
+    return [y @ coef + g for y, g in zip(basis, guess, strict=True)]
 
 
 def backward_feynman_kac_solution(
@@ -1084,7 +1083,7 @@ def backward_feynman_kac_solution(
     n_basis = basis[0].shape[1]
 
     out = []
-    for y, d, f, g in zip_equal(basis, in_domain, function, guess):
+    for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
         n_frames = y.shape[0]
         assert y.shape == (n_frames, n_basis)
         assert d.shape == (n_frames,)

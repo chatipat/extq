@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.linalg
 import scipy.sparse
-from more_itertools import zip_equal
 
 from .. import linalg, utils
 
@@ -50,7 +49,7 @@ def whiten(trajs, weights=None, *, rtol=None, with_mean=True, with_std=True):
             numer += x.T @ x
             denom += len(x)
     else:
-        for x, w in zip_equal(trajs, weights):
+        for x, w in zip(trajs, weights, strict=True):
             numer += x.T @ scipy.sparse.diags(w) @ x
             denom += np.sum(w)
     cov = numer / denom
@@ -149,7 +148,7 @@ def remove_constant_feature(trajs, weights=None, *, tol=0.0):
             numer += x.sum(axis=0)
             denom += x.shape[0]
     else:
-        for x, w in zip_equal(trajs, weights):
+        for x, w in zip(trajs, weights, strict=True):
             numer += w @ x
             denom += np.sum(w)
     means = np.ravel(numer) / denom
@@ -225,4 +224,4 @@ def scale_basis(scale, basis):
         Scaled features.
 
     """
-    return [linalg.scale_rows(s, y) for s, y in zip_equal(scale, basis)]
+    return [linalg.scale_rows(s, y) for s, y in zip(scale, basis, strict=True)]

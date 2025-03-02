@@ -1,6 +1,5 @@
 import numba as nb
 import numpy as np
-from more_itertools import zip_equal
 
 from .stop import backward_stop, forward_stop
 from .utils import normalize_weights
@@ -54,8 +53,8 @@ def rate(
     if normalize:
         weights = normalize_weights(weights)
     out = 0.0
-    for qp, qm, w, d, h in zip_equal(
-        forward_q, backward_q, weights, in_domain, rxn_coord
+    for qp, qm, w, d, h in zip(
+        forward_q, backward_q, weights, in_domain, rxn_coord, strict=True
     ):
         n_frames = w.shape[0]
         assert qp.shape == (n_frames,)
@@ -133,7 +132,9 @@ def density(forward_q, backward_q, weights, in_domain, lag, *, normalize=True):
     if normalize:
         weights = normalize_weights(weights)
     out = []
-    for qp, qm, w, d in zip_equal(forward_q, backward_q, weights, in_domain):
+    for qp, qm, w, d in zip(
+        forward_q, backward_q, weights, in_domain, strict=True
+    ):
         n_frames = w.shape[0]
         assert qp.shape == (n_frames,)
         assert qm.shape == (n_frames,)
@@ -183,8 +184,8 @@ def current(
     if normalize:
         weights = normalize_weights(weights)
     out = []
-    for qp, qm, w, d, f in zip_equal(
-        forward_q, backward_q, weights, in_domain, cv
+    for qp, qm, w, d, f in zip(
+        forward_q, backward_q, weights, in_domain, cv, strict=True
     ):
         n_frames = w.shape[0]
         assert qp.shape == (n_frames,)
@@ -243,7 +244,9 @@ def rate_jstrahan(forward_q, backward_q, weights, in_domain, lag):
     """
     numer = 0.0
     denom = lag * sum(np.sum(w) for w in weights)
-    for qp, qm, w, d in zip_equal(forward_q, backward_q, weights, in_domain):
+    for qp, qm, w, d in zip(
+        forward_q, backward_q, weights, in_domain, strict=True
+    ):
         assert np.all(w[-lag:] == 0.0)
         tp = np.minimum(np.arange(lag, len(w)), forward_stop(d)[:-lag])
         numer += np.sum(w[:-lag] * qm[:-lag] * qp[tp] * (qp[tp] - qp[:-lag]))
@@ -276,8 +279,8 @@ def current_jstrahan(forward_q, backward_q, weights, in_domain, cv, lag):
     """
     result = []
     denom = 2.0 * lag * sum(np.sum(w) for w in weights)
-    for qp, qm, w, d, f in zip_equal(
-        forward_q, backward_q, weights, in_domain, cv
+    for qp, qm, w, d, f in zip(
+        forward_q, backward_q, weights, in_domain, cv, strict=True
     ):
         assert np.all(w[-lag:] == 0.0)
         tp = np.minimum(np.arange(lag, len(w)), forward_stop(d)[:-lag])
