@@ -1,6 +1,5 @@
 import numpy as np
-import scipy.linalg
-import scipy.sparse
+import scipy as sp
 
 from .. import linalg, utils
 
@@ -50,12 +49,12 @@ def whiten(trajs, weights=None, *, rtol=None, with_mean=True, with_std=True):
             denom += len(x)
     else:
         for x, w in zip(trajs, weights, strict=True):
-            numer += x.T @ scipy.sparse.diags(w) @ x
+            numer += x.T @ sp.sparse.diags(w) @ x
             denom += np.sum(w)
     cov = numer / denom
 
     # solve the PCA eigenproblem
-    evals, evecs = scipy.linalg.eigh(cov)
+    evals, evecs = sp.linalg.eigh(cov)
 
     # remove near-zero eigenvalues
     # rtol, tol calculation based on scipy.linalg.orth
@@ -167,7 +166,7 @@ def remove_constant_feature(trajs, weights=None, *, tol=0.0):
     data = np.concatenate([np.ones(n_out), factor])
     row = np.concatenate([order[:-1], order[1:]])
     col = np.concatenate([np.arange(n_out), np.arange(n_out)])
-    mat = scipy.sparse.csr_matrix((data, (row, col)), shape=(n_out + 1, n_out))
+    mat = sp.sparse.csr_matrix((data, (row, col)), shape=(n_out + 1, n_out))
     return [x @ mat for x in trajs]
 
 
@@ -192,12 +191,12 @@ def concatenate_bases(*bases):
             msg = "Bases must have matching trajectory lengths."
             raise ValueError(msg)
 
-    sparse = [scipy.sparse.issparse(y) for basis in bases for y in basis]
+    sparse = [sp.sparse.issparse(y) for basis in bases for y in basis]
     if all(sparse):  # sparse basis
         # concatenate trajectories in each basis for efficiency
         flat_bases = [utils.flatten(basis) for basis in bases]
         # concatenate along basis dimension
-        flat_out = scipy.sparse.hstack(flat_bases, format="csr")
+        flat_out = sp.sparse.hstack(flat_bases, format="csr")
         # split into individual trajectories
         out = utils.unflatten(flat_out, lengths)
     elif not any(sparse):  # dense basis

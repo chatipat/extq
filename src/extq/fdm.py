@@ -1,6 +1,5 @@
 import numpy as np
-import scipy.sparse
-import scipy.sparse.linalg
+import scipy as sp
 
 __all__ = [
     "forward_committor",
@@ -141,10 +140,10 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
 
     a = generator[d, :][:, d]
     b = -generator[d, :] @ g - f[d]
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
-    return (
-        g + scipy.sparse.identity(size, format="csr")[:, d] @ coeffs
-    ).reshape(shape)
+    coeffs = sp.sparse.linalg.spsolve(a, b)
+    return (g + sp.sparse.identity(size, format="csr")[:, d] @ coeffs).reshape(
+        shape
+    )
 
 
 def backward_feynman_kac(generator, weights, in_domain, function, guess):
@@ -172,7 +171,7 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
     w, d, f, g = np.broadcast_arrays(weights, in_domain, function, guess)
     pi = np.ravel(w)
     adjoint_generator = (
-        scipy.sparse.diags(1.0 / pi) @ generator.T @ scipy.sparse.diags(pi)
+        sp.sparse.diags(1.0 / pi) @ generator.T @ sp.sparse.diags(pi)
     )
     return forward_feynman_kac(adjoint_generator, w, d, f, g)
 
@@ -199,7 +198,7 @@ def reweight(generator):
 
     a = generator.T[mask, :][:, mask]
     b = -generator.T[mask, fixed_index]
-    coeffs = scipy.sparse.linalg.spsolve(a, b)
+    coeffs = sp.sparse.linalg.spsolve(a, b)
 
     weights = np.empty(generator.shape[0])
     weights[fixed_index] = 1.0

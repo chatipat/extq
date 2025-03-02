@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.ndimage
+import scipy as sp
 
 
 def kdesum2d(
@@ -121,7 +121,7 @@ def kdesum2d(
         ystd = ysep
 
     # apply Gaussian filter to histogram
-    kde_padded = scipy.ndimage.gaussian_filter(
+    kde_padded = sp.ndimage.gaussian_filter(
         hist_padded,
         sigma=(xstd / xsep, ystd / ysep),  # in units of grid points
         mode="constant",

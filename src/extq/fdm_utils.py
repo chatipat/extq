@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-import scipy.sparse
+import scipy as sp
 
 __all__ = [
     "augment_generator",
@@ -37,7 +37,7 @@ def augment_generator(generator, spatial, temporal):
     n = spatial.shape[0]
     assert n % m == 0
     gen_spatial, gen_temporal = broadcast_kernel(
-        scipy.sparse.identity(m), generator, m, (n // m, m)
+        sp.sparse.identity(m), generator, m, (n // m, m)
     )
     joint_spatial, joint_temporal = joint_kernel(
         gen_spatial, gen_temporal, spatial, temporal
@@ -93,14 +93,14 @@ def build_kernel(generator, n_indices, entries):
     temporal_blocks = np.empty((n_indices, n_indices), dtype=object)
     for i in range(n_indices):
         for j in range(n_indices):
-            spatial_blocks[i, j] = scipy.sparse.coo_matrix(
+            spatial_blocks[i, j] = sp.sparse.coo_matrix(
                 (spatial_data[i, j], (row, col)), shape=generator.shape
             )
-            temporal_blocks[i, j] = scipy.sparse.coo_matrix(
+            temporal_blocks[i, j] = sp.sparse.coo_matrix(
                 (temporal_data[i, j], (row, col)), shape=generator.shape
             )
-    spatial = scipy.sparse.bmat(spatial_blocks)
-    temporal = scipy.sparse.bmat(temporal_blocks)
+    spatial = sp.sparse.bmat(spatial_blocks)
+    temporal = sp.sparse.bmat(temporal_blocks)
 
     return spatial, temporal
 
@@ -217,7 +217,7 @@ def spbroadcast(input_shape, output_shape, dtype=float):
         np.arange(input_size).reshape(input_shape), output_shape
     ).reshape(output_size)
     cols = np.arange(output_size)
-    return scipy.sparse.coo_matrix(
+    return sp.sparse.coo_matrix(
         (data, (rows, cols)), shape=(input_size, output_size)
     )
 
@@ -249,7 +249,7 @@ def spmoveaxis(shape, source, destination, dtype=float):
         np.arange(size).reshape(shape), source, destination
     ).reshape(size)
     cols = np.arange(size)
-    return scipy.sparse.coo_matrix((data, (rows, cols)), shape=(size, size))
+    return sp.sparse.coo_matrix((data, (rows, cols)), shape=(size, size))
 
 
 def spouter(m, op, a, b):
@@ -279,4 +279,4 @@ def spouter(m, op, a, b):
     assert a.shape == b.shape
     row, col = m.nonzero()
     data = op(a.ravel()[row], b.ravel()[col])
-    return scipy.sparse.csr_matrix((data, (row, col)), m.shape)
+    return sp.sparse.csr_matrix((data, (row, col)), m.shape)

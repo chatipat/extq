@@ -1,7 +1,7 @@
 from itertools import pairwise
 
 import numpy as np
-import scipy.signal
+import scipy as sp
 
 __all__ = [
     "uniform_weights",
@@ -108,7 +108,7 @@ def distribute_weights(weights, lag, maxlag):
         new_w = np.zeros(n_frames, dtype=w.dtype)
         if n_frames > maxlag:
             window = np.full(nlags, 1 / nlags, dtype=w.dtype)
-            temp = scipy.signal.convolve(w[: n_frames - maxlag], window)
+            temp = sp.signal.convolve(w[: n_frames - maxlag], window)
             new_w[: n_frames - lag] = temp
         result.append(new_w)
     return result
@@ -166,8 +166,8 @@ def flatten(trajs):
         Concatenated trajectory.
 
     """
-    if any(scipy.sparse.issparse(traj) for traj in trajs):
-        return scipy.sparse.vstack(trajs)
+    if any(sp.sparse.issparse(traj) for traj in trajs):
+        return sp.sparse.vstack(trajs)
     else:
         return np.concatenate(trajs)
 
