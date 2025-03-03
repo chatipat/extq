@@ -2,6 +2,10 @@ import numpy as np
 import scipy as sp
 
 
+def as_dense(a):
+    return a.toarray() if sp.sparse.issparse(a) else a
+
+
 def block_diag(mats, format="array"):
     if format != "array":
         return sp.sparse.block_diag(mats, format=format)
@@ -34,6 +38,29 @@ def factorized(a):
     else:
         lu, piv = sp.linalg.lu_factor(a)
         return lambda b: sp.linalg.lu_solve((lu, piv), b)
+
+
+def eigh(a, b=None, k=None, which="LM"):
+    if sp.sparse.issparse(a) or sp.sparse.issparse(b):
+        eigvals, eigvecs = sp.sparse.linalg.eigsh(a, k=k, m=b, which=which)
+    else:
+        eigvals, eigvecs = sp.linalg.eigh(a, b)
+    if which == "LM":
+        order = np.argsort(np.abs(eigvals))[::-1]
+    elif which == "SM":
+        order = np.argsort(np.abs(eigvals))
+    elif which == "LA":
+        order = np.argsort(np.real(eigvals))[::-1]
+    elif which == "SA":
+        order = np.argsort(np.real(eigvals))
+    else:
+        msg = f"which ({which}) must be 'LM', 'SM', 'LA', or 'SA'"
+        raise ValueError(msg)
+    if k is not None:
+        order = order[:k]
+    eigvals = eigvals[order]
+    eigvecs = eigvecs[:, order]
+    return eigvals, eigvecs
 
 
 def expm_multiply(a, b):
