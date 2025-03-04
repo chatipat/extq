@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 
 
 def sum_windows(a, start, end):
@@ -115,3 +116,45 @@ def count_transition_paths_windows(in_domain, reactant, product, start, end):
     out[idx_end == idx_start] = 0
 
     return out
+
+
+def weighted_lagged_covariance(x, y, w, lag_w):
+    r"""
+    Compute a weighted sum of time-lagged covariances.
+
+    This function efficiently calculates
+    ``sum(c * x[:-t].T * w[:-t] @ y[t:] for t, c in enumerate(lag_w))``
+    in linearithmic time with respect to `n_frames` and `max_lag`.
+
+    Parameters
+    ----------
+    x : (n_frames, n_left_features) ndarray of float
+        First set of features for the time series. Each row is a time
+        point and each column is a feature.
+    y : (n_frames, n_right_features) ndarray of float
+        Second set of features for the time series. Each row is a time
+        point and each column is a features.
+    w : (n_frames,) ndarray of float
+        Weight of the length ``max_lag + 1`` window starting at the
+        time point. Note that the weights of the last `max_lag` time
+        points must be zero (because their windows extend beyond the
+        end of the time series).
+    lag_w : (max_lag + 1,) ndarray of float
+        Weight of each lag time, starting at zero lag time.
+
+    Returns
+    -------
+    (n_left_features, n_right_features) ndarray of float
+        Weighted sum of time-lagged covariances.
+
+    """
+    maxlag = len(lag_w) - 1
+    if maxlag == 0:
+        return x.T * (lag_w * w) @ y
+    assert np.all(w[-maxlag:] == 0)
+    wt = np.concatenate([[0], np.cumsum(w[:-maxlag])])
+    wy = np.concatenate([np.full(maxlag, wt[0]), wt[:-1]])
+    wx = np.concatenate([wt[1:], np.full(maxlag, wt[-1])])
+    xt = sp.signal.fftconvolve(x, lag_w[:, None], axes=0)[:-maxlag]
+    yt = sp.signal.fftconvolve(y, lag_w[::-1, None], axes=0)[maxlag:]
+    return x.T * wx @ yt - xt.T * wy @ y
