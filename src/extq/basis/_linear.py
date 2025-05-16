@@ -36,7 +36,7 @@ def trilinear_basis(cv1, cv2, cv3, nodes1, nodes2, nodes3):
     n_basis = len(nodes1) * len(nodes2) * len(nodes3)
     out = []
     for v1, v2, v3 in zip(cv1, cv2, cv3, strict=True):
-        data, row, col = _bilinear(v1, v2, v3, nodes1, nodes2, nodes3)
+        data, row, col = _trilinear(v1, v2, v3, nodes1, nodes2, nodes3)
         out.append(
             sp.sparse.csr_matrix(
                 (np.ravel(data), (np.ravel(row), np.ravel(col))),
