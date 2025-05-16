@@ -10,7 +10,7 @@ def linear_basis(cv, nodes):
     for v in cv:
         data, row, col = _linear(v, nodes)
         out.append(
-            sp.sparse.csr_matrix(
+            sp.sparse.csr_array(
                 (np.ravel(data), (np.ravel(row), np.ravel(col))),
                 shape=(len(data), n_basis),
             )
@@ -24,7 +24,7 @@ def bilinear_basis(cv1, cv2, nodes1, nodes2):
     for v1, v2 in zip(cv1, cv2, strict=True):
         data, row, col = _bilinear(v1, v2, nodes1, nodes2)
         out.append(
-            sp.sparse.csr_matrix(
+            sp.sparse.csr_array(
                 (np.ravel(data), (np.ravel(row), np.ravel(col))),
                 shape=(len(data), n_basis),
             )
@@ -38,7 +38,7 @@ def trilinear_basis(cv1, cv2, cv3, nodes1, nodes2, nodes3):
     for v1, v2, v3 in zip(cv1, cv2, cv3, strict=True):
         data, row, col = _trilinear(v1, v2, v3, nodes1, nodes2, nodes3)
         out.append(
-            sp.sparse.csr_matrix(
+            sp.sparse.csr_array(
                 (np.ravel(data), (np.ravel(row), np.ravel(col))),
                 shape=(len(data), n_basis),
             )

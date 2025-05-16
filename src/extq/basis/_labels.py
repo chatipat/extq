@@ -85,7 +85,7 @@ def _labels_to_basis(indices, cols, *, sparse=True, mask=None):
         col_ind = col_ind[mask]
     assert np.all(col_ind >= 0) and np.all(col_ind < cols)
     if sparse:
-        return sp.sparse.csr_matrix(
+        return sp.sparse.csr_array(
             (np.ones(len(row_ind)), (row_ind, col_ind)), shape=(rows, cols)
         )
     else:

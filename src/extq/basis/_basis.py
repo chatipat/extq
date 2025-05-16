@@ -49,7 +49,7 @@ def whiten(trajs, weights=None, *, rtol=None, with_mean=True, with_std=True):
             denom += len(x)
     else:
         for x, w in zip(trajs, weights, strict=True):
-            numer += x.T @ sp.sparse.diags(w) @ x
+            numer += x.T @ sp.sparse.diags_array(w) @ x
             denom += np.sum(w)
     cov = numer / denom
 
@@ -165,7 +165,7 @@ def remove_constant_feature(trajs, weights=None, *, tol=0.0):
     data = np.concatenate([np.ones(n_out), factor])
     row = np.concatenate([order[:-1], order[1:]])
     col = np.concatenate([np.arange(n_out), np.arange(n_out)])
-    mat = sp.sparse.csr_matrix((data, (row, col)), shape=(n_out + 1, n_out))
+    mat = sp.sparse.csr_array((data, (row, col)), shape=(n_out + 1, n_out))
     return [x @ mat for x in trajs]
 
 

@@ -75,12 +75,12 @@ def expm_multiply(a, b):
 
 def scale_rows(a, b):
     if sp.sparse.issparse(b):
-        if isinstance(b, sp.sparse.csr_matrix):
+        if isinstance(b, (sp.sparse.csr_array, sp.sparse.csr_matrix)):
             return _scale_rows_csr(a, b)
-        elif isinstance(b, sp.sparse.csc_matrix):
+        elif isinstance(b, (sp.sparse.csc_array, sp.sparse.csc_matrix)):
             return _scale_rows_csc(a, b)
         else:
-            return sp.sparse.diags(a) @ b
+            return sp.sparse.diags_array(a) @ b
     else:
         if np.ndim(b) >= 2:
             return a[:, None] * b
@@ -90,31 +90,31 @@ def scale_rows(a, b):
 
 def scale_cols(a, b):
     if sp.sparse.issparse(a):
-        if isinstance(a, sp.sparse.csr_matrix):
+        if isinstance(a, (sp.sparse.csr_array, sp.sparse.csr_matrix)):
             return _scale_cols_csr(a, b)
-        elif isinstance(a, sp.sparse.csc_matrix):
+        elif isinstance(a, (sp.sparse.csc_array, sp.sparse.csc_matrix)):
             return _scale_cols_csc(a, b)
         else:
-            return a @ sp.sparse.diags(b)
+            return a @ sp.sparse.diags_array(b)
     else:
         return a * b
 
 
 def _scale_rows_csr(a, b):
     data = np.repeat(a, np.diff(b.indptr)) * b.data
-    return sp.sparse.csr_matrix((data, b.indices, b.indptr), shape=b.shape)
+    return sp.sparse.csr_array((data, b.indices, b.indptr), shape=b.shape)
 
 
 def _scale_rows_csc(a, b):
     data = a[b.indices] * b.data
-    return sp.sparse.csc_matrix((data, b.indices, b.indptr), shape=b.shape)
+    return sp.sparse.csc_array((data, b.indices, b.indptr), shape=b.shape)
 
 
 def _scale_cols_csr(a, b):
     data = a.data * b[a.indices]
-    return sp.sparse.csr_matrix((data, a.indices, a.indptr), shape=a.shape)
+    return sp.sparse.csr_array((data, a.indices, a.indptr), shape=a.shape)
 
 
 def _scale_cols_csc(a, b):
     data = a.data * np.repeat(b, np.diff(a.indptr))
-    return sp.sparse.csc_matrix((data, a.indices, a.indptr), shape=a.shape)
+    return sp.sparse.csc_array((data, a.indices, a.indptr), shape=a.shape)
