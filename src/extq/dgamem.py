@@ -83,12 +83,8 @@ def reweight(
         Memory-correction coefficients.
 
     """
-    assert (
-        return_projection or return_solution or return_coef or return_mem_coef
-    )
-    a, b, c0 = reweight_matrices(
-        basis, weights, lag, mem, test_basis=test_basis
-    )
+    assert return_projection or return_solution or return_coef or return_mem_coef
+    a, b, c0 = reweight_matrices(basis, weights, lag, mem, test_basis=test_basis)
     coef, mem_coef = solve(a, b, c0)
     out = []
     if return_projection:
@@ -471,9 +467,7 @@ def forward_feynman_kac(
         Memory-correction coefficients.
 
     """
-    assert (
-        return_projection or return_solution or return_coef or return_mem_coef
-    )
+    assert return_projection or return_solution or return_coef or return_mem_coef
     a, b, c0 = forward_feynman_kac_matrices(
         basis,
         weights,
@@ -895,9 +889,7 @@ def backward_feynman_kac(
         Memory-correction coefficients.
 
     """
-    assert (
-        return_projection or return_solution or return_coef or return_mem_coef
-    )
+    assert return_projection or return_solution or return_coef or return_mem_coef
     a, b, c0 = backward_feynman_kac_matrices(
         basis,
         weights,

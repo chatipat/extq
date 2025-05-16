@@ -75,12 +75,8 @@ def density3d(cv1, cv2, cv3, weights, edges1, edges2, edges3):
     """
     numer = 0.0
     for x, y, z, w in zip(cv1, cv2, cv3, weights, strict=True):
-        numer += np.histogramdd(
-            (x, y, z), bins=(edges1, edges2, edges3), weights=w
-        )[0]
-    denom = np.einsum(
-        "i,j,k->ijk", np.diff(edges1), np.diff(edges2), np.diff(edges3)
-    )
+        numer += np.histogramdd((x, y, z), bins=(edges1, edges2, edges3), weights=w)[0]
+    denom = np.einsum("i,j,k->ijk", np.diff(edges1), np.diff(edges2), np.diff(edges3))
     return numer / denom
 
 
@@ -172,7 +168,5 @@ def average3d(cv1, cv2, cv3, func, weights, edges1, edges2, edges3):
         numer += np.histogramdd(
             (x, y, z), bins=(edges1, edges2, edges3), weights=f * w
         )[0]
-        denom += np.histogramdd(
-            (x, y, z), bins=(edges1, edges2, edges3), weights=w
-        )[0]
+        denom += np.histogramdd((x, y, z), bins=(edges1, edges2, edges3), weights=w)[0]
     return numer / denom

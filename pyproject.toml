@@ -78,11 +78,9 @@ testpaths = ["tests"]
 
 [tool.isort]
 profile = "black"
-line_length = 79
 skip_gitignore = true
 known_first_party = ["extq"]
 forced_separate = ["test_extq"]
 
 [tool.black]
-line-length = 79
 target-version = ["py310", "py311", "py312"]

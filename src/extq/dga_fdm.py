@@ -96,9 +96,7 @@ def forward_committor(
     )
 
 
-def forward_mfpt(
-    generator, basis, weights, in_domain, guess, lag, test_basis=None
-):
+def forward_mfpt(generator, basis, weights, in_domain, guess, lag, test_basis=None):
     """
     Compute the exact DGA forward mean first passage time (MFPT).
 
@@ -572,8 +570,7 @@ def _to_flat(bases, functions):
         for basis, nbasis in zip(bases, nbases)
     )
     out_functions = tuple(
-        np.ravel(np.broadcast_to(function, out_shape))
-        for function in functions
+        np.ravel(np.broadcast_to(function, out_shape)) for function in functions
     )
 
     return out_shape, out_bases, out_functions

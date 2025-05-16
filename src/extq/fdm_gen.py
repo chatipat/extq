@@ -251,9 +251,7 @@ def _generator_reversible_helper(transitions, u, kT, ind, shape):
     data = np.concatenate(data)
     row_ind = np.concatenate(row_ind)
     col_ind = np.concatenate(col_ind)
-    return sp.sparse.csr_matrix(
-        (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
-    )
+    return sp.sparse.csr_matrix((data, (row_ind, col_ind)), shape=(p0.size, p0.size))
 
 
 def generator_irreversible_1d(drift, diffusion, x):
@@ -290,9 +288,7 @@ def generator_irreversible_1d(drift, diffusion, x):
     return _generator_irreversible_helper(transitions, ind, shape)
 
 
-def generator_irreversible_2d(
-    drift_x, drift_y, diffusion_x, diffusion_y, x, y
-):
+def generator_irreversible_2d(drift_x, drift_y, diffusion_x, diffusion_y, x, y):
     """Compute the generator matrix for an irreversible 2D potential.
 
     Parameters
@@ -402,6 +398,4 @@ def _generator_irreversible_helper(transitions, ind, shape):
     data = np.concatenate(data)
     row_ind = np.concatenate(row_ind)
     col_ind = np.concatenate(col_ind)
-    return sp.sparse.csr_matrix(
-        (data, (row_ind, col_ind)), shape=(p0.size, p0.size)
-    )
+    return sp.sparse.csr_matrix((data, (row_ind, col_ind)), shape=(p0.size, p0.size))

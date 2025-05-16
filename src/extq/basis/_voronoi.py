@@ -18,6 +18,4 @@ def voronoi_labels(cvs, centers):
         Index of the nearest center at each frame.
 
     """
-    return [
-        sklearn.metrics.pairwise_distances_argmin(vs, centers) for vs in cvs
-    ]
+    return [sklearn.metrics.pairwise_distances_argmin(vs, centers) for vs in cvs]

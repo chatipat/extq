@@ -183,9 +183,7 @@ def kmeans1d_basis(cv, num, *, sparse=True, in_domain=None, **kwargs):
         Basis of indicator functions.
 
     """
-    return kmeans_basis(
-        _stack(cv), num, sparse=sparse, in_domain=in_domain, **kwargs
-    )
+    return kmeans_basis(_stack(cv), num, sparse=sparse, in_domain=in_domain, **kwargs)
 
 
 def kmeans2d_basis(cv1, cv2, num, *, sparse=True, in_domain=None, **kwargs):
@@ -217,9 +215,7 @@ def kmeans2d_basis(cv1, cv2, num, *, sparse=True, in_domain=None, **kwargs):
     )
 
 
-def kmeans3d_basis(
-    cv1, cv2, cv3, num, *, sparse=True, in_domain=None, **kwargs
-):
+def kmeans3d_basis(cv1, cv2, cv3, num, *, sparse=True, in_domain=None, **kwargs):
     """
     Construct a basis of indicator functions within a specified domain
     in a 3D collective variable space using k-means.

@@ -42,9 +42,7 @@ def labels_to_basis(labels, num=None, *, sparse=True, in_domain=None):
             basis.append(_labels_to_basis(indices, num, sparse=sparse))
     else:
         for indices, mask in zip(labels, in_domain, strict=True):
-            basis.append(
-                _labels_to_basis(indices, num, sparse=sparse, mask=mask)
-            )
+            basis.append(_labels_to_basis(indices, num, sparse=sparse, mask=mask))
     return basis
 
 

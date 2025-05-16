@@ -334,9 +334,7 @@ def _time_lagged_aftcast(values, in_domain, function, lag):
     return out
 
 
-def _affine_projection_coef_distribution(
-    values, basis, origin, *, test_basis=None
-):
+def _affine_projection_coef_distribution(values, basis, origin, *, test_basis=None):
     if test_basis is None:
         test_basis = basis
 
@@ -356,9 +354,7 @@ def _affine_projection_coef_distribution(
     return linalg.solve(a, b)
 
 
-def _affine_projection_coef(
-    values, basis, weights, origin, *, test_basis=None
-):
+def _affine_projection_coef(values, basis, weights, origin, *, test_basis=None):
     if test_basis is None:
         test_basis = basis
 
@@ -367,9 +363,7 @@ def _affine_projection_coef(
     a = 0.0
     b = 0.0
 
-    for x, y, w, g, u in zip(
-        test_basis, basis, weights, origin, values, strict=True
-    ):
+    for x, y, w, g, u in zip(test_basis, basis, weights, origin, values, strict=True):
         n_frames = len(w)
         assert x.shape == y.shape == (n_frames, n_basis)
         assert w.shape == g.shape == u.shape == (n_frames,)

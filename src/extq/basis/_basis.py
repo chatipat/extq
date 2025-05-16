@@ -114,8 +114,7 @@ def add_constant_feature(trajs):
 
     """
     return [
-        np.concatenate((x, np.ones((len(x), 1), dtype=x.dtype)), axis=-1)
-        for x in trajs
+        np.concatenate((x, np.ones((len(x), 1), dtype=x.dtype)), axis=-1) for x in trajs
     ]
 
 

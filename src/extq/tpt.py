@@ -132,9 +132,7 @@ def density(forward_q, backward_q, weights, in_domain, lag, *, normalize=True):
     if normalize:
         weights = normalize_weights(weights)
     out = []
-    for qp, qm, w, d in zip(
-        forward_q, backward_q, weights, in_domain, strict=True
-    ):
+    for qp, qm, w, d in zip(forward_q, backward_q, weights, in_domain, strict=True):
         n_frames = w.shape[0]
         assert qp.shape == (n_frames,)
         assert qm.shape == (n_frames,)
@@ -152,9 +150,7 @@ def density(forward_q, backward_q, weights, in_domain, lag, *, normalize=True):
     return out
 
 
-def current(
-    forward_q, backward_q, weights, in_domain, cv, lag, *, normalize=True
-):
+def current(forward_q, backward_q, weights, in_domain, cv, lag, *, normalize=True):
     """Estimate the reactive current at each frame.
 
     Parameters
@@ -244,9 +240,7 @@ def rate_jstrahan(forward_q, backward_q, weights, in_domain, lag):
     """
     numer = 0.0
     denom = lag * sum(np.sum(w) for w in weights)
-    for qp, qm, w, d in zip(
-        forward_q, backward_q, weights, in_domain, strict=True
-    ):
+    for qp, qm, w, d in zip(forward_q, backward_q, weights, in_domain, strict=True):
         assert np.all(w[-lag:] == 0.0)
         tp = np.minimum(np.arange(lag, len(w)), forward_stop(d)[:-lag])
         numer += np.sum(w[:-lag] * qm[:-lag] * qp[tp] * (qp[tp] - qp[:-lag]))

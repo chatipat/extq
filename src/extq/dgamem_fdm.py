@@ -37,9 +37,7 @@ def reweight(
     return_coef=False,
     return_mem_coef=False,
 ):
-    assert (
-        return_projection or return_solution or return_coef or return_mem_coef
-    )
+    assert return_projection or return_solution or return_coef or return_mem_coef
     a, b, c0 = reweight_matrices(
         generator, basis, weights, lag, mem, test_basis=test_basis
     )
@@ -49,9 +47,7 @@ def reweight(
         out.append(reweight_projection(basis, weights, coef))
     if return_solution:
         out.append(
-            reweight_solution(
-                generator, basis, weights, lag, mem, coef, mem_coef
-            )
+            reweight_solution(generator, basis, weights, lag, mem, coef, mem_coef)
         )
     if return_coef:
         out.append(coef)
@@ -187,9 +183,7 @@ def forward_feynman_kac(
     return_coef=False,
     return_mem_coef=False,
 ):
-    assert (
-        return_projection or return_solution or return_coef or return_mem_coef
-    )
+    assert return_projection or return_solution or return_coef or return_mem_coef
     a, b, c0 = forward_feynman_kac_matrices(
         generator,
         basis,
@@ -377,9 +371,7 @@ def backward_feynman_kac(
     return_coef=False,
     return_mem_coef=False,
 ):
-    assert (
-        return_projection or return_solution or return_coef or return_mem_coef
-    )
+    assert return_projection or return_solution or return_coef or return_mem_coef
     a, b, c0 = backward_feynman_kac_matrices(
         generator,
         basis,
@@ -494,9 +486,7 @@ def backward_feynman_kac_solution(
     coef,
     mem_coef,
 ):
-    shape, [y], [w, d, f, g] = _to_flat(
-        [basis], [weights, in_domain, function, guess]
-    )
+    shape, [y], [w, d, f, g] = _to_flat([basis], [weights, in_domain, function, guess])
     dlag = lag / (mem + 1)
 
     L = generator.T
@@ -620,8 +610,7 @@ def _to_flat(bases, functions):
         for basis, nbasis in zip(bases, nbases)
     )
     out_functions = tuple(
-        np.ravel(np.broadcast_to(function, out_shape))
-        for function in functions
+        np.ravel(np.broadcast_to(function, out_shape)) for function in functions
     )
 
     return out_shape, out_bases, out_functions

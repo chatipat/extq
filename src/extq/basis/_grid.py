@@ -152,9 +152,7 @@ def grid2d_basis(cv1, cv2, edges1, edges2, *, sparse=True, in_domain=None):
     return labels_to_basis(labels, num, sparse=sparse, in_domain=in_domain)
 
 
-def grid3d_basis(
-    cv1, cv2, cv3, edges1, edges2, edges3, *, sparse=True, in_domain=None
-):
+def grid3d_basis(cv1, cv2, cv3, edges1, edges2, edges3, *, sparse=True, in_domain=None):
     """
     Construct a basis of indicator functions on a 3D grid within a
     specified domain.

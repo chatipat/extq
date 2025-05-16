@@ -25,10 +25,12 @@ def sum_windows(a, start, end):
         Sum of the elements within each window.
 
     """
-    c = np.concatenate([
-        np.zeros((1, *a.shape[1:]), a.dtype),
-        np.cumsum(a, axis=0),
-    ])
+    c = np.concatenate(
+        [
+            np.zeros((1, *a.shape[1:]), a.dtype),
+            np.cumsum(a, axis=0),
+        ]
+    )
     return c[end] - c[start]
 
 

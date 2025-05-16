@@ -140,9 +140,7 @@ def integral(generator, forward_q, backward_q, weights, *, normalize=True):
     return out
 
 
-def pointwise_integral(
-    generator, forward_q, backward_q, weights, *, normalize=True
-):
+def pointwise_integral(generator, forward_q, backward_q, weights, *, normalize=True):
     """Calculate the contribution of each point to a TPT integral.
 
     Parameter

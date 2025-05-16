@@ -141,9 +141,7 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
     a = generator[d, :][:, d]
     b = -generator[d, :] @ g - f[d]
     coeffs = sp.sparse.linalg.spsolve(a, b)
-    return (g + sp.sparse.identity(size, format="csr")[:, d] @ coeffs).reshape(
-        shape
-    )
+    return (g + sp.sparse.identity(size, format="csr")[:, d] @ coeffs).reshape(shape)
 
 
 def backward_feynman_kac(generator, weights, in_domain, function, guess):
@@ -170,9 +168,7 @@ def backward_feynman_kac(generator, weights, in_domain, function, guess):
     """
     w, d, f, g = np.broadcast_arrays(weights, in_domain, function, guess)
     pi = np.ravel(w)
-    adjoint_generator = (
-        sp.sparse.diags(1.0 / pi) @ generator.T @ sp.sparse.diags(pi)
-    )
+    adjoint_generator = sp.sparse.diags(1.0 / pi) @ generator.T @ sp.sparse.diags(pi)
     return forward_feynman_kac(adjoint_generator, w, d, f, g)
 
 

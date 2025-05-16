@@ -217,9 +217,7 @@ def spbroadcast(input_shape, output_shape, dtype=float):
         np.arange(input_size).reshape(input_shape), output_shape
     ).reshape(output_size)
     cols = np.arange(output_size)
-    return sp.sparse.coo_matrix(
-        (data, (rows, cols)), shape=(input_size, output_size)
-    )
+    return sp.sparse.coo_matrix((data, (rows, cols)), shape=(input_size, output_size))
 
 
 def spmoveaxis(shape, source, destination, dtype=float):
@@ -245,9 +243,9 @@ def spmoveaxis(shape, source, destination, dtype=float):
     """
     size = np.prod(shape)
     data = np.ones(size, dtype=dtype)
-    rows = np.moveaxis(
-        np.arange(size).reshape(shape), source, destination
-    ).reshape(size)
+    rows = np.moveaxis(np.arange(size).reshape(shape), source, destination).reshape(
+        size
+    )
     cols = np.arange(size)
     return sp.sparse.coo_matrix((data, (rows, cols)), shape=(size, size))
 

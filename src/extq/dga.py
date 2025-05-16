@@ -16,9 +16,7 @@ __all__ = [
 ]
 
 
-def reweight(
-    basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=True
-):
+def reweight(basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=True):
     """Estimate the change of measure to the invariant distribution.
 
     Parameters
