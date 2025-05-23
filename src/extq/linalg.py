@@ -18,6 +18,72 @@ def block_diag(mats, format="array"):
         return sp.linalg.block_diag(*arrs)
 
 
+def batched_block(blocks):
+    n1 = len(blocks)
+    n2 = len(blocks[0])
+    assert all(len(b) == n2 for b in blocks)
+
+    dtypes = []
+    batch_dims = []
+    k1 = [None] * n1
+    k2 = [None] * n2
+    for i in range(n1):
+        for j in range(n2):
+            a = blocks[i][j]
+            if a is not None:
+                dtypes.append(a.dtype)
+                batch_dims.append(a.shape[:-2])
+                if k1[i] is None:
+                    k1[i] = a.shape[-2]
+                if k2[j] is None:
+                    k2[j] = a.shape[-1]
+                assert k1[i] == a.shape[-2]
+                assert k2[j] == a.shape[-1]
+    dtype = np.result_type(*dtypes)
+    batch_dims = np.broadcast_shapes(*batch_dims)
+    assert None not in k1
+    assert None not in k2
+    k1 = np.array(k1)
+    k2 = np.array(k2)
+
+    offset1 = np.concatenate([[0], np.cumsum(k1)])
+    offset2 = np.concatenate([[0], np.cumsum(k2)])
+    out = np.zeros((*batch_dims, offset1[-1], offset2[-1]), dtype=dtype)
+    for i in range(n1):
+        for j in range(n2):
+            a = blocks[i][j]
+            if a is not None:
+                out[..., offset1[i] : offset1[i + 1], offset2[j] : offset2[j + 1]] = a
+    return out
+
+
+def batched_block_diag(*arrs):
+    assert all(a.ndim >= 2 for a in arrs)
+    shape = np.broadcast_shapes(*[a.shape[:-2] for a in arrs])
+    k1 = np.sum([a.shape[-2] for a in arrs])
+    k2 = np.sum([a.shape[-1] for a in arrs])
+    dtype = np.result_type(*[a.dtype for a in arrs])
+
+    out = np.zeros((*shape, k1, k2), dtype=dtype)
+    r = 0
+    c = 0
+    for a in arrs:
+        out[..., r : r + a.shape[-2], c : c + a.shape[-1]] = a
+        r += a.shape[-2]
+        c += a.shape[-1]
+    assert r == k1 and c == k2
+
+    return out
+
+
+def batched_kron(arr1, arr2):
+    m1, n1 = arr1.shape[-2:]
+    m2, n2 = arr2.shape[-2:]
+    out = arr1[..., :, None, :, None] * arr2[..., None, :, None, :]
+    out = out.reshape(*out.shape[:-4], m1 * m2, n1 * n2)
+    return out
+
+
 def inv(a):
     if sp.sparse.issparse(a):
         return sp.sparse.linalg.inv(a)
