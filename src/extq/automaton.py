@@ -150,3 +150,12 @@ def prune(automaton):
         transitions = transitions[:, mask, :][:, :, mask]
         final = final[mask]
         epsilon_transition = epsilon_transition[mask, :][:, mask]
+
+
+def eliminate_epsilon_transition(automaton):
+    eps = automaton.epsilon_transition
+    eps_star = np.linalg.inv(np.identity(len(eps), dtype=eps.dtype) - eps)
+    initial = automaton.initial @ eps_star
+    transitions = automaton.transitions @ eps_star
+    final = automaton.final
+    return Automaton(initial, transitions, final)
