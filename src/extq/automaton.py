@@ -145,7 +145,7 @@ def prune(automaton):
         )
         mask = nonzero_rows & nonzero_cols
         if np.all(mask):
-            return Automaton(initial, transitions, final)
+            return Automaton(initial, transitions, final, epsilon_transition)
         initial = initial[mask]
         transitions = transitions[:, mask, :][:, :, mask]
         final = final[mask]
