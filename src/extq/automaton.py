@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 
 from . import linalg
 
@@ -159,3 +160,57 @@ def eliminate_epsilon_transition(automaton):
     transitions = automaton.transitions @ eps_star
     final = automaton.final
     return Automaton(initial, transitions, final)
+
+
+def optimize(automaton, rcond=None):
+    automaton = eliminate_epsilon_transition(automaton)
+    initial = automaton.initial
+    transitions = automaton.transitions
+    final = automaton.final
+
+    # accessible span of rows and columns
+    row_span = _multi_krylov_span(transitions, final[:, None], rcond=rcond)
+    col_span = _multi_krylov_span(
+        np.moveaxis(transitions, 1, 2), initial[:, None], rcond=rcond
+    )
+
+    # orthonormalize to make row_proj and col_proj more balanced
+    row_span, _ = sp.linalg.qr(row_span, mode="economic")
+    col_span, _ = sp.linalg.qr(col_span, mode="economic")
+
+    # intersection of row and column spans
+    cov = row_span.T @ col_span
+    u, s, vh = sp.linalg.svd(cov, full_matrices=False)
+    if rcond is None:
+        rcond = np.max(cov.shape) * np.finfo(s.dtype).eps
+    tol = np.max(s) * rcond
+    num = np.sum(s > tol)
+    # col_proj @ row_proj.T is a projection matrix
+    col_proj = row_span @ (u[:, :num] / np.sqrt(s[:num]))
+    row_proj = col_span @ (vh.T[:, :num] / np.sqrt(s[:num]))
+
+    initial = initial @ col_proj
+    transitions = row_proj.T @ transitions @ col_proj
+    final = final @ row_proj
+    return Automaton(initial, transitions, final)
+
+
+def _multi_krylov_span(mats, basis, rcond=None):
+    n, k, _ = mats.shape
+    rank = 0
+    while basis.shape[1] != rank:
+        rank = basis.shape[1]
+        image_basis = np.moveaxis(mats @ basis, 1, 0)
+        image_basis = image_basis.reshape(k, n * rank)
+        basis = np.concatenate([basis, image_basis], axis=1)
+        basis = _remove_dependent_columns(basis, rcond=rcond)
+    return basis
+
+
+def _remove_dependent_columns(a, rcond=None):
+    r, p = sp.linalg.qr(a, mode="r", pivoting=True)
+    if rcond is None:
+        rcond = np.max(a.shape) * np.finfo(r.dtype).eps
+    tol = np.max(np.abs(a), initial=0.0) * rcond
+    rank = np.sum(np.abs(np.diag(r)) > tol)
+    return a[:, p[:rank]]
