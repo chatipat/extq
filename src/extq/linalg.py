@@ -76,11 +76,29 @@ def batched_block_diag(*arrs):
     return out
 
 
-def batched_kron(arr1, arr2):
-    m1, n1 = arr1.shape[-2:]
-    m2, n2 = arr2.shape[-2:]
-    out = arr1[..., :, None, :, None] * arr2[..., None, :, None, :]
-    out = out.reshape(*out.shape[:-4], m1 * m2, n1 * n2)
+def batched_kron(arr1, arr2, axis=(-2, -1)):
+    slice1 = []
+    slice2 = []
+    n = 0
+    shape = []
+    for i, is_kron_axis in enumerate(np.bincount(-np.unique(axis) - 1).astype(bool)):
+        if is_kron_axis:
+            slice1.append(None)
+            slice1.append(slice(None))
+            slice2.append(slice(None))
+            slice2.append(None)
+            n += 2
+            shape.append(arr1.shape[-i - 1] * arr2.shape[-i - 1])
+        else:
+            slice1.append(slice(None))
+            slice2.append(slice(None))
+            n += 1
+            shape.append(np.broadcast_shapes(arr1.shape[-i - 1], arr2.shape[-i - 1])[0])
+    slice1 = (..., *slice1[::-1])
+    slice2 = (..., *slice2[::-1])
+    shape = tuple(shape[::-1])
+    out = arr1[slice1] * arr2[slice2]
+    out = out.reshape(*out.shape[:-n], *shape)
     return out
 
 
