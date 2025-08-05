@@ -167,15 +167,15 @@ def _stationary_distribution_matrices(
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
 
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
+        t0 = np.flatnonzero(w)  # start of window
+        if len(t0) == 0:
             continue
-        ix = iw  # initial time
-        iy = ix + lag1  # final time
-        assert iy[-1] < n_frames  # all times < n_frames
+        t1 = t0 + lag1
+        t2 = t0 + lag2
+        assert t2[-1] < n_frames
 
-        wdx = linalg.scale_rows(w[iw], x[iy] - x[ix])
-        a += wdx.T @ y[iw]
+        wdx = linalg.scale_rows(w[t0], x[t2] - x[t1])
+        a += wdx.T @ y[t0]
         b += np.ravel(wdx.sum(axis=0))
     return a, b
 
