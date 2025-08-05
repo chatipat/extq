@@ -3,7 +3,12 @@
 import numpy as np
 
 from . import linalg
-from ._utils import sum_windows
+from ._utils import (
+    backward_feynman_kac_propagate,
+    distribution_propagate,
+    forward_feynman_kac_propagate,
+    sum_windows,
+)
 from .stop import backward_stop, forward_stop
 
 __all__ = [
@@ -232,18 +237,11 @@ def reweight_solution(basis, weights, lag, mem, coef, mem_coef):
         assert y.shape == (n_frames, n_basis)
         assert w.shape == (n_frames,)
 
-        if n_frames <= lag:
-            assert np.all(w == 0.0)
-            out.append(np.zeros(n_frames))
-            continue
-        assert np.all(w[-lag:] == 0.0)
-
-        pad = np.zeros(dlag)
         u = w * (y @ coef + 1.0)
         for v in mem_coef:
-            u = np.concatenate([pad, u[:-dlag]])
+            u = distribution_propagate(u, dlag)
             u -= w * (y @ v)
-        u = np.concatenate([pad, u[:-dlag]])
+        u = distribution_propagate(u, dlag)
         out.append(u)
     return out
 
@@ -653,19 +651,11 @@ def forward_feynman_kac_solution(
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
 
-        if n_frames <= lag:
-            out.append(np.full(n_frames, np.nan))
-            continue
-
-        stop = np.minimum(np.arange(dlag, len(d)), forward_stop(d)[:-dlag])
-        intf = np.insert(np.cumsum(f), 0, 0.0)
-        r = intf[stop] - intf[:-dlag]
-        pad = np.full(dlag, np.nan)
         u = y @ coef + g
         for v in mem_coef:
-            u = np.concatenate([u[stop] + r, pad])
+            u = forward_feynman_kac_propagate(u, d, f, dlag)
             u -= y @ v
-        u = np.concatenate([u[stop] + r, pad])
+        u = forward_feynman_kac_propagate(u, d, f, dlag)
         out.append(u)
     return out
 
@@ -1082,19 +1072,11 @@ def backward_feynman_kac_solution(
         assert f.shape == (n_frames - 1,)
         assert g.shape == (n_frames,)
 
-        if n_frames <= lag:
-            out.append(np.full(n_frames, np.nan))
-            continue
-
-        stop = np.maximum(np.arange(len(d) - dlag), backward_stop(d)[dlag:])
-        intf = np.insert(np.cumsum(f), 0, 0.0)
-        r = intf[dlag:] - intf[stop]
-        pad = np.full(dlag, np.nan)
         u = y @ coef + g
         for v in mem_coef:
-            u = np.concatenate([pad, u[stop] + r])
+            u = backward_feynman_kac_propagate(u, d, f, dlag)
             u -= y @ v
-        u = np.concatenate([pad, u[stop] + r])
+        u = backward_feynman_kac_propagate(u, d, f, dlag)
         out.append(u)
     return out
 

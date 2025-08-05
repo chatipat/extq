@@ -3,7 +3,12 @@
 import numpy as np
 
 from . import linalg, utils
-from ._utils import sum_windows
+from ._utils import (
+    backward_feynman_kac_propagate,
+    distribution_propagate,
+    forward_feynman_kac_propagate,
+    sum_windows,
+)
 from .stop import backward_stop, forward_stop
 from .utils import normalize_weights, uniform_weights
 
@@ -264,72 +269,27 @@ def _aftcast_matrices(
 
 
 def _time_lagged_stationary_distribution(values, lag):
-    assert lag >= 0
     out = []
     for u0 in values:
-        (n_frames,) = u0.shape
-        u1 = np.zeros(n_frames)
-        t0 = np.flatnonzero(u0)
-        if len(t0) > 0:
-            t1 = t0 + lag
-            assert t1[-1] < n_frames
-            u1[t1] = u0[t0]
+        u1 = distribution_propagate(u0, lag)
         out.append(u1)
     return out
 
 
 def _time_lagged_forecast(values, in_domain, function, lag):
     function = _broadcast_integrand(function, values)
-
-    assert lag >= 0
-
     out = []
     for u0, d, f in zip(values, in_domain, function, strict=True):
-        n_frames = len(u0)
-        assert u0.shape == d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-
-        # frames beyond endpoints of trajectory are nan
-        u1 = np.full(n_frames, np.nan)
-
-        if n_frames > lag:
-            t0 = np.arange(n_frames)
-            t1 = np.minimum(t0 + lag, forward_stop(d))
-
-            mask = t1 < n_frames
-            t0 = t0[mask]
-            t1 = t1[mask]
-
-            u1[t0] = u0[t1] + sum_windows(f, t0, t1)
-
+        u1 = forward_feynman_kac_propagate(u0, d, f, lag)
         out.append(u1)
     return out
 
 
 def _time_lagged_aftcast(values, in_domain, function, lag):
     function = _broadcast_integrand(function, values)
-
-    assert lag >= 0
-
     out = []
     for u0, d, f in zip(values, in_domain, function, strict=True):
-        n_frames = len(u0)
-        assert u0.shape == d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-
-        # frames beyond endpoints of trajectory are nan
-        u1 = np.full(n_frames, np.nan)
-
-        if n_frames > lag:
-            t0 = np.arange(n_frames)
-            t1 = np.maximum(t0 - lag, backward_stop(d))
-
-            mask = t1 >= 0
-            t0 = t0[mask]
-            t1 = t1[mask]
-
-            u1[t0] = u0[t1] + sum_windows(f, t1, t0)
-
+        u1 = backward_feynman_kac_propagate(u0, d, f, lag)
         out.append(u1)
     return out
 

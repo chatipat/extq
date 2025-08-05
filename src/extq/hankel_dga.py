@@ -1,7 +1,12 @@
 import numpy as np
 
 from . import linalg
-from ._utils import sum_windows
+from ._utils import (
+    backward_feynman_kac_propagate,
+    distribution_propagate,
+    forward_feynman_kac_propagate,
+    sum_windows,
+)
 from .stop import backward_stop, forward_stop
 from .utils import normalize_weights, uniform_weights
 
@@ -102,13 +107,10 @@ def _reweight_transform(basis, guess, delay, coef):
     for y, w in zip(basis, guess, strict=True):
         n_frames = len(w)
         u = np.zeros(n_frames)
-        ix = np.flatnonzero(w)
         for n in range(n_blocks):
             lag = delay * n
-            iy = ix + lag
-            assert iy[-1] < n_frames
             w0 = w * (1.0 + y @ coef[n])
-            u[iy] += w0[ix]
+            u += distribution_propagate(w0, lag)
         out.append(u)
     return out
 
@@ -287,18 +289,11 @@ def _forward_transform(basis, in_domain, function, guess, delay, coef):
     out = []
     for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
         n_frames = len(d)
-        s = forward_stop(d)
         u = np.zeros(n_frames)
         for n in range(n_blocks):
             lag = delay * n
-            ix = np.arange(n_frames)
-            iy = np.minimum(ix + lag, s)
-            mask = iy < n_frames
-            ix = ix[mask]
-            iy = iy[mask]
             u0 = g + y @ coef[n]
-            u[mask] += u0[iy] + sum_windows(f, ix, iy)
-            u[~mask] = np.nan
+            u += forward_feynman_kac_propagate(u0, d, f, lag)
         out.append(u)
     return out
 
@@ -478,18 +473,11 @@ def _backward_transform(basis, in_domain, function, guess, delay, coef):
     out = []
     for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
         n_frames = len(d)
-        s = backward_stop(d)
         u = np.zeros(n_frames)
         for n in range(n_blocks):
             lag = delay * n
-            ix = np.arange(n_frames)
-            iy = np.maximum(ix - lag, s)
-            mask = iy >= 0
-            ix = ix[mask]
-            iy = iy[mask]
             u0 = g + y @ coef[n]
-            u[mask] += u0[iy] + sum_windows(f, iy, ix)
-            u[~mask] = np.nan
+            u += backward_feynman_kac_propagate(u0, d, f, lag)
         out.append(u)
     return out
 

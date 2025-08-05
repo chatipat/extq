@@ -1,6 +1,8 @@
 import numpy as np
 import scipy as sp
 
+from .stop import backward_stop, forward_stop
+
 
 def sum_windows(a, start, end):
     r"""
@@ -160,3 +162,70 @@ def weighted_lagged_covariance(x, y, w, lag_w):
     xt = sp.signal.fftconvolve(x, lag_w[:, None], axes=0)[:-maxlag]
     yt = sp.signal.fftconvolve(y, lag_w[::-1, None], axes=0)[maxlag:]
     return x.T * wx @ yt - xt.T * wy @ y
+
+
+def distribution_propagate(w, lag):
+    assert lag >= 0
+    (n,) = w.shape
+    out = np.zeros(n)
+    ix = np.flatnonzero(w)
+    iy = ix + lag
+    assert iy[-1] < lag
+    out[iy] = w[ix]
+    return out
+
+
+def forward_propagate(u, lag):
+    assert lag >= 0
+    (n,) = u.shape
+    # frames beyond endpoints of trajectory are nan
+    out = np.full(n, np.nan)
+    if n <= lag:
+        return out
+    out[: n - lag] = u[lag:]
+    return out
+
+
+def backward_propagate(u, lag):
+    assert lag >= 0
+    (n,) = u.shape
+    # frames beyond endpoints of trajectory are nan
+    out = np.full(n, np.nan)
+    if n <= lag:
+        return out
+    out[lag:] = u[: n - lag]
+    return out
+
+
+def forward_feynman_kac_propagate(u, d, f, lag):
+    assert lag >= 0
+    n = len(u)
+    assert u.shape == (n,)
+    assert d.shape == (n,)
+    assert f.shape == (n - 1,)
+    ix = np.arange(n)
+    iy = np.minimum(ix + lag, forward_stop(d))
+    mask = iy < n
+    ix = ix[mask]
+    iy = iy[mask]
+    # frames beyond endpoints of trajectory are nan
+    out = np.full(n, np.nan)
+    out[ix] = u[iy] + sum_windows(f, ix, iy)
+    return out
+
+
+def backward_feynman_kac_propagate(u, d, f, lag):
+    assert lag >= 0
+    n = len(u)
+    assert u.shape == (n,)
+    assert d.shape == (n,)
+    assert f.shape == (n - 1,)
+    ix = np.arange(n)
+    iy = np.maximum(ix - lag, backward_stop(d))
+    mask = iy >= 0
+    ix = ix[mask]
+    iy = iy[mask]
+    # frames beyond endpoints of trajectory are nan
+    out = np.full(n, np.nan)
+    out[ix] = u[iy] + sum_windows(f, iy, ix)
+    return out
