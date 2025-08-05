@@ -6,6 +6,19 @@ def as_dense(a):
     return a.toarray() if sp.sparse.issparse(a) else a
 
 
+def block(blocks, format=None):
+    if format is None:
+        if not any(sp.sparse.issparse(a) for row in blocks for a in row):
+            format = "array"
+
+    if format == "array":
+        return batched_block(blocks)
+    else:
+        if format == "sparse":
+            format = None
+        return sp.sparse.block_array(blocks, format=format)
+
+
 def block_diag(mats, format="array"):
     if format != "array":
         return sp.sparse.block_diag(mats, format=format)
