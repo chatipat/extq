@@ -138,7 +138,7 @@ def forward_feynman_kac(generator, weights, in_domain, function, guess):
     f = np.ravel(f)
     g = np.ravel(g)
 
-    a = generator[d, :][:, d]
+    a = generator[np.ix_(d, d)]
     b = -generator[d, :] @ g - f[d]
     coeffs = sp.sparse.linalg.spsolve(a, b)
     return (g + sp.sparse.eye_array(size, format="csr")[:, d] @ coeffs).reshape(shape)
@@ -194,7 +194,7 @@ def reweight(generator):
     mask = np.full(generator.shape[0], True)
     mask[fixed_index] = False
 
-    a = generator.T[mask, :][:, mask]
+    a = generator.T[np.ix_(mask, mask)]
     b = -generator.T[mask, fixed_index]
     coeffs = sp.sparse.linalg.spsolve(a, b)
 
