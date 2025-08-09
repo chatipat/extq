@@ -112,7 +112,7 @@ def aftcast(
     test_basis=None,
 ):
     # shift weights because time 0 is at end of window
-    weights = utils.shift_weights(weights, 0, lag2)
+    weights = utils.shift_weights(weights, lag2)
 
     # solve DGA for coef
     a, b = _aftcast_matrices(

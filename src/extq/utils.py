@@ -47,33 +47,33 @@ def uniform_weights(trajs, maxlag, *, normalize=True):
     return weights
 
 
-def shift_weights(weights, lag, maxlag):
-    """Convert weights for length maxlag short trajectories to
-    right-aligned length lag short trajectories.
+def shift_weights(weights, lag):
+    """
+    Shift weights forward in time by a specified lag.
 
     Parameters
     ----------
     weights : list of (n_frames[i],) ndarray of float
         Change of measure to the invariant distribution for each frame.
-        The last maxlag frames must be zero.
+        The last `lag` frames in each trajectory must be zero.
     lag : int
-        New length of short trajectories, in units of frames.
-    maxlag : int
-        Original length of short trajectories, in units of frames.
+        Number of frames to shift the weights forward.
 
     Returns
     -------
     list of (n_frames[i],) ndarray of float
-        New change of measure to the invariant distribution for each
-        frame. The last lag frames are zero.
+        Change of measure to the invariant distribution after shifting.
 
     """
-    assert 0 <= lag <= maxlag
+    assert lag >= 0
     result = []
     for w in weights:
         (n_frames,) = w.shape
-        assert np.all(w[max(0, n_frames - maxlag) :] == 0.0)
-        new_w = np.roll(w, maxlag - lag)
+        t0 = np.flatnonzero(w)
+        t1 = t0 + lag
+        assert t1[-1] < n_frames
+        new_w = np.zeros_like(w)
+        new_w[t1] = w[t0]
         result.append(new_w)
     return result
 
