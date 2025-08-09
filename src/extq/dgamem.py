@@ -2,14 +2,13 @@
 
 import numpy as np
 
-from . import linalg
+from . import _dgamat, linalg
 from ._utils import (
     backward_feynman_kac_propagate,
     distribution_propagate,
     forward_feynman_kac_propagate,
-    sum_windows,
 )
-from .stop import backward_stop, forward_stop
+from .utils import shift_weights
 
 __all__ = [
     "reweight",
@@ -139,37 +138,18 @@ def reweight_matrices(basis, weights, lag, mem, test_basis=None):
         Matrix of inner products of basis functions.
 
     """
-    if test_basis is None:
-        test_basis = basis
-
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
-    n_basis = basis[0].shape[1]
-
-    a = np.zeros((mem + 1, n_basis, n_basis))
-    b = np.zeros((mem + 1, n_basis))
-    c0 = np.zeros((n_basis, n_basis))
-
-    for x, y, w in zip(test_basis, basis, weights, strict=True):
-        n_frames = len(w)
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-
-        wy = linalg.scale_rows(w[iw], y[ix])
-        for n in range(mem + 1):
-            iy = ix + (n + 1) * dlag  # final time
-            assert iy[-1] < n_frames  # all times < n_frames
-            dx = (x[iy] - x[ix]).T
-            a[n] += dx @ wy
-            b[n] += dx @ w[iw]
-        c0[:] += x[ix].T @ wy
-
+    a = []
+    b = []
+    for n in range(mem + 1):
+        lag = (n + 1) * dlag
+        a_n, b_n = _dgamat.reweight_matrices(basis, lag, weights, test_basis=test_basis)
+        a.append(linalg.as_dense(a_n))
+        b.append(linalg.as_dense(b_n))
+    a = np.array(a)
+    b = np.array(b)
+    c0 = linalg.as_dense(_dgamat.gram_matrix(basis, weights, test_basis=test_basis))
     return a, b, c0
 
 
@@ -537,43 +517,20 @@ def forward_feynman_kac_matrices(
         Matrix of inner products of basis functions.
 
     """
-    if test_basis is None:
-        test_basis = basis
-    function = _broadcast_integrand(function, guess)
-
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
-    n_basis = basis[0].shape[1]
-
-    a = np.zeros((mem + 1, n_basis, n_basis))
-    b = np.zeros((mem + 1, n_basis))
-    c0 = np.zeros((n_basis, n_basis))
-
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess, strict=True
-    ):
-        n_frames = len(w)
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-        stop = forward_stop(d)[ix]
-
-        xw = linalg.scale_rows(w[iw], x[ix]).T
-        for n in range(mem + 1):
-            iy = np.minimum(ix + (n + 1) * dlag, stop)  # final time
-            assert iy[-1] < n_frames  # all times < n_frames
-            a[n] += xw @ (y[iy] - y[ix])
-            b[n] += xw @ ((g[iy] - g[ix]) + sum_windows(f, ix, iy))
-        c0[:] += xw @ y[ix]
-
+    a = []
+    b = []
+    for n in range(mem + 1):
+        lag = (n + 1) * dlag
+        a_n, b_n = _dgamat.forward_feynman_kac_matrices(
+            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
+        )
+        a.append(linalg.as_dense(a_n))
+        b.append(linalg.as_dense(b_n))
+    a = np.array(a)
+    b = np.array(b)
+    c0 = linalg.as_dense(_dgamat.gram_matrix(basis, weights, test_basis=test_basis))
     return a, b, c0
 
 
@@ -958,43 +915,21 @@ def backward_feynman_kac_matrices(
         Matrix of inner products of basis functions.
 
     """
-    if test_basis is None:
-        test_basis = basis
-    function = _broadcast_integrand(function, guess)
-
     assert lag % (mem + 1) == 0
     dlag = lag // (mem + 1)
-    n_basis = basis[0].shape[1]
-
-    a = np.zeros((mem + 1, n_basis, n_basis))
-    b = np.zeros((mem + 1, n_basis))
-    c0 = np.zeros((n_basis, n_basis))
-
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess, strict=True
-    ):
-        n_frames = len(w)
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw + lag  # initial time
-        assert ix[-1] < n_frames  # all times < n_frames
-        stop = backward_stop(d)[ix]
-
-        xw = linalg.scale_rows(w[iw], x[ix]).T
-        for n in range(mem + 1):
-            iy = np.maximum(ix - (n + 1) * dlag, stop)  # final time
-            a[n] += xw @ (y[iy] - y[ix])
-            b[n] += xw @ ((g[iy] - g[ix]) + sum_windows(f, iy, ix))
-        c0[:] += xw @ y[ix]
-
+    weights = shift_weights(weights, lag)
+    a = []
+    b = []
+    for n in range(mem + 1):
+        lag = (n + 1) * dlag
+        a_n, b_n = _dgamat.backward_feynman_kac_matrices(
+            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
+        )
+        a.append(linalg.as_dense(a_n))
+        b.append(linalg.as_dense(b_n))
+    a = np.array(a)
+    b = np.array(b)
+    c0 = linalg.as_dense(_dgamat.gram_matrix(basis, weights, test_basis=test_basis))
     return a, b, c0
 
 

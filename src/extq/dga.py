@@ -1,9 +1,5 @@
-import numpy as np
-
-from . import linalg
-from ._utils import sum_windows
-from .stop import backward_stop, forward_stop
-from .utils import normalize_weights, uniform_weights
+from . import _dgamat, linalg
+from .utils import normalize_weights, shift_weights, uniform_weights
 
 __all__ = [
     "reweight",
@@ -51,32 +47,11 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=
     if maxlag is None:
         maxlag = lag
     assert 0 < lag <= maxlag
-    if test_basis is None:
-        test_basis = basis
     if guess is None:
         guess = uniform_weights(basis, maxlag)
-    n_basis = None
-    a = 0.0
-    b = 0.0
-    for x, y, w in zip(test_basis, basis, guess, strict=True):
-        n_frames = x.shape[0]
-        n_basis = x.shape[1] if n_basis is None else n_basis
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-        iy = ix + lag  # final time
-        assert iy[-1] < n_frames  # all times < n_frames
-
-        wdx = linalg.scale_rows(w[iw], x[iy] - x[ix])
-        a += wdx.T @ y[iw]
-        b -= np.ravel(wdx.sum(axis=0))
-    coeffs = linalg.solve(a, b)
-    out = [w * (y @ coeffs + 1.0) for y, w in zip(basis, guess, strict=True)]
+    a, b = _dgamat.reweight_matrices(basis, lag, guess, test_basis=test_basis)
+    coef = -linalg.solve(a, b)
+    out = [w * (y @ coef + 1.0) for y, w in zip(basis, guess, strict=True)]
     if normalize:
         out = normalize_weights(out)
     return out
@@ -195,37 +170,11 @@ def forward_feynman_kac(
         each frame of the trajectory.
 
     """
-    assert lag > 0
-    if test_basis is None:
-        test_basis = basis
-    function = _broadcast_integrand(function, guess)
-    n_basis = None
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess, strict=True
-    ):
-        n_frames = x.shape[0]
-        n_basis = x.shape[1] if n_basis is None else n_basis
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-        iy = np.minimum(ix + lag, forward_stop(d)[ix])  # final time
-        assert iy[-1] < n_frames  # all times < n_frames
-
-        wx = linalg.scale_rows(w[iw], x[ix])
-        a += wx.T @ (y[iy] - y[ix])
-        b -= wx.T @ (g[iy] - g[ix] + sum_windows(f, ix, iy))
-    coeffs = linalg.solve(a, b)
-    return transform(coeffs, basis, guess)
+    a, b = _dgamat.forward_feynman_kac_matrices(
+        basis, weights, in_domain, function, guess, lag, test_basis=test_basis
+    )
+    coef = -linalg.solve(a, b)
+    return transform(coef, basis, guess)
 
 
 def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
@@ -341,44 +290,13 @@ def backward_feynman_kac(
         each frame of the trajectory.
 
     """
-    assert lag > 0
-    if test_basis is None:
-        test_basis = basis
-    function = _broadcast_integrand(function, guess)
-    n_basis = None
-    a = 0.0
-    b = 0.0
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess, strict=True
-    ):
-        n_frames = x.shape[0]
-        n_basis = x.shape[1] if n_basis is None else n_basis
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw + lag  # initial time
-        assert ix[-1] < n_frames  # all times < n_frames
-        iy = np.maximum(ix - lag, backward_stop(d)[ix])  # final time
-
-        wx = linalg.scale_rows(w[iw], x[ix])
-        a += wx.T @ (y[iy] - y[ix])
-        b -= wx.T @ (g[iy] - g[ix] + sum_windows(f, iy, ix))
-    coeffs = linalg.solve(a, b)
-    return transform(coeffs, basis, guess)
+    weights = shift_weights(weights, lag)
+    a, b = _dgamat.backward_feynman_kac_matrices(
+        basis, weights, in_domain, function, guess, lag, test_basis=test_basis
+    )
+    coef = -linalg.solve(a, b)
+    return transform(coef, basis, guess)
 
 
-def transform(coeffs, basis, guess):
-    return [y @ coeffs + g for y, g in zip(basis, guess, strict=True)]
-
-
-def _broadcast_integrand(f, trajs):
-    if not np.iterable(f):
-        f = [np.broadcast_to(f, traj.shape[0] - 1) for traj in trajs]
-    return f
+def transform(coef, basis, guess):
+    return [y @ coef + g for y, g in zip(basis, guess, strict=True)]

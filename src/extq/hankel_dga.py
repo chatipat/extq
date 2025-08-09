@@ -1,14 +1,12 @@
 import numpy as np
 
-from . import linalg
+from . import _dgamat, linalg
 from ._utils import (
     backward_feynman_kac_propagate,
     distribution_propagate,
     forward_feynman_kac_propagate,
-    sum_windows,
 )
-from .stop import backward_stop, forward_stop
-from .utils import normalize_weights, uniform_weights
+from .utils import normalize_weights, shift_weights, uniform_weights
 
 __all__ = [
     "reweight",
@@ -64,35 +62,17 @@ def reweight(
     if maxlag is None:
         maxlag = delay * n_delays
     assert 0 < delay * n_delays <= maxlag
-    if test_basis is None:
-        test_basis = basis
     if guess is None:
         guess = uniform_weights(basis, maxlag)
-    n_basis = None
 
-    a_mats = np.zeros(n_delays, dtype=object)
-    b_mats = np.zeros(n_delays, dtype=object)
-
-    for x, y, w in zip(test_basis, basis, guess, strict=True):
-        n_frames = x.shape[0]
-        n_basis = x.shape[1] if n_basis is None else n_basis
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-
-        for n in range(n_delays):
-            # lag = 0 can be skipped because DGA matrices are zero
-            lag = delay * (n + 1)
-            iy = ix + lag  # final time
-            assert iy[-1] < n_frames  # all times < n_frames
-            wdx = linalg.scale_rows(w[iw], x[iy] - x[ix])
-            a_mats[n] += wdx.T @ y[iw]
-            b_mats[n] += np.ravel(wdx.sum(axis=0))
+    a_mats = []
+    b_mats = []
+    for n in range(n_delays):
+        # lag = 0 can be skipped because DGA matrices are zero
+        lag = delay * (n + 1)
+        a, b = _dgamat.reweight_matrices(basis, lag, guess, test_basis=test_basis)
+        a_mats.append(a)
+        b_mats.append(b)
 
     coef = _hankel_solve(a_mats, b_mats)
     out = _reweight_transform(basis, guess, delay, coef)
@@ -246,39 +226,18 @@ def forward_feynman_kac(
     """
     assert delay > 0
     assert n_delays > 0 and n_delays % 2 == 1
-    if test_basis is None:
-        test_basis = basis
     function = _broadcast_integrand(function, guess)
-    n_basis = None
 
-    a_mats = np.zeros(n_delays, dtype=object)
-    b_mats = np.zeros(n_delays, dtype=object)
-
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess, strict=True
-    ):
-        n_frames = x.shape[0]
-        n_basis = x.shape[1] if n_basis is None else n_basis
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-        s = forward_stop(d)[ix]  # stopping time
-        wx = linalg.scale_rows(w[iw], x[ix])
-        for n in range(n_delays):
-            # lag = 0 can be skipped because DGA matrices are zero
-            lag = delay * (n + 1)
-            iy = np.minimum(ix + lag, s)  # final time
-            assert iy[-1] < n_frames  # all times < n_frames
-            a_mats[n] += wx.T @ (y[iy] - y[ix])
-            b_mats[n] += wx.T @ (g[iy] - g[ix] + sum_windows(f, ix, iy))
+    a_mats = []
+    b_mats = []
+    for n in range(n_delays):
+        # lag = 0 can be skipped because DGA matrices are zero
+        lag = delay * (n + 1)
+        a, b = _dgamat.forward_feynman_kac_matrices(
+            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
+        )
+        a_mats.append(a)
+        b_mats.append(b)
 
     coef = _hankel_solve(a_mats, b_mats)
     return _forward_transform(basis, in_domain, function, guess, delay, coef)
@@ -429,40 +388,19 @@ def backward_feynman_kac(
     """
     assert delay > 0
     assert n_delays > 0 and n_delays % 2 == 1
-    max_lag = delay * n_delays
-    if test_basis is None:
-        test_basis = basis
+    weights = shift_weights(weights, delay * n_delays)
     function = _broadcast_integrand(function, guess)
-    n_basis = None
 
-    a_mats = np.zeros(n_delays, dtype=object)
-    b_mats = np.zeros(n_delays, dtype=object)
-
-    for x, y, w, d, f, g in zip(
-        test_basis, basis, weights, in_domain, function, guess, strict=True
-    ):
-        n_frames = x.shape[0]
-        n_basis = x.shape[1] if n_basis is None else n_basis
-        assert x.shape == (n_frames, n_basis)
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw + max_lag  # initial time
-        assert ix[-1] < n_frames  # all times < n_frames
-        s = backward_stop(d)[ix]  # stopping time
-        wx = linalg.scale_rows(w[iw], x[ix])
-        for n in range(n_delays):
-            # lag = 0 can be skipped because DGA matrices are zero
-            lag = delay * (n + 1)
-            iy = np.maximum(ix - lag, s)  # final time
-            a_mats[n] += wx.T @ (y[iy] - y[ix])
-            b_mats[n] += wx.T @ (g[iy] - g[ix] + sum_windows(f, iy, ix))
+    a_mats = []
+    b_mats = []
+    for n in range(n_delays):
+        # lag = 0 can be skipped because DGA matrices are zero
+        lag = delay * (n + 1)
+        a, b = _dgamat.backward_feynman_kac_matrices(
+            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
+        )
+        a_mats.append(a)
+        b_mats.append(b)
 
     coef = _hankel_solve(a_mats, b_mats)
     return _backward_transform(basis, in_domain, function, guess, delay, coef)
@@ -483,13 +421,16 @@ def _backward_transform(basis, in_domain, function, guess, delay, coef):
 
 
 def _hankel_solve(a_mats, b_mats):
+    a_mats = list(a_mats)
+    b_mats = list(b_mats)
     assert len(a_mats) == len(b_mats)
     n_delays = len(a_mats)
+    assert n_delays % 2 == 1
     n_blocks = (n_delays + 1) // 2
 
     a_diff = np.full(n_delays + 1, None)
     a_diff[0] = 0
-    a_diff[1:] = list(a_mats)
+    a_diff[1:] = a_mats
     a_diff = np.diff(a_diff)
 
     a = np.full((n_blocks, n_blocks), None)
@@ -500,7 +441,7 @@ def _hankel_solve(a_mats, b_mats):
 
     b = np.full(n_delays + 1, None)
     b[0] = 0
-    b[1:] = list(b_mats)
+    b[1:] = b_mats
     b = b[n_blocks:] - b[:n_blocks]
     b = np.concatenate(b.tolist())
 
