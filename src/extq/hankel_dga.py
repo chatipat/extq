@@ -1,12 +1,6 @@
 import numpy as np
 
-from . import _dgamat, linalg
-from ._utils import (
-    backward_feynman_kac_propagate,
-    distribution_propagate,
-    forward_feynman_kac_propagate,
-)
-from .utils import normalize_weights, shift_weights, uniform_weights
+from . import dgastat, linalg, utils
 
 __all__ = [
     "reweight",
@@ -16,6 +10,7 @@ __all__ = [
     "backward_committor",
     "backward_mfpt",
     "backward_feynman_kac",
+    "HankelDGA",
 ]
 
 
@@ -57,41 +52,16 @@ def reweight(
         trajectory.
 
     """
-    assert delay > 0
-    assert n_delays > 0 and n_delays % 2 == 1
     if maxlag is None:
         maxlag = delay * n_delays
     assert 0 < delay * n_delays <= maxlag
     if guess is None:
-        guess = uniform_weights(basis, maxlag)
-
-    a_mats = []
-    b_mats = []
-    for n in range(n_delays):
-        # lag = 0 can be skipped because DGA matrices are zero
-        lag = delay * (n + 1)
-        a, b = _dgamat.reweight_matrices(basis, lag, guess, test_basis=test_basis)
-        a_mats.append(a)
-        b_mats.append(b)
-
-    coef = _hankel_solve(a_mats, b_mats)
-    out = _reweight_transform(basis, guess, delay, coef)
+        guess = utils.uniform_weights(basis, maxlag)
+    stat = dgastat.StationaryDistribution(basis, guess, test_basis=test_basis)
+    algo = HankelDGA(delay, n_delays).fit(stat)
+    out = algo.solution(stat)
     if normalize:
-        out = normalize_weights(out)
-    return out
-
-
-def _reweight_transform(basis, guess, delay, coef):
-    n_blocks, _ = coef.shape
-    out = []
-    for y, w in zip(basis, guess, strict=True):
-        n_frames = len(w)
-        u = np.zeros(n_frames)
-        for n in range(n_blocks):
-            lag = delay * n
-            w0 = w * (1.0 + y @ coef[n])
-            u += distribution_propagate(w0, lag)
-        out.append(u)
+        out = utils.normalize_weights(out)
     return out
 
 
@@ -224,37 +194,11 @@ def forward_feynman_kac(
         each frame of the trajectory.
 
     """
-    assert delay > 0
-    assert n_delays > 0 and n_delays % 2 == 1
-    function = _broadcast_integrand(function, guess)
-
-    a_mats = []
-    b_mats = []
-    for n in range(n_delays):
-        # lag = 0 can be skipped because DGA matrices are zero
-        lag = delay * (n + 1)
-        a, b = _dgamat.forward_feynman_kac_matrices(
-            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
-        )
-        a_mats.append(a)
-        b_mats.append(b)
-
-    coef = _hankel_solve(a_mats, b_mats)
-    return _forward_transform(basis, in_domain, function, guess, delay, coef)
-
-
-def _forward_transform(basis, in_domain, function, guess, delay, coef):
-    n_blocks, _ = coef.shape
-    out = []
-    for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
-        n_frames = len(d)
-        u = np.zeros(n_frames)
-        for n in range(n_blocks):
-            lag = delay * n
-            u0 = g + y @ coef[n]
-            u += forward_feynman_kac_propagate(u0, d, f, lag)
-        out.append(u)
-    return out
+    stat = dgastat.ForwardFeynmanKac(
+        basis, weights, in_domain, function, guess, test_basis=test_basis
+    )
+    algo = HankelDGA(delay, n_delays).fit(stat)
+    return algo.solution(stat)
 
 
 def backward_committor(
@@ -386,38 +330,123 @@ def backward_feynman_kac(
         each frame of the trajectory.
 
     """
-    assert delay > 0
-    assert n_delays > 0 and n_delays % 2 == 1
-    weights = shift_weights(weights, delay * n_delays)
-    function = _broadcast_integrand(function, guess)
-
-    a_mats = []
-    b_mats = []
-    for n in range(n_delays):
-        # lag = 0 can be skipped because DGA matrices are zero
-        lag = delay * (n + 1)
-        a, b = _dgamat.backward_feynman_kac_matrices(
-            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
-        )
-        a_mats.append(a)
-        b_mats.append(b)
-
-    coef = _hankel_solve(a_mats, b_mats)
-    return _backward_transform(basis, in_domain, function, guess, delay, coef)
+    weights = utils.shift_weights(weights, delay * n_delays)
+    stat = dgastat.BackwardFeynmanKac(
+        basis, weights, in_domain, function, guess, test_basis=test_basis
+    )
+    algo = HankelDGA(delay, n_delays).fit(stat)
+    return algo.solution(stat)
 
 
-def _backward_transform(basis, in_domain, function, guess, delay, coef):
-    n_blocks, _ = coef.shape
-    out = []
-    for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
-        n_frames = len(d)
-        u = np.zeros(n_frames)
+class HankelDGA:
+    def __init__(self, delay, n_delays):
+        assert delay > 0
+        assert n_delays > 0 and n_delays % 2 == 1
+        self.delay = delay
+        self.n_delays = n_delays
+        self.coef = None
+
+    def get_parameters(self):
+        """
+        Compute DGA matrices.
+
+        Returns
+        -------
+        coef : (n_basis,) ndarray of float
+            Projection coefficients.
+
+        """
+        return self.coef
+
+    def set_parameters(self, coef):
+        """
+        Compute DGA matrices.
+
+        Parameters
+        ----------
+        coef : (n_basis,) ndarray of float
+            Projection coefficients.
+
+        Returns
+        -------
+        self
+
+        """
+        self.coef = coef
+        return self
+
+    def fit(self, stat):
+        """
+        Fit statistic to data.
+
+        Parameters
+        ----------
+        stat
+            DGA statistic.
+
+        Returns
+        -------
+        self
+
+        """
+        a, b = self.matrices(stat)
+        coef = _hankel_solve(a, b)
+        self.set_parameters(coef)
+        return self
+
+    def matrices(self, stat):
+        """
+        Compute DGA matrices.
+
+        Parameters
+        ----------
+        stat
+            DGA statistic.
+
+        Returns
+        -------
+        a : list of (n_basis, n_basis) ndarray of float
+            DGA matrices for the homogeneous term.
+        b : list of (n_basis,) ndarray of float
+            DGA matrices for the nonhomogeneous term.
+
+        """
+        a = []
+        b = []
+        for n in range(self.n_delays):
+            # lag = 0 can be skipped because DGA matrices are zero
+            lag = self.delay * (n + 1)
+            a_n, b_n = stat.matrices(lag)
+            a.append(a_n)
+            b.append(b_n)
+        return a, b
+
+    def solution(self, stat):
+        """
+        Returns a stochastic approximation of the solution.
+
+        Parameters
+        ----------
+        stat
+            DGA statistic.
+
+        Returns
+        -------
+        list of (n_frames[i],) ndarray of float
+            Estimate of the solution.
+
+        """
+        if self.coef is None:
+            raise ValueError
+        n_blocks, _ = self.coef.shape
+        out = []
         for n in range(n_blocks):
-            lag = delay * n
-            u0 = g + y @ coef[n]
-            u += backward_feynman_kac_propagate(u0, d, f, lag)
-        out.append(u)
-    return out
+            lag = self.delay * n
+            u = stat.transform(self.coef[n])
+            u = stat.propagate(u, lag)
+            out.append(u)
+        out = [sum(u) for u in zip(*out, strict=True)]
+        return out
 
 
 def _hankel_solve(a_mats, b_mats):
@@ -447,9 +476,3 @@ def _hankel_solve(a_mats, b_mats):
 
     coef = -linalg.solve(a, b)
     return coef.reshape(n_blocks, -1)
-
-
-def _broadcast_integrand(f, trajs):
-    if not np.iterable(f):
-        f = [np.broadcast_to(f, traj.shape[0] - 1) for traj in trajs]
-    return f

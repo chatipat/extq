@@ -2,32 +2,17 @@
 
 import numpy as np
 
-from . import _dgamat, linalg
-from ._utils import (
-    backward_feynman_kac_propagate,
-    distribution_propagate,
-    forward_feynman_kac_propagate,
-)
-from .utils import shift_weights
+from . import dgastat, linalg, utils
 
 __all__ = [
     "reweight",
-    "reweight_matrices",
-    "reweight_projection",
-    "reweight_solution",
     "forward_committor",
     "forward_mfpt",
     "forward_feynman_kac",
-    "forward_feynman_kac_matrices",
-    "forward_feynman_kac_projection",
-    "forward_feynman_kac_solution",
     "backward_committor",
     "backward_mfpt",
     "backward_feynman_kac",
-    "backward_feynman_kac_matrices",
-    "backward_feynman_kac_projection",
-    "backward_feynman_kac_solution",
-    "solve",
+    "DGAWithMemory",
 ]
 
 
@@ -88,141 +73,20 @@ def reweight(
 
     """
     assert return_projection or return_solution or return_coef or return_mem_coef
-    a, b, c0 = reweight_matrices(basis, weights, lag, mem, test_basis=test_basis)
-    coef, mem_coef = solve(a, b, c0)
+    stat = dgastat.StationaryDistribution(basis, weights, test_basis=test_basis)
+    algo = DGAWithMemory(lag, mem).fit(stat)
+    coef, mem_coef = algo.get_parameters()
     out = []
     if return_projection:
-        out.append(reweight_projection(basis, weights, coef))
+        out.append(algo.projection(stat))
     if return_solution:
-        out.append(reweight_solution(basis, weights, lag, mem, coef, mem_coef))
+        out.append(algo.solution(stat))
     if return_coef:
         out.append(coef)
     if return_mem_coef:
         out.append(mem_coef)
     if len(out) == 1:
         out = out[0]
-    return out
-
-
-def reweight_matrices(basis, weights, lag, mem, test_basis=None):
-    """
-    Compute DGA matrices for estimating the invariant distribution.
-
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the invariant distribution. The span of
-        `basis` must *not* contain the constant function.
-    weights : sequence of (n_frames[i],) ndarray of float
-        Weight of each frame. The last `lag` frames of each trajectory
-        must be zero.
-    lag : int
-        Maximum lag time in units of frames.
-    mem : int
-        Number of memory terms to use. These are evaluated at equally
-        spaced times between time 0 and time `lag`, so `mem+1` must
-        evenly divide `lag`. For example, with a `lag=32`, `mem=3` and
-        `mem=7` are fine since 7+1=8 and 3+1=4 evenly divide 32. Setting
-        `mem=0` corresponds to not using memory.
-    test_basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
-        Test basis against which to minimize the error. Must have the
-        same dimension as `basis`. If `None`, use `basis`.
-
-    Returns
-    -------
-    a : (mem + 1, n_basis, n_basis) ndarray of float
-        DGA matrices for the homogeneous term.
-    b : (mem + 1, n_basis) ndarray of float
-        DGA matrices for the nonhomogeneous term.
-    c0 : (n_basis, n_basis) ndarray of float
-        Matrix of inner products of basis functions.
-
-    """
-    assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)
-    a = []
-    b = []
-    for n in range(mem + 1):
-        lag = (n + 1) * dlag
-        a_n, b_n = _dgamat.reweight_matrices(basis, lag, weights, test_basis=test_basis)
-        a.append(linalg.as_dense(a_n))
-        b.append(linalg.as_dense(b_n))
-    a = np.array(a)
-    b = np.array(b)
-    c0 = linalg.as_dense(_dgamat.gram_matrix(basis, weights, test_basis=test_basis))
-    return a, b, c0
-
-
-def reweight_projection(basis, weights, coef):
-    """
-    Returns the projected invariant distribution.
-
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the invariant distribution. The span of
-        `basis` must *not* contain the constant function.
-    weights : sequence of (n_frames[i],) ndarray of float
-        Weight of each frame.
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray of float
-        Estimate of the projected invariant distribution.
-
-    """
-    return [w * (y @ coef + 1.0) for y, w in zip(basis, weights, strict=True)]
-
-
-def reweight_solution(basis, weights, lag, mem, coef, mem_coef):
-    """
-    Returns a stochastic approximation of the invariant distribution.
-
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the invariant distribution. The span of
-        `basis` must *not* contain the constant function.
-    weights : sequence of (n_frames[i],) ndarray of float
-        Weight of each frame. The last `lag` frames of each trajectory
-        must be zero.
-    lag : int
-        Maximum lag time in units of frames.
-    mem : int
-        Number of memory terms to use. These are evaluated at equally
-        spaced times between time 0 and time `lag`, so `mem+1` must
-        evenly divide `lag`. For example, with a `lag=32`, `mem=3` and
-        `mem=7` are fine since 7+1=8 and 3+1=4 evenly divide 32. Setting
-        `mem=0` corresponds to not using memory.
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
-    mem_coef : (mem, n_basis) ndarray of float
-        Memory-correction coefficients.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray of float
-        Estimate of the invariant distribution.
-
-    """
-    assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)
-    n_basis = basis[0].shape[1]
-
-    out = []
-    for y, w in zip(basis, weights, strict=True):
-        n_frames = y.shape[0]
-        assert y.shape == (n_frames, n_basis)
-        assert w.shape == (n_frames,)
-
-        u = w * (y @ coef + 1.0)
-        for v in mem_coef:
-            u = distribution_propagate(u, dlag)
-            u -= w * (y @ v)
-        u = distribution_propagate(u, dlag)
-        out.append(u)
     return out
 
 
@@ -446,174 +310,22 @@ def forward_feynman_kac(
 
     """
     assert return_projection or return_solution or return_coef or return_mem_coef
-    a, b, c0 = forward_feynman_kac_matrices(
-        basis,
-        weights,
-        in_domain,
-        function,
-        guess,
-        lag,
-        mem,
-        test_basis=test_basis,
+    stat = dgastat.ForwardFeynmanKac(
+        basis, weights, in_domain, function, guess, test_basis=test_basis
     )
-    coef, mem_coef = solve(a, b, c0)
+    algo = DGAWithMemory(lag, mem).fit(stat)
+    coef, mem_coef = algo.get_parameters()
     out = []
     if return_projection:
-        out.append(forward_feynman_kac_projection(basis, guess, coef))
+        out.append(algo.projection(stat))
     if return_solution:
-        out.append(
-            forward_feynman_kac_solution(
-                basis, in_domain, function, guess, lag, mem, coef, mem_coef
-            )
-        )
+        out.append(algo.solution(stat))
     if return_coef:
         out.append(coef)
     if return_mem_coef:
         out.append(mem_coef)
     if len(out) == 1:
         out = out[0]
-    return out
-
-
-def forward_feynman_kac_matrices(
-    basis, weights, in_domain, function, guess, lag, mem, test_basis=None
-):
-    """
-    Solve a forward Feynman-Kac problem using DGA with memory.
-
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the solution. Must be zero outside of the
-        domain.
-    weights : sequence of (n_frames[i],) ndarray of float
-        Weight of each frame. The last `lag` frames of each trajectory
-        must be zero.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain.
-    function : sequence of (n_frames[i] - 1,) ndarray of float
-        Function to integrate. This is defined over *steps*, not frames.
-    guess : sequence of (n_frames[i],) ndarray of float
-        Guess for the solution. Must satisfy boundary conditions.
-    lag : int
-        Maximum lag time in units of frames.
-    mem : int
-        Number of memory terms to use. These are evaluated at equally
-        spaced times between time 0 and time `lag`, so `mem+1` must
-        evenly divide `lag`. For example, with a `lag=32`, `mem=3` and
-        `mem=7` are fine since 7+1=8 and 3+1=4 evenly divide 32. Setting
-        `mem=0` corresponds to not using memory.
-    test_basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
-        Test basis against which to minimize the error. Must have the
-        same dimension as `basis`. If `None`, use `basis`.
-
-    Returns
-    -------
-    a : (mem + 1, n_basis, n_basis) ndarray of float
-        DGA matrices for the homogeneous term.
-    b : (mem + 1, n_basis) ndarray of float
-        DGA matrices for the nonhomogeneous term.
-    c0 : (n_basis, n_basis) ndarray of float
-        Matrix of inner products of basis functions.
-
-    """
-    assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)
-    a = []
-    b = []
-    for n in range(mem + 1):
-        lag = (n + 1) * dlag
-        a_n, b_n = _dgamat.forward_feynman_kac_matrices(
-            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
-        )
-        a.append(linalg.as_dense(a_n))
-        b.append(linalg.as_dense(b_n))
-    a = np.array(a)
-    b = np.array(b)
-    c0 = linalg.as_dense(_dgamat.gram_matrix(basis, weights, test_basis=test_basis))
-    return a, b, c0
-
-
-def forward_feynman_kac_projection(basis, guess, coef):
-    """
-    Returns the projected solution of a forward Feynman-Kac problem.
-
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the solution. Must be zero outside of the
-        domain.
-    guess : sequence of (n_frames[i],) ndarray of float
-        Guess for the solution. Must satisfy boundary conditions.
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray of float
-        Estimate of the projected solution.
-
-    """
-    return [y @ coef + g for y, g in zip(basis, guess, strict=True)]
-
-
-def forward_feynman_kac_solution(
-    basis, in_domain, function, guess, lag, mem, coef, mem_coef
-):
-    """
-    Returns a stochastic approximation of the solution of a forward
-    Feynman-Kac problem.
-
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the solution. Must be zero outside of the
-        domain.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain.
-    function : sequence of (n_frames[i] - 1,) ndarray of float
-        Function to integrate. This is defined over *steps*, not frames.
-    guess : sequence of (n_frames[i],) ndarray of float
-        Guess for the solution. Must satisfy boundary conditions.
-    lag : int
-        Maximum lag time in units of frames.
-    mem : int
-        Number of memory terms to use. These are evaluated at equally
-        spaced times between time 0 and time `lag`, so `mem+1` must
-        evenly divide `lag`. For example, with a `lag=32`, `mem=3` and
-        `mem=7` are fine since 7+1=8 and 3+1=4 evenly divide 32. Setting
-        `mem=0` corresponds to not using memory.
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
-    mem_coef : (mem, n_basis) ndarray of float
-        Memory-correction coefficients.
-
-    Returns
-    -------
-    list of (n_frames[i],) ndarray of float
-        Estimate of the solution.
-
-    """
-    function = _broadcast_integrand(function, guess)
-
-    assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)
-    n_basis = basis[0].shape[1]
-
-    out = []
-    for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
-        n_frames = y.shape[0]
-        assert y.shape == (n_frames, n_basis)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
-
-        u = y @ coef + g
-        for v in mem_coef:
-            u = forward_feynman_kac_propagate(u, d, f, dlag)
-            u -= y @ v
-        u = forward_feynman_kac_propagate(u, d, f, dlag)
-        out.append(u)
     return out
 
 
@@ -837,26 +549,17 @@ def backward_feynman_kac(
 
     """
     assert return_projection or return_solution or return_coef or return_mem_coef
-    a, b, c0 = backward_feynman_kac_matrices(
-        basis,
-        weights,
-        in_domain,
-        function,
-        guess,
-        lag,
-        mem,
-        test_basis=test_basis,
+    weights = utils.shift_weights(weights, lag)
+    stat = dgastat.BackwardFeynmanKac(
+        basis, weights, in_domain, function, guess, test_basis=test_basis
     )
-    coef, mem_coef = solve(a, b, c0)
+    algo = DGAWithMemory(lag, mem).fit(stat)
+    coef, mem_coef = algo.get_parameters()
     out = []
     if return_projection:
-        out.append(backward_feynman_kac_projection(basis, guess, coef))
+        out.append(algo.projection(stat))
     if return_solution:
-        out.append(
-            backward_feynman_kac_solution(
-                basis, in_domain, function, guess, lag, mem, coef, mem_coef
-            )
-        )
+        out.append(algo.solution(stat))
     if return_coef:
         out.append(coef)
     if return_mem_coef:
@@ -866,154 +569,141 @@ def backward_feynman_kac(
     return out
 
 
-def backward_feynman_kac_matrices(
-    basis,
-    weights,
-    in_domain,
-    function,
-    guess,
-    lag,
-    mem,
-    test_basis=None,
-):
-    """
-    Solve a backward Feynman-Kac problem using DGA with memory.
+class DGAWithMemory:
+    def __init__(self, lag, mem):
+        assert lag % (mem + 1) == 0
+        self.lag = lag
+        self.mem = mem
+        self._dlag = lag // (mem + 1)
+        self.coef = self.mem_coef = None
 
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the solution. Must be zero outside of the
-        domain.
-    weights : sequence of (n_frames[i],) ndarray of float
-        Change of measure to the invariant distribution. The last `lag`
-        frames of each trajectory must be zero.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain.
-    function : sequence of (n_frames[i] - 1,) ndarray of float
-        Function to integrate. This is defined over *steps*, not frames.
-    guess : sequence of (n_frames[i],) ndarray of float
-        Guess for the solution. Must satisfy boundary conditions.
-    lag : int
-        Maximum lag time in units of frames.
-    mem : int
-        Number of memory terms to use. These are evaluated at equally
-        spaced times between time 0 and time `lag`, so `mem+1` must
-        evenly divide `lag`. For example, with a `lag=32`, `mem=3` and
-        `mem=7` are fine since 7+1=8 and 3+1=4 evenly divide 32. Setting
-        `mem=0` corresponds to not using memory.
-    test_basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float, optional
-        Test basis against which to minimize the error. Must have the
-        same dimension as `basis`. If `None`, use `basis`.
+    def get_parameters(self):
+        """
+        Compute DGA matrices.
 
-    Returns
-    -------
-    a : (mem + 1, n_basis, n_basis) ndarray of float
-        DGA matrices for the homogeneous term.
-    b : (mem + 1, n_basis) ndarray of float
-        DGA matrices for the nonhomogeneous term.
-    c0 : (n_basis, n_basis) ndarray of float
-        Matrix of inner products of basis functions.
+        Returns
+        -------
+        coef : (n_basis,) ndarray of float
+            Projection coefficients.
+        mem_coef : (mem, n_basis) ndarray of float
+            Memory-correction coefficients.
 
-    """
-    assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)
-    weights = shift_weights(weights, lag)
-    a = []
-    b = []
-    for n in range(mem + 1):
-        lag = (n + 1) * dlag
-        a_n, b_n = _dgamat.backward_feynman_kac_matrices(
-            basis, weights, in_domain, function, guess, lag, test_basis=test_basis
-        )
-        a.append(linalg.as_dense(a_n))
-        b.append(linalg.as_dense(b_n))
-    a = np.array(a)
-    b = np.array(b)
-    c0 = linalg.as_dense(_dgamat.gram_matrix(basis, weights, test_basis=test_basis))
-    return a, b, c0
+        """
+        return self.coef, self.mem_coef
 
+    def set_parameters(self, coef, mem_coef):
+        """
+        Compute DGA matrices.
 
-def backward_feynman_kac_projection(basis, guess, coef):
-    """
-    Returns the projected solution of a backward Feynman-Kac problem.
+        Parameters
+        ----------
+        coef : (n_basis,) ndarray of float
+            Projection coefficients.
+        mem_coef : (mem, n_basis) ndarray of float
+            Memory-correction coefficients.
 
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the solution. Must be zero outside of the
-        domain.
-    guess : sequence of (n_frames[i],) ndarray of float
-        Guess for the solution. Must satisfy boundary conditions.
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
+        Returns
+        -------
+        self
 
-    Returns
-    -------
-    list of (n_frames[i],) ndarray of float
-        Estimate of the projected solution.
+        """
+        self.coef = coef
+        self.mem_coef = mem_coef
+        return self
 
-    """
-    return [y @ coef + g for y, g in zip(basis, guess, strict=True)]
+    def fit(self, stat):
+        """
+        Fit statistic to data.
 
+        Parameters
+        ----------
+        stat
+            DGA statistic.
 
-def backward_feynman_kac_solution(
-    basis, in_domain, function, guess, lag, mem, coef, mem_coef
-):
-    """
-    Returns a stochastic approximation of the solution of a backward
-    Feynman-Kac problem.
+        Returns
+        -------
+        self
 
-    Parameters
-    ----------
-    basis : sequence of (n_frames[i], n_basis) {ndarray, sparse matrix} of float
-        Basis for estimating the solution. Must be zero outside of the
-        domain.
-    in_domain : sequence of (n_frames[i],) ndarray of bool
-        Whether each frame is in the domain.
-    function : sequence of (n_frames[i] - 1,) ndarray of float
-        Function to integrate. This is defined over *steps*, not frames.
-    guess : sequence of (n_frames[i],) ndarray of float
-        Guess for the solution. Must satisfy boundary conditions.
-    lag : int
-        Maximum lag time in units of frames.
-    mem : int
-        Number of memory terms to use. These are evaluated at equally
-        spaced times between time 0 and time `lag`, so `mem+1` must
-        evenly divide `lag`. For example, with a `lag=32`, `mem=3` and
-        `mem=7` are fine since 7+1=8 and 3+1=4 evenly divide 32. Setting
-        `mem=0` corresponds to not using memory.
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
-    mem_coef : (mem, n_basis) ndarray of float
-        Memory-correction coefficients.
+        """
+        a, b, c0 = self.matrices(stat)
+        coef, mem_coef = solve(a, b, c0)
+        self.set_parameters(coef, mem_coef)
+        return self
 
-    Returns
-    -------
-    list of (n_frames[i],) ndarray of float
-        Estimate of the solution.
+    def matrices(self, stat):
+        """
+        Compute DGA matrices.
 
-    """
-    function = _broadcast_integrand(function, guess)
+        Parameters
+        ----------
+        stat
+            DGA statistic.
 
-    assert lag % (mem + 1) == 0
-    dlag = lag // (mem + 1)
-    n_basis = basis[0].shape[1]
+        Returns
+        -------
+        a : (mem + 1, n_basis, n_basis) ndarray of float
+            DGA matrices for the homogeneous term.
+        b : (mem + 1, n_basis) ndarray of float
+            DGA matrices for the nonhomogeneous term.
+        c0 : (n_basis, n_basis) ndarray of float
+            Matrix of inner products of basis functions.
 
-    out = []
-    for y, d, f, g in zip(basis, in_domain, function, guess, strict=True):
-        n_frames = y.shape[0]
-        assert y.shape == (n_frames, n_basis)
-        assert d.shape == (n_frames,)
-        assert f.shape == (n_frames - 1,)
-        assert g.shape == (n_frames,)
+        """
+        a = []
+        b = []
+        for n in range(self.mem + 1):
+            lag = (n + 1) * self._dlag
+            a_n, b_n = stat.matrices(lag)
+            a.append(linalg.as_dense(a_n))
+            b.append(linalg.as_dense(b_n))
+        a = np.array(a)
+        b = np.array(b)
+        c0 = linalg.as_dense(stat.gram_matrix())
+        return a, b, c0
 
-        u = y @ coef + g
-        for v in mem_coef:
-            u = backward_feynman_kac_propagate(u, d, f, dlag)
-            u -= y @ v
-        u = backward_feynman_kac_propagate(u, d, f, dlag)
-        out.append(u)
-    return out
+    def projection(self, stat):
+        """
+        Returns the projected solution.
+
+        Parameters
+        ----------
+        stat
+            DGA statistic.
+
+        Returns
+        -------
+        list of (n_frames[i],) ndarray of float
+            Estimate of the projected solution.
+
+        """
+        if self.coef is None:
+            raise ValueError
+        return stat.transform(self.coef)
+
+    def solution(self, stat):
+        """
+        Returns a stochastic approximation of the solution.
+
+        Parameters
+        ----------
+        stat
+            DGA statistic.
+
+        Returns
+        -------
+        list of (n_frames[i],) ndarray of float
+            Estimate of the solution.
+
+        """
+        if self.coef is None or self.mem_coef is None:
+            raise ValueError
+        out = stat.transform(self.coef)
+        for v in self.mem_coef:
+            out = stat.propagate(out, self._dlag)
+            correction = stat.transform_difference(v)
+            out = [u - du for u, du in zip(out, correction, strict=True)]
+        out = stat.propagate(out, self._dlag)
+        return out
 
 
 def solve(a, b, c0):
@@ -1058,9 +748,3 @@ def solve(a, b, c0):
     coef = linalg.solve(a[-1], -b[-1])
     mem_coef = a[:-1] @ coef + b[:-1]
     return coef, mem_coef
-
-
-def _broadcast_integrand(f, trajs):
-    if not np.iterable(f):
-        f = [np.broadcast_to(f, traj.shape[0] - 1) for traj in trajs]
-    return f
