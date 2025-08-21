@@ -1,11 +1,9 @@
 """Finite difference reference calculation for DGA with memory."""
 
-from abc import ABC, abstractmethod
-
-import numpy as np
 import scipy as sp
 
-from . import dgastat_fdm, linalg
+from . import dgastat_fdm
+from .dgamem import DGAWithMemory
 
 __all__ = [
     "reweight",
@@ -15,8 +13,6 @@ __all__ = [
     "backward_committor",
     "backward_mfpt",
     "backward_feynman_kac",
-    "solve",
-    "DGAWithMemory",
 ]
 
 
@@ -264,99 +260,3 @@ def backward_feynman_kac(
     if len(out) == 1:
         out = out[0]
     return out
-
-
-def solve(a, b, c0):
-    """
-    Solve DGA with memory for projection and memory-correction
-    coefficients.
-
-    Parameters
-    ----------
-    a : (mem + 1, n_basis, n_basis) ndarray of float
-        DGA matrices for the homogeneous term.
-    b : (mem + 1, n_basis) ndarray of float
-        DGA matrices for the nonhomogeneous term.
-    c0 : (n_basis, n_basis) ndarray of float
-        Matrix of inner products of basis functions.
-
-    Returns
-    -------
-    coef : (n_basis,) ndarray of float
-        Projection coefficients.
-    mem_coef : (mem, n_basis) ndarray of float
-        Memory-correction coefficients.
-
-    """
-    mem = a.shape[0] - 1
-    n_basis = a.shape[1]
-    assert a.shape == (mem + 1, n_basis, n_basis)
-    assert b.shape == (mem + 1, n_basis)
-
-    b = b[..., None]
-
-    inv = sp.linalg.inv(c0)
-    a = inv @ a
-    b = inv @ b
-    c = a[::-1] + np.identity(n_basis)
-    for n in range(1, mem + 1):
-        a[n] -= np.sum(c[-n:] @ a[:n], axis=0)
-        b[n] -= np.sum(c[-n:] @ b[:n], axis=0)
-
-    b = b.reshape(b.shape[:2])
-
-    coef = sp.linalg.solve(a[-1], -b[-1])
-    mem_coef = a[:-1] @ coef + b[:-1]
-    return coef, mem_coef
-
-
-class DGAWithMemory:
-    def __init__(self, lag, mem):
-        assert lag % (mem + 1) == 0
-        self.lag = lag
-        self.mem = mem
-        self._dlag = lag // (mem + 1)
-        self.params = None
-
-    def get_parameters(self):
-        if self.params is None:
-            raise ValueError
-        return self.params
-
-    def set_parameters(self, params):
-        self.params = params
-        return self
-
-    def fit(self, stat):
-        a, b, c0 = self.matrices(stat)
-        self.set_parameters(solve(a, b, c0))
-        return self
-
-    def matrices(self, stat):
-        a = []
-        b = []
-        for n in range(self.mem + 1):
-            lag = (n + 1) * self._dlag
-            a_n, b_n = stat.matrices(lag)
-            a.append(linalg.as_dense(a_n))
-            b.append(linalg.as_dense(b_n))
-        a = np.array(a)
-        b = np.array(b)
-        c0 = linalg.as_dense(stat.gram_matrix())
-        return a, b, c0
-
-    def projection(self, stat):
-        coef, _ = self.get_parameters()
-        return stat.transform(coef)
-
-    def solution(self, stat):
-        lag = self.lag
-        dlag = self._dlag
-        mem = self.mem
-        coef, mem_coef = self.get_parameters()
-        out = stat.propagate(stat.transform(coef), lag)
-        for m in range(mem):
-            out -= stat.propagate_difference(
-                stat.transform_difference(mem_coef[m]), lag - dlag * (m + 1)
-            )
-        return out

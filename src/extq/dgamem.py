@@ -575,11 +575,11 @@ class DGAWithMemory:
         self.lag = lag
         self.mem = mem
         self._dlag = lag // (mem + 1)
-        self.coef = self.mem_coef = None
+        self.params = None
 
     def get_parameters(self):
         """
-        Compute DGA matrices.
+        Return fit parameters.
 
         Returns
         -------
@@ -589,11 +589,13 @@ class DGAWithMemory:
             Memory-correction coefficients.
 
         """
-        return self.coef, self.mem_coef
+        if self.params is None:
+            raise ValueError
+        return self.params
 
     def set_parameters(self, coef, mem_coef):
         """
-        Compute DGA matrices.
+        Set fit parameters.
 
         Parameters
         ----------
@@ -607,8 +609,7 @@ class DGAWithMemory:
         self
 
         """
-        self.coef = coef
-        self.mem_coef = mem_coef
+        self.params = (coef, mem_coef)
         return self
 
     def fit(self, stat):
@@ -676,9 +677,8 @@ class DGAWithMemory:
             Estimate of the projected solution.
 
         """
-        if self.coef is None:
-            raise ValueError
-        return stat.transform(self.coef)
+        coef, _ = self.get_parameters()
+        return stat.transform(coef)
 
     def solution(self, stat):
         """
@@ -695,14 +695,15 @@ class DGAWithMemory:
             Estimate of the solution.
 
         """
-        if self.coef is None or self.mem_coef is None:
-            raise ValueError
-        out = stat.transform(self.coef)
-        for v in self.mem_coef:
-            out = stat.propagate(out, self._dlag)
-            correction = stat.transform_difference(v)
-            out = [u - du for u, du in zip(out, correction, strict=True)]
-        out = stat.propagate(out, self._dlag)
+        lag = self.lag
+        dlag = self._dlag
+        mem = self.mem
+        coef, mem_coef = self.get_parameters()
+        out = stat.propagate(stat.transform(coef), lag)
+        for m in range(mem):
+            out = out - stat.propagate_difference(
+                stat.transform_difference(mem_coef[m]), lag - dlag * (m + 1)
+            )
         return out
 
 
