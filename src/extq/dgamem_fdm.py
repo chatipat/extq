@@ -1,26 +1,25 @@
 """Finite difference reference calculation for DGA with memory."""
 
+from abc import ABC, abstractmethod
+
 import numpy as np
 import scipy as sp
 
+from . import linalg
+
 __all__ = [
     "reweight",
-    "reweight_matrices",
-    "reweight_projection",
-    "reweight_solution",
     "forward_committor",
     "forward_mfpt",
     "forward_feynman_kac",
-    "forward_feynman_kac_matrices",
-    "forward_feynman_kac_projection",
-    "forward_feynman_kac_solution",
     "backward_committor",
     "backward_mfpt",
     "backward_feynman_kac",
-    "backward_feynman_kac_matrices",
-    "backward_feynman_kac_projection",
-    "backward_feynman_kac_solution",
     "solve",
+    "DGAWithMemory",
+    "StationaryDistribution",
+    "ForwardFeynmanKac",
+    "BackwardFeynmanKac",
 ]
 
 
@@ -38,17 +37,14 @@ def reweight(
     return_mem_coef=False,
 ):
     assert return_projection or return_solution or return_coef or return_mem_coef
-    a, b, c0 = reweight_matrices(
-        generator, basis, weights, lag, mem, test_basis=test_basis
-    )
-    coef, mem_coef = solve(a, b, c0)
+    stat = StationaryDistribution(generator, basis, weights, test_basis=test_basis)
+    algo = DGAWithMemory(lag, mem).fit(stat)
+    coef, mem_coef = algo.get_parameters()
     out = []
     if return_projection:
-        out.append(reweight_projection(basis, weights, coef))
+        out.append(algo.projection(stat))
     if return_solution:
-        out.append(
-            reweight_solution(generator, basis, weights, lag, mem, coef, mem_coef)
-        )
+        out.append(algo.solution(stat))
     if return_coef:
         out.append(coef)
     if return_mem_coef:
@@ -56,51 +52,6 @@ def reweight(
     if len(out) == 1:
         out = out[0]
     return out
-
-
-def reweight_matrices(generator, basis, weights, lag, mem, test_basis=None):
-    if test_basis is None:
-        test_basis = basis
-
-    _, [x, y], [w] = _to_flat([test_basis, basis], [weights])
-    _, k = y.shape
-    dlag = lag / (mem + 1)
-
-    L = generator.T
-    T = sp.linalg.expm(L * dlag)  # adjoint transition operator
-    wy = w[:, None] * y
-
-    a = np.zeros((mem + 1, k, k))
-    b = np.zeros((mem + 1, k))
-    wy_t = wy
-    w_t = w
-    for m in range(mem + 1):
-        wy_t = T @ wy_t
-        w_t = T @ w_t
-        a[m] = x.T @ (wy_t - wy)
-        b[m] = x.T @ (w_t - w)
-    c0 = x.T @ wy
-    return a, b, c0
-
-
-def reweight_projection(basis, weights, coef):
-    shape, [y], [w] = _to_flat([basis], [weights])
-    u = w * (y @ coef + 1.0)
-    return u.reshape(shape)
-
-
-def reweight_solution(generator, basis, weights, lag, mem, coef, mem_coef):
-    shape, [y], [w] = _to_flat([basis], [weights])
-    dlag = lag / (mem + 1)
-
-    L = generator.T
-    T = sp.linalg.expm(L * dlag)  # adjoint transition operator
-
-    u = w * (y @ coef + 1.0)  # dga projection
-    for m in range(mem):
-        u = T @ u - w * (y @ mem_coef[m])
-    u = T @ u  # dga solution
-    return u.reshape(shape)
 
 
 def forward_committor(
@@ -184,35 +135,22 @@ def forward_feynman_kac(
     return_mem_coef=False,
 ):
     assert return_projection or return_solution or return_coef or return_mem_coef
-    a, b, c0 = forward_feynman_kac_matrices(
+    stat = ForwardFeynmanKac(
         generator,
         basis,
         weights,
         in_domain,
         function,
         guess,
-        lag,
-        mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = solve(a, b, c0)
+    algo = DGAWithMemory(lag, mem).fit(stat)
+    coef, mem_coef = algo.get_parameters()
     out = []
     if return_projection:
-        out.append(forward_feynman_kac_projection(basis, guess, coef))
+        out.append(algo.projection(stat))
     if return_solution:
-        out.append(
-            forward_feynman_kac_solution(
-                generator,
-                basis,
-                in_domain,
-                function,
-                guess,
-                lag,
-                mem,
-                coef,
-                mem_coef,
-            )
-        )
+        out.append(algo.solution(stat))
     if return_coef:
         out.append(coef)
     if return_mem_coef:
@@ -220,75 +158,6 @@ def forward_feynman_kac(
     if len(out) == 1:
         out = out[0]
     return out
-
-
-def forward_feynman_kac_matrices(
-    generator,
-    basis,
-    weights,
-    in_domain,
-    function,
-    guess,
-    lag,
-    mem,
-    test_basis=None,
-):
-    if test_basis is None:
-        test_basis = basis
-
-    _, [x, y], [w, d, f, g] = _to_flat(
-        [test_basis, basis], [weights, in_domain, function, guess]
-    )
-    _, k = y.shape
-    dlag = lag / (mem + 1)
-
-    L = generator
-    Ld = L[np.ix_(d, d)]
-    xwd = x[d].T * w[d]
-    yd = y[d]
-    rd = sp.linalg.solve(Ld, L[d] @ g + f[d])  # guess - solution
-    Sd = sp.linalg.expm(dlag * Ld)  # stopped transition operator
-
-    a = np.empty((mem + 1, k, k))
-    b = np.empty((mem + 1, k))
-    yd_t = yd
-    rd_t = rd
-    for m in range(mem + 1):
-        yd_t = Sd @ yd_t
-        rd_t = Sd @ rd_t
-        a[m] = xwd @ (yd_t - yd)
-        b[m] = xwd @ (rd_t - rd)
-    c0 = xwd @ yd
-    return a, b, c0
-
-
-def forward_feynman_kac_projection(basis, guess, coef):
-    shape, [y], [g] = _to_flat([basis], [guess])
-    u = y @ coef + g
-    return u.reshape(shape)
-
-
-def forward_feynman_kac_solution(
-    generator, basis, in_domain, function, guess, lag, mem, coef, mem_coef
-):
-    shape, [y], [d, f, g] = _to_flat([basis], [in_domain, function, guess])
-    dlag = lag / (mem + 1)
-
-    L = generator
-    Ld = L[np.ix_(d, d)]
-    yd = y[d]
-    rd = sp.linalg.solve(Ld, L[d] @ g + f[d])  # guess - true solution
-    Sd = sp.linalg.expm(dlag * Ld)  # stopped transition operator
-
-    du = yd @ coef + rd  # dga projection - true solution
-    for m in range(mem):
-        du = Sd @ du - yd @ mem_coef[m]
-    du = Sd @ du  # dga solution - true solution
-
-    u = np.copy(g)
-    u[d] -= rd  # true solution
-    u[d] += du  # dga solution
-    return u.reshape(shape)
 
 
 def backward_committor(
@@ -372,36 +241,23 @@ def backward_feynman_kac(
     return_mem_coef=False,
 ):
     assert return_projection or return_solution or return_coef or return_mem_coef
-    a, b, c0 = backward_feynman_kac_matrices(
+    weights = sp.linalg.expm(generator.T * lag) @ weights
+    stat = BackwardFeynmanKac(
         generator,
         basis,
         weights,
         in_domain,
         function,
         guess,
-        lag,
-        mem,
         test_basis=test_basis,
     )
-    coef, mem_coef = solve(a, b, c0)
+    algo = DGAWithMemory(lag, mem).fit(stat)
+    coef, mem_coef = algo.get_parameters()
     out = []
     if return_projection:
-        out.append(backward_feynman_kac_projection(basis, guess, coef))
+        out.append(algo.projection(stat))
     if return_solution:
-        out.append(
-            backward_feynman_kac_solution(
-                generator,
-                basis,
-                weights,
-                in_domain,
-                function,
-                guess,
-                lag,
-                mem,
-                coef,
-                mem_coef,
-            )
-        )
+        out.append(algo.solution(stat))
     if return_coef:
         out.append(coef)
     if return_mem_coef:
@@ -409,114 +265,6 @@ def backward_feynman_kac(
     if len(out) == 1:
         out = out[0]
     return out
-
-
-def backward_feynman_kac_matrices(
-    generator,
-    basis,
-    weights,
-    in_domain,
-    function,
-    guess,
-    lag,
-    mem,
-    test_basis=None,
-):
-    if test_basis is None:
-        test_basis = basis
-
-    _, [x, y], [w, d, f, g] = _to_flat(
-        [test_basis, basis], [weights, in_domain, function, guess]
-    )
-    _, k = y.shape
-    dlag = lag / (mem + 1)
-
-    L = generator.T
-    Ld = L[np.ix_(d, d)]
-    rd = L[d] * g - g[d, None] * L[d] + np.diag(f)[d]
-
-    n = L.shape[0]
-    nd = Ld.shape[0]
-
-    A = np.block([[Ld, rd], [np.zeros((n, nd)), L]])
-    eA = sp.linalg.expm(dlag * A)
-
-    T = eA[nd:, nd:]  # time-reversed transition operator
-    Sd = eA[:nd, :nd]  # time-reversed stopped transition operator
-    Rd = eA[:nd, nd:]
-
-    a = np.empty((mem + 1, k, k))
-    b = np.empty((mem + 1, k))
-
-    xd = x[d].T
-    yd = y[d]
-
-    w_t = np.empty((mem + 2, n))
-    w_t[0] = w
-    for m in range(1, mem + 2):
-        w_t[m] = T @ w_t[m - 1]
-    wyd_0 = w_t[mem + 1, d, None] * yd
-    for m in range(mem + 1):
-        wyd_t = w_t[mem - m, d, None] * yd
-        wr = np.zeros(nd)
-        for i in range(mem - m, mem + 1):
-            wyd_t = Sd @ wyd_t
-            wr = Sd @ wr + Rd @ w_t[i]
-        a[m] = xd @ (wyd_t - wyd_0)
-        b[m] = xd @ wr
-    c0 = xd @ wyd_0
-    return a, b, c0
-
-
-def backward_feynman_kac_projection(basis, guess, coef):
-    shape, [y], [g] = _to_flat([basis], [guess])
-    u = y @ coef + g
-    return u.reshape(shape)
-
-
-def backward_feynman_kac_solution(
-    generator,
-    basis,
-    weights,
-    in_domain,
-    function,
-    guess,
-    lag,
-    mem,
-    coef,
-    mem_coef,
-):
-    shape, [y], [w, d, f, g] = _to_flat([basis], [weights, in_domain, function, guess])
-    dlag = lag / (mem + 1)
-
-    L = generator.T
-    Ld = L[np.ix_(d, d)]
-    rd = L[d] * g - g[d, None] * L[d] + np.diag(f)[d]
-
-    n = L.shape[0]
-    nd = Ld.shape[0]
-
-    A = np.block([[Ld, rd], [np.zeros((n, nd)), L]])
-    eA = sp.linalg.expm(dlag * A)
-
-    T = eA[nd:, nd:]  # time-reversed transition operator
-    Sd = eA[:nd, :nd]  # time-reversed stopped transition operator
-    Rd = eA[:nd, nd:]
-
-    yd = y[d]
-
-    duw = w[d] * (yd @ coef)  # dga projection - guess
-    for m in range(mem):
-        duw = Sd @ duw + Rd @ w - w[d] * (yd @ mem_coef[m])
-        w = T @ w
-    duw = Sd @ duw + Rd @ w  # dga solution - guess
-    w = T @ w
-
-    uw = w * g
-    uw[d] += duw  # dga solution
-    u = uw / w
-
-    return u.reshape(shape)
 
 
 def solve(a, b, c0):
@@ -563,54 +311,296 @@ def solve(a, b, c0):
     return coef, mem_coef
 
 
-def _to_flat(bases, functions):
-    """
-    Flatten state space dimensions.
+class DGAWithMemory:
+    def __init__(self, lag, mem):
+        assert lag % (mem + 1) == 0
+        self.lag = lag
+        self.mem = mem
+        self._dlag = lag // (mem + 1)
+        self.params = None
 
-    This function broadcasts the state space dimensions of the input
-    arrays against each other, and returns the shape of these dimensions
-    and arrays with these dimensions flattened.
+    def get_parameters(self):
+        if self.params is None:
+            raise ValueError
+        return self.params
 
-    Parameters
-    ----------
-    bases : sequence of (*shape[i], nbasis[i]) ndarray
-        Vector-valued functions of the state space.
-    functions : sequence of shape[i] ndarray
-        Scalar functions of the state space.
+    def set_parameters(self, params):
+        self.params = params
+        return self
 
-    Returns
-    -------
-    out_shape : tuple
-        Broadcasted shape of the state space:
-        ``out_shape = numpy.broadcast_shapes(*shape)``.
-        The flattened size of the state space is
-        ``size = numpy.product(out_shape)``.
-    out_bases : tuple of (size, nbasis[i]) ndarray
-        Flattened broadcasted bases. Note that the last dimension is
-        preserved: ``bases[i].shape[-1] == out_bases[i].shape[-1]``.
-    out_functions : tuple of (size,) ndarray
-        Flattened broadcasted functions.
+    def fit(self, stat):
+        a, b, c0 = self.matrices(stat)
+        self.set_parameters(solve(a, b, c0))
+        return self
 
-    """
-    # determine out_shape
-    shapes = []
-    nbases = []
-    for basis in bases:
-        *shape, nbasis = np.shape(basis)
-        shapes.append(shape)
-        nbases.append(nbasis)
-    for function in functions:
-        shape = np.shape(function)
-        shapes.append(shape)
-    out_shape = np.broadcast_shapes(*shapes)
+    def matrices(self, stat):
+        a = []
+        b = []
+        for n in range(self.mem + 1):
+            lag = (n + 1) * self._dlag
+            a_n, b_n = stat.matrices(lag)
+            a.append(linalg.as_dense(a_n))
+            b.append(linalg.as_dense(b_n))
+        a = np.array(a)
+        b = np.array(b)
+        c0 = linalg.as_dense(stat.gram_matrix())
+        return a, b, c0
 
-    # broadcast and flatten arrays
-    out_bases = tuple(
-        np.broadcast_to(basis, (out_shape, *nbasis)).reshape((-1, nbasis))
-        for basis, nbasis in zip(bases, nbases)
-    )
-    out_functions = tuple(
-        np.ravel(np.broadcast_to(function, out_shape)) for function in functions
-    )
+    def projection(self, stat):
+        coef, _ = self.get_parameters()
+        return stat.transform(coef)
 
-    return out_shape, out_bases, out_functions
+    def solution(self, stat):
+        lag = self.lag
+        dlag = self._dlag
+        mem = self.mem
+        coef, mem_coef = self.get_parameters()
+        out = stat.propagate(stat.transform(coef), lag)
+        for m in range(mem):
+            out -= stat.propagate_difference(
+                stat.transform_difference(mem_coef[m]), lag - dlag * (m + 1)
+            )
+        return out
+
+
+class Statistic(ABC):
+    @abstractmethod
+    def matrices(self, lag: int) -> tuple[np.ndarray, np.ndarray]: ...
+    @abstractmethod
+    def gram_matrix(self) -> np.ndarray: ...
+    @abstractmethod
+    def transform(self, coef: np.ndarray) -> np.ndarray: ...
+    @abstractmethod
+    def transform_difference(self, coef: np.ndarray) -> np.ndarray: ...
+    @abstractmethod
+    def propagate(self, u: np.ndarray, lag: int) -> np.ndarray: ...
+    @abstractmethod
+    def propagate_difference(self, u: np.ndarray, lag: int) -> np.ndarray: ...
+
+
+class StationaryDistribution(Statistic):
+    def __init__(self, generator, basis, weights, test_basis=None):
+        if test_basis is None:
+            test_basis = basis
+        self.generator = generator
+        self.basis = basis
+        self.weights = weights
+        self.test_basis = test_basis
+
+    def matrices(self, lag):
+        assert lag >= 0
+        L = self.generator.T
+        x = self.test_basis
+        y = self.basis
+        w = self.weights
+
+        T = sp.linalg.expm(L * lag)
+
+        wy = w[:, None] * y
+        a = x.T @ (T @ wy - wy)
+        b = x.T @ (T @ w - w)
+        return a, b
+
+    def gram_matrix(self):
+        x = self.test_basis
+        y = self.basis
+        w = self.weights
+
+        c0 = x.T * w @ y
+        return c0
+
+    def transform(self, coef):
+        return self.weights * (self.basis @ coef + 1.0)
+
+    def transform_difference(self, coef):
+        return self.weights * (self.basis @ coef)
+
+    def propagate(self, u, lag):
+        assert lag >= 0
+        L = self.generator.T
+        T = sp.linalg.expm(L * lag)
+        return T @ u
+
+    def propagate_difference(self, u, lag):
+        assert lag >= 0
+        L = self.generator.T
+        T = sp.linalg.expm(L * lag)
+        return T @ u
+
+
+class ForwardFeynmanKac(Statistic):
+    def __init__(
+        self,
+        generator,
+        basis,
+        weights,
+        in_domain,
+        function,
+        guess,
+        test_basis=None,
+    ):
+        if test_basis is None:
+            test_basis = basis
+        self.generator = generator
+        self.basis = basis
+        self.weights = weights
+        self.in_domain = in_domain
+        self.function = function
+        self.guess = guess
+        self.test_basis = test_basis
+
+    def matrices(self, lag):
+        assert lag >= 0
+        L = self.generator
+        x = self.test_basis
+        y = self.basis
+        w = self.weights
+        d = self.in_domain
+        f = self.function
+        g = self.guess
+
+        Ld = L[np.ix_(d, d)]
+        Sd = sp.linalg.expm(Ld * lag)
+        rd = sp.linalg.solve(Ld, L[d] @ g + f[d])
+
+        xwd = x[d].T * w[d]
+        yd = y[d]
+        a = xwd @ (Sd @ yd - yd)
+        b = xwd @ (Sd @ rd - rd)
+        return a, b
+
+    def gram_matrix(self):
+        x = self.test_basis
+        y = self.basis
+        w = self.weights
+        d = self.in_domain
+
+        c0 = x[d].T * w[d] @ y[d]
+        return c0
+
+    def transform(self, coef):
+        return self.basis @ coef + self.guess
+
+    def transform_difference(self, coef):
+        return self.basis @ coef
+
+    def propagate(self, u, lag):
+        assert lag >= 0
+        L = self.generator
+        d = self.in_domain
+        f = self.function
+
+        Ld = L[np.ix_(d, d)]
+        Sd = sp.linalg.expm(Ld * lag)
+        rd = sp.linalg.solve(Ld, L[d] @ u + f[d])
+
+        out = u.copy()
+        out[d] += Sd @ rd - rd
+        return out
+
+    def propagate_difference(self, u, lag):
+        assert lag >= 0
+        L = self.generator
+        d = self.in_domain
+
+        Ld = L[np.ix_(d, d)]
+        Sd = sp.linalg.expm(Ld * lag)
+
+        out = np.zeros(u.shape)
+        out[d] = Sd @ u[d]
+        return out
+
+
+class BackwardFeynmanKac(Statistic):
+    def __init__(
+        self,
+        generator,
+        basis,
+        weights,
+        in_domain,
+        function,
+        guess,
+        test_basis=None,
+    ):
+        if test_basis is None:
+            test_basis = basis
+        self.generator = generator
+        self.basis = basis
+        self.weights = weights
+        self.in_domain = in_domain
+        self.function = function
+        self.guess = guess
+        self.test_basis = test_basis
+
+    def matrices(self, lag):
+        assert lag >= 0
+        L = self.generator.T
+        x = self.test_basis
+        y = self.basis
+        w = self.weights
+        d = self.in_domain
+        f = self.function
+        g = self.guess
+
+        Ld = L[np.ix_(d, d)]
+        Sd = sp.linalg.expm(Ld * lag)
+        T = sp.linalg.expm(L * lag)
+        rd = L[d] * g - g[d, None] * L[d] + np.diag(f)[d]
+        F = sp.linalg.solve_sylvester(Ld, -L, rd)
+        Rd = Sd @ F - F @ T
+
+        xd = x[d].T
+        yd = y[d]
+        wt = sp.linalg.solve(T, w)
+        a = xd @ (Sd @ (wt[d, None] * yd) - w[d, None] * yd)
+        b = xd @ (Rd @ wt)
+        return a, b
+
+    def gram_matrix(self):
+        x = self.test_basis
+        y = self.basis
+        w = self.weights
+        d = self.in_domain
+
+        c0 = x[d].T * w[d] @ y[d]
+        return c0
+
+    def transform(self, coef):
+        return self.basis @ coef + self.guess
+
+    def transform_difference(self, coef):
+        return self.basis @ coef
+
+    def propagate(self, u, lag):
+        assert lag >= 0
+        L = self.generator.T
+        w = self.weights
+        d = self.in_domain
+        f = self.function
+
+        Ld = L[np.ix_(d, d)]
+        Sd = sp.linalg.expm(Ld * lag)
+        T = sp.linalg.expm(L * lag)
+        rd = L[d] * u - u[d, None] * L[d] + np.diag(f)[d]
+        F = sp.linalg.solve_sylvester(Ld, -L, rd)
+        Rd = Sd @ F - F @ T
+
+        wt = linalg.solve(T, w)
+        out = u.copy()
+        out[d] += (Rd @ wt) / w[d]
+        return out
+
+    def propagate_difference(self, u, lag):
+        assert lag >= 0
+        L = self.generator.T
+        w = self.weights
+        d = self.in_domain
+
+        Ld = L[np.ix_(d, d)]
+        Sd = sp.linalg.expm(Ld * lag)
+        T = sp.linalg.expm(L * lag)
+
+        wt = linalg.solve(T, w)
+        out = np.zeros(u.shape)
+        out[d] = (Sd @ (wt * u)[d]) / w[d]
+        return out
