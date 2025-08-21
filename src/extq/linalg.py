@@ -170,6 +170,23 @@ def expm_multiply(a, b):
         return sp.linalg.expm(a) @ b
 
 
+def expm_block_triu(blocks):
+    n, n_ = blocks.shape
+    assert n == n_
+    out = np.full((n, n), None)
+    for k in range(n):
+        for i in range(n - k):
+            j = i + k
+            if i == j:
+                out[i, j] = sp.linalg.expm(blocks[i, j])
+            else:
+                rhs = out[i, i] @ blocks[i, j] - blocks[i, j] @ out[j, j]
+                for l in range(i + 1, j):
+                    rhs += out[i, l] @ blocks[l, j] - blocks[i, l] @ out[l, j]
+                out[i, j] = sp.linalg.solve_sylvester(blocks[i, i], -blocks[j, j], rhs)
+    return out
+
+
 def scale_rows(a, b):
     if sp.sparse.issparse(b):
         if isinstance(b, (sp.sparse.csr_array, sp.sparse.csr_matrix)):
