@@ -1,4 +1,6 @@
-from . import dgastat, linalg, utils
+from .dga_methods import DGA
+from .dgastat import BackwardFeynmanKac, ForwardFeynmanKac, StationaryDistribution
+from .utils import normalize_weights, shift_weights, uniform_weights
 
 __all__ = [
     "reweight",
@@ -8,11 +10,20 @@ __all__ = [
     "backward_committor",
     "backward_mfpt",
     "backward_feynman_kac",
-    "DGA",
 ]
 
 
-def reweight(basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=True):
+def reweight(
+    basis,
+    lag,
+    maxlag=None,
+    guess=None,
+    test_basis=None,
+    *,
+    normalize=True,
+    method=None,
+    output="projection",
+):
     """Estimate the change of measure to the invariant distribution.
 
     Parameters
@@ -36,6 +47,12 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=
         change of measure.
     normalize : bool, optional
         If True (default), normalize output to one.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -48,16 +65,27 @@ def reweight(basis, lag, maxlag=None, guess=None, test_basis=None, *, normalize=
         maxlag = lag
     assert 0 < lag <= maxlag
     if guess is None:
-        guess = utils.uniform_weights(basis, maxlag)
-    stat = dgastat.StationaryDistribution(basis, guess, test_basis=test_basis)
-    algo = DGA(lag).fit(stat)
-    out = algo.projection(stat)
+        guess = uniform_weights(basis, maxlag)
+    if method is None:
+        method = DGA(lag)
+    stat = StationaryDistribution(basis, guess, test_basis=test_basis)
+    out = method.fit_transform(stat, output=output)
     if normalize:
-        out = utils.normalize_weights(out)
+        out = normalize_weights(out)
     return out
 
 
-def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
+def forward_committor(
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    *,
+    method=None,
+    output="projection",
+):
     """Estimate the forward committor using DGA.
 
     Parameters
@@ -77,6 +105,12 @@ def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the committor.
         If None, use the basis that is used to estimate the committor.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -93,10 +127,22 @@ def forward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
-def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
+def forward_mfpt(
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    *,
+    method=None,
+    output="projection",
+):
     """Estimate the forward mean first passage time using DGA.
 
     Parameters
@@ -118,6 +164,12 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
         the mean first passage time.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -134,11 +186,22 @@ def forward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
 def forward_feynman_kac(
-    basis, weights, in_domain, function, guess, lag, test_basis=None
+    basis,
+    weights,
+    in_domain,
+    function,
+    guess,
+    lag,
+    test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Solve the forward Feynman-Kac formula using DGA.
 
@@ -162,6 +225,12 @@ def forward_feynman_kac(
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -170,14 +239,26 @@ def forward_feynman_kac(
         each frame of the trajectory.
 
     """
-    stat = dgastat.ForwardFeynmanKac(
+    if method is None:
+        method = DGA(lag)
+    stat = ForwardFeynmanKac(
         basis, weights, in_domain, function, guess, test_basis=test_basis
     )
-    algo = DGA(lag).fit(stat)
-    return algo.projection(stat)
+    out = method.fit_transform(stat, output=output)
+    return out
 
 
-def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
+def backward_committor(
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    *,
+    method=None,
+    output="projection",
+):
     """Estimate the backward committor using DGA.
 
     Parameters
@@ -197,6 +278,12 @@ def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the committor.
         If None, use the basis that is used to estimate the committor.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -213,10 +300,22 @@ def backward_committor(basis, weights, in_domain, guess, lag, test_basis=None):
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
-def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
+def backward_mfpt(
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    *,
+    method=None,
+    output="projection",
+):
     """Estimate the backward mean first passage time using DGA.
 
     Parameters
@@ -238,6 +337,12 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
         the mean first passage time.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -254,11 +359,22 @@ def backward_mfpt(basis, weights, in_domain, guess, lag, test_basis=None):
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
 def backward_feynman_kac(
-    basis, weights, in_domain, function, guess, lag, test_basis=None
+    basis,
+    weights,
+    in_domain,
+    function,
+    guess,
+    lag,
+    test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Solve the backward Feynman-Kac formula using DGA.
 
@@ -282,6 +398,12 @@ def backward_feynman_kac(
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -290,120 +412,11 @@ def backward_feynman_kac(
         each frame of the trajectory.
 
     """
-    weights = utils.shift_weights(weights, lag)
-    stat = dgastat.BackwardFeynmanKac(
+    if method is None:
+        method = DGA(lag)
+    weights = shift_weights(weights, lag)
+    stat = BackwardFeynmanKac(
         basis, weights, in_domain, function, guess, test_basis=test_basis
     )
-    algo = DGA(lag).fit(stat)
-    return algo.projection(stat)
-
-
-class DGA:
-    def __init__(self, lag):
-        self.lag = lag
-        self.coef = None
-
-    def get_parameters(self):
-        """
-        Compute DGA matrices.
-
-        Returns
-        -------
-        coef : (n_basis,) ndarray of float
-            Projection coefficients.
-
-        """
-        return self.coef
-
-    def set_parameters(self, coef):
-        """
-        Compute DGA matrices.
-
-        Parameters
-        ----------
-        coef : (n_basis,) ndarray of float
-            Projection coefficients.
-
-        Returns
-        -------
-        self
-
-        """
-        self.coef = coef
-        return self
-
-    def fit(self, stat):
-        """
-        Fit statistic to data.
-
-        Parameters
-        ----------
-        stat
-            DGA statistic.
-
-        Returns
-        -------
-        self
-
-        """
-        a, b = self.matrices(stat)
-        coef = -linalg.solve(a, b)
-        self.set_parameters(coef)
-        return self
-
-    def matrices(self, stat):
-        """
-        Compute DGA matrices.
-
-        Parameters
-        ----------
-        stat
-            DGA statistic.
-
-        Returns
-        -------
-        a : (n_basis, n_basis) ndarray of float
-            DGA matrix for the homogeneous term.
-        b : (n_basis,) ndarray of float
-            DGA matrix for the nonhomogeneous term.
-
-        """
-        return stat.matrices(self.lag)
-
-    def projection(self, stat):
-        """
-        Returns the projected solution.
-
-        Parameters
-        ----------
-        stat
-            DGA statistic.
-
-        Returns
-        -------
-        list of (n_frames[i],) ndarray of float
-            Estimate of the projected solution.
-
-        """
-        if self.coef is None:
-            raise ValueError
-        return stat.transform(self.coef)
-
-    def solution(self, stat):
-        """
-        Returns a stochastic approximation of the solution.
-
-        Parameters
-        ----------
-        stat
-            DGA statistic.
-
-        Returns
-        -------
-        list of (n_frames[i],) ndarray of float
-            Estimate of the solution.
-
-        """
-        out = stat.transform(self.coef)
-        out = stat.propagate(out, self.lag)
-        return out
+    out = method.fit_transform(stat, output=output)
+    return out

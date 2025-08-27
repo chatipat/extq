@@ -14,7 +14,9 @@ __all__ = [
 ]
 
 
-def reweight(generator, basis, weights, lag, *, test_basis=None):
+def reweight(
+    generator, basis, weights, lag, *, test_basis=None, method=None, output="projection"
+):
     """
     Compute the exact DGA stationary distribution.
 
@@ -45,12 +47,22 @@ def reweight(generator, basis, weights, lag, *, test_basis=None):
     stat = dgastat_fdm.StationaryDistribution(
         generator, basis, weights, test_basis=test_basis
     )
-    algo = DGA(lag).fit(stat)
-    return algo.projection(stat)
+    if method is None:
+        method = DGA(lag)
+    out = method.fit_transform(stat, output=output)
+    return out
 
 
 def forward_committor(
-    generator, basis, weights, in_domain, guess, lag, test_basis=None
+    generator,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    method=None,
+    output="projection",
 ):
     """
     Compute the exact DGA forward committor.
@@ -89,10 +101,22 @@ def forward_committor(
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
-def forward_mfpt(generator, basis, weights, in_domain, guess, lag, test_basis=None):
+def forward_mfpt(
+    generator,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    method=None,
+    output="projection",
+):
     """
     Compute the exact DGA forward mean first passage time (MFPT).
 
@@ -130,6 +154,8 @@ def forward_mfpt(generator, basis, weights, in_domain, guess, lag, test_basis=No
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
@@ -142,6 +168,8 @@ def forward_feynman_kac(
     guess,
     lag,
     test_basis=None,
+    method=None,
+    output="projection",
 ):
     """
     Compute the exact DGA solution to a forward Feynman-Kac problem.
@@ -176,12 +204,22 @@ def forward_feynman_kac(
     stat = dgastat_fdm.ForwardFeynmanKac(
         generator, basis, weights, in_domain, function, guess, test_basis=test_basis
     )
-    algo = DGA(lag).fit(stat)
-    return algo.projection(stat)
+    if method is None:
+        method = DGA(lag)
+    out = method.fit_transform(stat, output=output)
+    return out
 
 
 def backward_committor(
-    generator, basis, weights, in_domain, guess, lag, test_basis=None
+    generator,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    method=None,
+    output="projection",
 ):
     """
     Compute the exact DGA backward committor.
@@ -220,10 +258,22 @@ def backward_committor(
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
-def backward_mfpt(generator, basis, weights, in_domain, guess, lag, test_basis=None):
+def backward_mfpt(
+    generator,
+    basis,
+    weights,
+    in_domain,
+    guess,
+    lag,
+    test_basis=None,
+    method=None,
+    output="projection",
+):
     """
     Compute the exact DGA backward mean first passage time (MFPT).
 
@@ -261,6 +311,8 @@ def backward_mfpt(generator, basis, weights, in_domain, guess, lag, test_basis=N
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
@@ -273,6 +325,8 @@ def backward_feynman_kac(
     guess,
     lag,
     test_basis=None,
+    method=None,
+    output="projection",
 ):
     """
     Compute the exact DGA solution to a backward Feynman-Kac problem.
@@ -308,5 +362,7 @@ def backward_feynman_kac(
     stat = dgastat_fdm.BackwardFeynmanKac(
         generator, basis, weights, in_domain, function, guess, test_basis=test_basis
     )
-    algo = DGA(lag).fit(stat)
-    return algo.projection(stat)
+    if method is None:
+        method = DGA(lag)
+    out = method.fit_transform(stat, output=output)
+    return out
