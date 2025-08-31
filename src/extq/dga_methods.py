@@ -99,16 +99,14 @@ class DGAMemMZ(DGAMethod):
         dlag = self._dlag
         mem = self.mem
 
-        a = []
-        b = []
+        a = np.full(mem + 1, None)
+        b = np.full(mem + 1, None)
         for n in range(mem + 1):
             lag = (n + 1) * dlag
             a_n, b_n = stat.matrices(lag)
-            a.append(linalg.as_dense(a_n))
-            b.append(linalg.as_dense(b_n))
-        a = np.array(a)
-        b = np.array(b)
-        c0 = linalg.as_dense(stat.gram_matrix())
+            a[n] = a_n
+            b[n] = b_n
+        c0 = stat.gram_matrix()
         if state is not None:
             a_old, b_old, c0_old = state
             a = a + a_old
@@ -121,38 +119,49 @@ class DGAMemMZ(DGAMethod):
 
         a, b, c0 = state
 
-        n_basis = a.shape[1]
-        assert a.shape == (mem + 1, n_basis, n_basis)
-        assert b.shape == (mem + 1, n_basis)
+        n_basis = c0.shape[0]
+        assert len(a) == len(b) == mem + 1
+        assert all(ai.shape == (n_basis, n_basis) for ai in a)
+        assert all(bi.shape == (n_basis,) for bi in b)
+        assert c0.shape == (n_basis, n_basis)
 
-        b = b[..., None]
+        da = np.full(mem + 1, None)
+        db = np.full(mem + 1, None)
+        for i in range(mem + 1):
+            if i == 0:
+                da[i] = a[i]
+                db[i] = b[i]
+            else:
+                da[i] = a[i] - a[i - 1]
+                db[i] = b[i] - b[i - 1]
 
-        a = np.linalg.solve(c0, a)
-        b = np.linalg.solve(c0, b)
-        c = a[::-1] + np.identity(n_basis)
-        for n in range(1, mem + 1):
-            a[n] -= np.sum(c[-n:] @ a[:n], axis=0)
-            b[n] -= np.sum(c[-n:] @ b[:n], axis=0)
+        lhs = np.full((mem + 1, mem + 1), None)
+        for i in range(mem + 1):
+            for j in range(mem + 1):
+                if j <= i:
+                    lhs[i, j] = da[i - j]
+                elif j == i + 1:
+                    lhs[i, j] = c0
+        lhs = linalg.block(lhs)
+        rhs = np.concatenate(db)
 
-        b = b.reshape(b.shape[:2])
-
-        coef = -linalg.solve(a[-1], b[-1])
-        mem_coef = a[:-1] @ coef + b[:-1]
-        return coef, mem_coef
+        coef = -linalg.solve(lhs, rhs)
+        coef = coef.reshape(mem + 1, n_basis)
+        return coef
 
     def _transform(self, parameters, stat, output):
         lag = self.lag
         dlag = self._dlag
         mem = self.mem
 
-        coef, mem_coef = parameters
+        coef = parameters
         if output == "projection":
-            out = stat.transform(coef)
+            out = stat.transform(coef[0])
         elif output == "solution":
-            out = stat.propagate(stat.transform(coef), lag)
-            for m in range(mem):
-                diff = stat.transform_difference(mem_coef[m])
-                out = out - stat.propagate_difference(diff, lag - dlag * (m + 1))
+            out = stat.propagate(stat.transform(coef[0]), lag)
+            for m in range(1, mem + 1):
+                diff = stat.transform_difference(coef[m])
+                out = out + stat.propagate_difference(diff, lag - dlag * m)
         else:
             raise ValueError
         return out
