@@ -136,5 +136,5 @@ def renumber_basis(basis):
         data set.
 
     """
-    mask = sum(np.ravel((x != 0).sum(axis=0)).astype(bool) for x in basis)
+    mask = sum(np.ravel((x != 0).sum(axis=0)).astype(bool) for x in basis) > 0
     return [x[:, mask] for x in basis]
