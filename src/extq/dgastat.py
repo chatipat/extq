@@ -31,9 +31,9 @@ class StationaryDistribution(Statistic):
     def __init__(self, basis, weights, test_basis=None):
         if test_basis is None:
             test_basis = basis
-        self.basis = basis
-        self.weights = weights
-        self.test_basis = test_basis
+        self.basis = _objarray(basis, 1)
+        self.weights = _objarray(weights, 1)
+        self.test_basis = _objarray(test_basis, 1)
 
     def matrices(self, lag):
         assert lag > 0
@@ -67,14 +67,10 @@ class StationaryDistribution(Statistic):
         return gram_matrix(self.basis, self.weights, test_basis=self.test_basis)
 
     def transform(self, coef):
-        out = [
-            w * (y @ coef + 1.0) for y, w in zip(self.basis, self.weights, strict=True)
-        ]
-        return _objarray(out, 1)
+        return self.weights * (_basis_coef(self.basis, coef) + 1.0)
 
     def transform_difference(self, coef):
-        out = [w * (y @ coef) for y, w in zip(self.basis, self.weights, strict=True)]
-        return _objarray(out, 1)
+        return self.weights * _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -98,12 +94,12 @@ class ForwardFeynmanKac(Statistic):
         if test_basis is None:
             test_basis = basis
         function = _broadcast_integrand(function, guess)
-        self.basis = basis
-        self.weights = weights
-        self.in_domain = in_domain
-        self.function = function
-        self.guess = guess
-        self.test_basis = test_basis
+        self.basis = _objarray(basis, 1)
+        self.weights = _objarray(weights, 1)
+        self.in_domain = _objarray(in_domain, 1)
+        self.function = _objarray(function, 1)
+        self.guess = _objarray(guess, 1)
+        self.test_basis = _objarray(test_basis, 1)
 
     def matrices(self, lag):
         assert lag > 0
@@ -143,12 +139,10 @@ class ForwardFeynmanKac(Statistic):
         return gram_matrix(self.basis, self.weights, test_basis=self.test_basis)
 
     def transform(self, coef):
-        out = [y @ coef + g for y, g in zip(self.basis, self.guess, strict=True)]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef) + self.guess
 
     def transform_difference(self, coef):
-        out = [y @ coef for y in self.basis]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -191,12 +185,12 @@ class BackwardFeynmanKac(Statistic):
         if test_basis is None:
             test_basis = basis
         function = _broadcast_integrand(function, guess)
-        self.basis = basis
-        self.weights = weights
-        self.in_domain = in_domain
-        self.function = function
-        self.guess = guess
-        self.test_basis = test_basis
+        self.basis = _objarray(basis, 1)
+        self.weights = _objarray(weights, 1)
+        self.in_domain = _objarray(in_domain, 1)
+        self.function = _objarray(function, 1)
+        self.guess = _objarray(guess, 1)
+        self.test_basis = _objarray(test_basis, 1)
 
     def matrices(self, lag):
         assert lag > 0
@@ -236,12 +230,10 @@ class BackwardFeynmanKac(Statistic):
         return gram_matrix(self.basis, self.weights, test_basis=self.test_basis)
 
     def transform(self, coef):
-        out = [y @ coef + g for y, g in zip(self.basis, self.guess, strict=True)]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef) + self.guess
 
     def transform_difference(self, coef):
-        out = [y @ coef for y in self.basis]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -285,13 +277,13 @@ class SoftForwardCommittor(Statistic):
     ):
         if test_basis is None:
             test_basis = basis
-        self.basis = basis
-        self.weights = weights
-        self.stop_rate = stop_rate
-        self.boundary = boundary
-        self.guess = guess
+        self.basis = _objarray(basis, 1)
+        self.weights = _objarray(weights, 1)
+        self.stop_rate = _objarray(stop_rate, 1)
+        self.boundary = _objarray(boundary, 1)
+        self.guess = _objarray(guess, 1)
         self.dt = dt
-        self.test_basis = test_basis
+        self.test_basis = _objarray(test_basis, 1)
 
         # continuous time equation is evaluated with discrete sampling
         # using nearest neighbor interpolation
@@ -345,12 +337,10 @@ class SoftForwardCommittor(Statistic):
         return gram_matrix(self.basis, self.weights, test_basis=self.test_basis)
 
     def transform(self, coef):
-        out = [y @ coef + g for y, g in zip(self.basis, self.guess, strict=True)]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef) + self.guess
 
     def transform_difference(self, coef):
-        out = [y @ coef for y in self.basis]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -391,13 +381,13 @@ class SoftBackwardCommittor(Statistic):
     ):
         if test_basis is None:
             test_basis = basis
-        self.basis = basis
-        self.weights = weights
-        self.stop_rate = stop_rate
-        self.boundary = boundary
-        self.guess = guess
+        self.basis = _objarray(basis, 1)
+        self.weights = _objarray(weights, 1)
+        self.stop_rate = _objarray(stop_rate, 1)
+        self.boundary = _objarray(boundary, 1)
+        self.guess = _objarray(guess, 1)
         self.dt = dt
-        self.test_basis = test_basis
+        self.test_basis = _objarray(test_basis, 1)
 
         # continuous time equation is evaluated with discrete sampling
         # using nearest neighbor interpolation
@@ -451,12 +441,10 @@ class SoftBackwardCommittor(Statistic):
         return gram_matrix(self.basis, self.weights, test_basis=self.test_basis)
 
     def transform(self, coef):
-        out = [y @ coef + g for y, g in zip(self.basis, self.guess, strict=True)]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef) + self.guess
 
     def transform_difference(self, coef):
-        out = [y @ coef for y in self.basis]
-        return _objarray(out, 1)
+        return _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -573,9 +561,7 @@ class ForwardVectorFeynmanKac(Statistic):
             t1 = t0 + lag
             assert t1[-1] < n_frames  # all frames < n_frames
 
-            m = np.moveaxis(
-                moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1
-            )[t0]
+            m = _kernel_lag(m, lag)[t0]
 
             for i in range(n_indices):
                 wx = linalg.scale_rows(w[t0], x[i][t0])
@@ -626,12 +612,10 @@ class ForwardVectorFeynmanKac(Statistic):
         return c
 
     def transform(self, coef):
-        func = np.vectorize(lambda y, g: y @ coef + g)
-        return func(self.basis, self.guess)
+        return _basis_coef(self.basis, coef) + self.guess
 
     def transform_difference(self, coef):
-        func = np.vectorize(lambda y: y @ coef)
-        return func(self.basis)
+        return _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -640,9 +624,7 @@ class ForwardVectorFeynmanKac(Statistic):
         for u, m in zip(_adapt_frames(input), _adapt_steps(kernel), strict=True):
             n_indices, n_frames = u.shape
             assert m.shape == (n_indices + 1, n_indices + 1, n_frames - 1)
-            m = np.moveaxis(
-                moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1
-            )
+            m = _kernel_lag(m, lag)
             t0 = np.arange(n_frames - lag)
             t1 = t0 + lag
             # frames beyond endpoints of trajectory are nan
@@ -658,9 +640,7 @@ class ForwardVectorFeynmanKac(Statistic):
         for u, m in zip(_adapt_frames(input), _adapt_steps(kernel), strict=True):
             n_indices, n_frames = u.shape
             assert m.shape == (n_indices + 1, n_indices + 1, n_frames - 1)
-            m = np.moveaxis(
-                moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1
-            )
+            m = _kernel_lag(m, lag)
             t0 = np.arange(n_frames - lag)
             t1 = t0 + lag
             # frames beyond endpoints of trajectory are nan
@@ -752,9 +732,7 @@ class BackwardVectorFeynmanKac(Statistic):
             t1 = t0 - lag
             assert t1[0] >= 0  # all frames >= 0
 
-            m = np.moveaxis(
-                moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1
-            )[t1]
+            m = _kernel_lag(m, lag)[t1]
 
             for i in range(n_indices):
                 wx = linalg.scale_rows(w[t0], x[i][t0])
@@ -805,12 +783,10 @@ class BackwardVectorFeynmanKac(Statistic):
         return c
 
     def transform(self, coef):
-        func = np.vectorize(lambda y, g: y @ coef + g)
-        return func(self.basis, self.guess)
+        return _basis_coef(self.basis, coef) + self.guess
 
     def transform_difference(self, coef):
-        func = np.vectorize(lambda y: y @ coef)
-        return func(self.basis)
+        return _basis_coef(self.basis, coef)
 
     def propagate(self, input, lag):
         assert lag >= 0
@@ -819,9 +795,7 @@ class BackwardVectorFeynmanKac(Statistic):
         for u, m in zip(_adapt_frames(input), _adapt_steps(kernel), strict=True):
             n_indices, n_frames = u.shape
             assert m.shape == (n_indices + 1, n_indices + 1, n_frames - 1)
-            m = np.moveaxis(
-                moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1
-            )
+            m = _kernel_lag(m, lag)
             t0 = np.arange(lag, n_frames)
             t1 = t0 - lag
             # frames beyond endpoints of trajectory are nan
@@ -837,9 +811,7 @@ class BackwardVectorFeynmanKac(Statistic):
         for u, m in zip(_adapt_frames(input), _adapt_steps(kernel), strict=True):
             n_indices, n_frames = u.shape
             assert m.shape == (n_indices + 1, n_indices + 1, n_frames - 1)
-            m = np.moveaxis(
-                moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1
-            )
+            m = _kernel_lag(m, lag)
             t0 = np.arange(lag, n_frames)
             t1 = t0 - lag
             # frames beyond endpoints of trajectory are nan
@@ -885,6 +857,14 @@ def gram_matrix(basis, weights, test_basis=None):
         c += xw @ y[t]
     assert isinstance(c, (np.ndarray, sp.sparse.sparray, sp.sparse.spmatrix))
     return c
+
+
+def _basis_coef(basis, coef):
+    return np.vectorize(lambda y: y @ coef)(basis)
+
+
+def _kernel_lag(m, lag):
+    return np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0).copy(order="C"), lag), 0, -1)
 
 
 def _adapt_basis(a):
