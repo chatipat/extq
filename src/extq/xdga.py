@@ -1,7 +1,6 @@
-import numpy as np
-
-from . import linalg
-from .moving_semigroup import moving_matmul
+from .dga_methods import DGA
+from .dgastat import BackwardVectorFeynmanKac, ForwardVectorFeynmanKac
+from .utils import shift_weights
 
 __all__ = [
     "forward_extended_committor",
@@ -21,6 +20,9 @@ def forward_extended_committor(
     guess,
     lag,
     test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Estimate the forward extended committor using DGA.
 
@@ -46,6 +48,12 @@ def forward_extended_committor(
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
         extended committor.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -62,6 +70,8 @@ def forward_extended_committor(
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
@@ -73,6 +83,9 @@ def forward_extended_mfpt(
     guess,
     lag,
     test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Estimate the forward mean first passage time using DGA.
 
@@ -99,6 +112,12 @@ def forward_extended_mfpt(
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
         the mean first passage time.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -115,6 +134,8 @@ def forward_extended_mfpt(
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
@@ -127,6 +148,9 @@ def forward_extended_feynman_kac(
     guess,
     lag,
     test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Solve the forward Feynman-Kac formula using DGA.
 
@@ -154,6 +178,12 @@ def forward_extended_feynman_kac(
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -162,73 +192,13 @@ def forward_extended_feynman_kac(
         each frame.
 
     """
-    assert lag > 0
-    if test_basis is None:
-        test_basis = basis
-    function = _broadcast_integrand(function, transitions)
-
-    n_indices = None
-    n_basis = None
-    a = 0.0
-    b = 0.0
-    for x, y, w, k, d, f, g in zip(
-        _adapt_basis(test_basis),
-        _adapt_basis(basis),
-        weights,
-        _adapt_steps(transitions),
-        _adapt_frames(in_domain),
-        _adapt_steps(function),
-        _adapt_frames(guess),
-        strict=True,
-    ):
-        n_frames = x[0].shape[0]
-        n_indices = len(x) if n_indices is None else n_indices
-        n_basis = x[0].shape[1] if n_basis is None else n_basis
-
-        assert len(x) == n_indices
-        assert all(xi.shape == (n_frames, n_basis) for xi in x)
-        assert len(y) == n_indices
-        assert all(yi.shape == (n_frames, n_basis) for yi in y)
-        assert w.shape == (n_frames,)
-        assert k.shape == (n_indices, n_indices, n_frames - 1)
-        assert d.shape == (n_indices, n_frames)
-        assert f.shape == (n_indices, n_indices, n_frames - 1)
-        assert g.shape == (n_indices, n_frames)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw  # initial time
-        iy = ix + lag  # final time
-        assert iy[-1] < n_frames  # all frames < n_frames
-        ik = ix  # kernel index
-
-        m = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
-        m = np.moveaxis(m, 0, -1)
-        m[:-1, :-1] = np.where(d[:, None, :-1], k, 0)
-        m[:-1, -1] = np.where(d[:, :-1], np.sum(k * f, axis=1), g[:, :-1])
-        m[-1, -1] = 1
-        m = np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0), lag), 0, -1)
-
-        for i in range(n_indices):
-            wx = linalg.scale_rows(w[iw], x[i][ix])
-
-            yi = 0.0
-            gi = 0.0
-
-            for j in range(n_indices):
-                yi += linalg.scale_rows(m[i, j][ik], y[j][iy])
-                gi += linalg.scale_rows(m[i, j][ik], g[j][iy])
-            gi += m[i, -1][ik]  # integral and boundary conditions
-
-            yi -= y[i][ix]
-            gi -= g[i][ix]
-
-            a += wx.T @ yi
-            b -= wx.T @ gi
-
-    coeffs = linalg.solve(a, b)
-    return transform(coeffs, basis, guess)
+    if method is None:
+        method = DGA(lag)
+    stat = ForwardVectorFeynmanKac(
+        basis, weights, transitions, in_domain, function, guess, test_basis=test_basis
+    )
+    out = method.fit_transform(stat, output=output)
+    return out
 
 
 def backward_extended_committor(
@@ -239,6 +209,9 @@ def backward_extended_committor(
     guess,
     lag,
     test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Estimate the backward extended committor using DGA.
 
@@ -264,6 +237,12 @@ def backward_extended_committor(
         same dimension as the basis used to estimate the extended
         committor. If None, use the basis that is used to estimate the
         extended committor.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -280,6 +259,8 @@ def backward_extended_committor(
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
@@ -291,6 +272,9 @@ def backward_extended_mfpt(
     guess,
     lag,
     test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Estimate the backward mean first passage time using DGA.
 
@@ -317,6 +301,12 @@ def backward_extended_mfpt(
         same dimension as the basis used to estimate the mean first
         passage time. If None, use the basis that is used to estimate
         the mean first passage time.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -333,6 +323,8 @@ def backward_extended_mfpt(
         guess,
         lag,
         test_basis=test_basis,
+        method=method,
+        output=output,
     )
 
 
@@ -345,6 +337,9 @@ def backward_extended_feynman_kac(
     guess,
     lag,
     test_basis=None,
+    *,
+    method=None,
+    output="projection",
 ):
     """Solve the backward Feynman-Kac formula using DGA.
 
@@ -372,6 +367,12 @@ def backward_extended_feynman_kac(
         Test basis against which to minimize the error. Must have the
         same dimension as the basis used to estimate the solution.
         If None, use the basis that is used to estimate the solution.
+    method : DGAMethod, optional
+        Method for estimating the solution. If None (default), use
+        ``DGA(lag)``.
+    output : str, optional
+        Type of output to return. The default ('projection') returns
+        the projected solution.
 
     Returns
     -------
@@ -380,121 +381,11 @@ def backward_extended_feynman_kac(
         each frame.
 
     """
-    assert lag > 0
-    if test_basis is None:
-        test_basis = basis
-    function = _broadcast_integrand(function, transitions)
-
-    n_indices = None
-    n_basis = None
-    a = 0.0
-    b = 0.0
-    for x, y, w, k, d, f, g in zip(
-        _adapt_basis(test_basis),
-        _adapt_basis(basis),
-        weights,
-        _adapt_steps(transitions),
-        _adapt_frames(in_domain),
-        _adapt_steps(function),
-        _adapt_frames(guess),
-        strict=True,
-    ):
-        n_frames = x[0].shape[0]
-        n_indices = len(x) if n_indices is None else n_indices
-        n_basis = x[0].shape[1] if n_basis is None else n_basis
-
-        assert len(x) == n_indices
-        assert all(xi.shape == (n_frames, n_basis) for xi in x)
-        assert len(y) == n_indices
-        assert all(yi.shape == (n_frames, n_basis) for yi in y)
-        assert w.shape == (n_frames,)
-        assert k.shape == (n_indices, n_indices, n_frames - 1)
-        assert d.shape == (n_indices, n_frames)
-        assert f.shape == (n_indices, n_indices, n_frames - 1)
-        assert g.shape == (n_indices, n_frames)
-
-        iw = np.flatnonzero(w)  # start of window
-        if len(iw) == 0:
-            continue
-        ix = iw + lag  # initial time
-        assert ix[-1] < n_frames  # all frames < n_frames
-        iy = ix - lag  # final time
-        ik = iy  # kernel index
-
-        m = np.zeros((n_frames - 1, n_indices + 1, n_indices + 1))
-        m = np.moveaxis(m, 0, -1)
-        m[:-1, :-1] = np.where(d[None, :, 1:], k, 0)
-        m[-1, :-1] = np.where(d[:, 1:], np.sum(k * f, axis=0), g[:, 1:])
-        m[-1, -1] = 1
-        m = np.moveaxis(moving_matmul(np.moveaxis(m, -1, 0), lag), 0, -1)
-
-        for i in range(n_indices):
-            wx = linalg.scale_rows(w[iw], x[i][ix])
-
-            yi = 0.0
-            gi = 0.0
-
-            for j in range(n_indices):
-                yi += linalg.scale_rows(m[j, i][ik], y[j][iy])
-                gi += linalg.scale_rows(m[j, i][ik], g[j][iy])
-            gi += m[-1, i][ik]  # integral and boundary conditions
-
-            yi -= y[i][ix]
-            gi -= g[i][ix]
-
-            a += wx.T @ yi
-            b -= wx.T @ gi
-
-    coeffs = linalg.solve(a, b)
-    return transform(coeffs, basis, guess)
-
-
-def transform(coeffs, basis, guess):
-    return [
-        [yi @ coeffs + gi for yi, gi in zip(basis_i, guess_i, strict=True)]
-        for basis_i, guess_i in zip(basis, guess, strict=True)
-    ]
-
-
-def _broadcast_integrand(f, transitions):
-    if not np.iterable(f):
-        f = [
-            [
-                [np.broadcast_to(f, kij) for kij in transitions_ij]
-                for transitions_ij in transitions_i
-            ]
-            for transitions_i in transitions
-        ]
-    return f
-
-
-def _adapt_basis(a):
-    return np.moveaxis(_objarray(a, 2), 1, 0).tolist()
-
-
-def _adapt_frames(a):
-    return map(np.array, np.moveaxis(_objarray(a, 2), 1, 0).tolist())
-
-
-def _adapt_steps(a):
-    return map(np.array, np.moveaxis(_objarray(a, 3), 2, 0).tolist())
-
-
-def _objarray(a, ndim):
-    shape = _shape(a, ndim)
-    out = np.full(shape, None)
-    for index in np.ndindex(shape):
-        x = a
-        for i in index:
-            x = x[i]
-        out[index] = x
+    if method is None:
+        method = DGA(lag)
+    weights = shift_weights(weights, lag)
+    stat = BackwardVectorFeynmanKac(
+        basis, weights, transitions, in_domain, function, guess, test_basis=test_basis
+    )
+    out = method.fit_transform(stat, output=output)
     return out
-
-
-def _shape(a, ndim):
-    assert ndim >= 0
-    if ndim == 0:
-        return ()
-    shapes = [_shape(ai, ndim - 1) for ai in a]
-    assert all(shape == shapes[0] for shape in shapes)
-    return (len(a), *shapes[0])
