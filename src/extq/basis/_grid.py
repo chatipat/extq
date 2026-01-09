@@ -208,7 +208,7 @@ def grid_basis(cvs, edges, sparse=True, in_domain=None):
         Basis of indicator functions.
 
     """
-    num = np.product([len(e) + 1 for e in edges])
+    num = np.prod([len(e) + 1 for e in edges])
     labels = grid_labels(cvs, edges)
     return labels_to_basis(labels, num, sparse=sparse, in_domain=in_domain)
 

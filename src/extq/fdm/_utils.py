@@ -115,10 +115,10 @@ def broadcast_kernel(spatial, temporal, input_shape, output_shape):
         Temporal component of the transition kernel.
     input_shape : int or sequence of int
         Shape of the input state space. The size of the input state
-        space is ``input_size = numpy.product(input_shape)``.
+        space is ``input_size = numpy.prod(input_shape)``.
     output_shape : int or sequence of int
         Shape of the output state space. The size of the output state
-        space is ``output_size = numpy.product(output_shape)``.
+        space is ``output_size = numpy.prod(output_shape)``.
 
     Returns
     -------
@@ -168,7 +168,7 @@ def moveaxis_kernel(spatial, temporal, shape, source, destination):
         Temporal component of the transition kernel.
     shape : int or sequence of int
         Shape of the state space. The size of the state space is
-        ``n_points = numpy.product(shape)``.
+        ``n_points = numpy.prod(shape)``.
     source : int or sequence of int
         Initial indices of the state space variables to move.
     destination : int or sequence of int
@@ -188,17 +188,17 @@ def moveaxis_kernel(spatial, temporal, shape, source, destination):
     return spatial, temporal
 
 
-def spbroadcast(input_shape, output_shape, dtype=np.float_):
+def spbroadcast(input_shape, output_shape, dtype=np.float64):
     """Returns a matrix for broadcasting flattened dimensions.
 
     Parameters
     ----------
     input_shape : int or sequence of int
         Shape of the input dimensions. The size of the flattened input
-        is ``input_size = numpy.product(input_shape)``.
+        is ``input_size = numpy.prod(input_shape)``.
     output_shape : int or sequence of int
         Shape of the output dimensions. The size of the flattened output
-        is ``output_size = numpy.product(output_shape)``.
+        is ``output_size = numpy.prod(output_shape)``.
     dtype : data-type, optional
         Data-type of the output matrix.
 
@@ -209,8 +209,8 @@ def spbroadcast(input_shape, output_shape, dtype=np.float_):
         flattened output dimensions.
 
     """
-    input_size = np.product(input_shape)
-    output_size = np.product(output_shape)
+    input_size = np.prod(input_shape)
+    output_size = np.prod(output_shape)
     data = np.ones(output_size, dtype=dtype)
     rows = np.broadcast_to(
         np.arange(input_size).reshape(input_shape), output_shape
@@ -221,14 +221,14 @@ def spbroadcast(input_shape, output_shape, dtype=np.float_):
     )
 
 
-def spmoveaxis(shape, source, destination, dtype=np.float_):
+def spmoveaxis(shape, source, destination, dtype=np.float64):
     """Returns a matrix for permuting flattened dimensions.
 
     Parameters
     ----------
     shape : int or sequence of int
         Shape of the input dimensions. The size of the flattened
-        dimensions is ``size = numpy.product(shape)``.
+        dimensions is ``size = numpy.prod(shape)``.
     source : int or sequence of int
         Initial indices of the dimensions.
     destination : int or sequence of int
@@ -242,7 +242,7 @@ def spmoveaxis(shape, source, destination, dtype=np.float_):
         Matrix to permute the flattened dimensions.
 
     """
-    size = np.product(shape)
+    size = np.prod(shape)
     data = np.ones(size, dtype=dtype)
     rows = np.moveaxis(
         np.arange(size).reshape(shape), source, destination

@@ -587,7 +587,7 @@ def _to_flat(bases, functions):
         Broadcasted shape of the state space:
         ``out_shape = numpy.broadcast_shapes(*shape)``.
         The flattened size of the state space is
-        ``size = numpy.product(out_shape)``.
+        ``size = numpy.prod(out_shape)``.
     out_bases : tuple of (size, nbasis[i]) ndarray
         Flattened broadcasted bases. Note that the last dimension is
         preserved: ``bases[i].shape[-1] == out_bases[i].shape[-1]``.
